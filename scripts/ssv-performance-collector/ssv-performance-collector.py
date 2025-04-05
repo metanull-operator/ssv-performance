@@ -106,9 +106,10 @@ def cleanup_outdated_records(client):
 
     update_query = f"""
         ALTER TABLE operators UPDATE validator_count = 0
-        WHERE operator_id IN (
-            SELECT operator_id FROM performance
-            WHERE metric_date < toDate('{cutoff_date}')
+        WHERE (network, operator_id) NOT IN (
+            SELECT DISTINCT network, operator_id
+            FROM performance
+            WHERE metric_date >= toDate('{cutoff_date}')
         )
     """
     client.command(update_query)
