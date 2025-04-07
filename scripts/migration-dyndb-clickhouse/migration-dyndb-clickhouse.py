@@ -89,7 +89,7 @@ def migrate_performance(dynamo_table, clickhouse_client, clickhouse_table, netwo
                 try:
                     date_obj = datetime.strptime(date, "%Y-%m-%d").date()
                 except ValueError:
-                    logger.warning("Skipping malformed date '%s' for operator %s", date, operator_id)
+                    logging.warning("Skipping malformed date '%s' for operator %s", date, operator_id)
                     continue
 
                 performance_data.append((
@@ -106,7 +106,7 @@ def migrate_performance(dynamo_table, clickhouse_client, clickhouse_table, netwo
                 try:
                     date_obj = datetime.strptime(date, "%Y-%m-%d").date()
                 except ValueError:
-                    logger.warning("Skipping malformed date '%s' for operator %s", date, operator_id)
+                    logging.warning("Skipping malformed date '%s' for operator %s", date, operator_id)
                     continue
 
                 performance_data.append((
@@ -219,7 +219,7 @@ def main():
         args.ch_subscriptions_table
     ])
 
-    logger.info("🎉 Migration complete in %.2f seconds.", time() - start_time)
+    logging.info("🎉 Migration complete in %.2f seconds.", time() - start_time)
 
 
 if __name__ == "__main__":
