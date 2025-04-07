@@ -17,6 +17,8 @@ ENV CLICKHOUSE_HOST=clickhouse
 ENV CLICKHOUSE_USER=ssv_performance
 ENV CLICKHOUSE_PASSWORD=dsFtsxfSfNKd42uDrkp47gt22cfgG8sh
 
+ENV COLLECTOR_LOG_LEVEL=INFO
+
 ENV PYTHONUNBUFFERED=1
 
 ENTRYPOINT ["python", "ssv-performance-collector.py"]

@@ -13,4 +13,6 @@ ENV CLICKHOUSE_PASSWORD=dsFtsxfSfNKd42uDrkp47gt22cfgG8sh
 
 ENV PYTHONUNBUFFERED=1
 
+ENV BOT_LOG_LEVEL=DEBUG
+
 ENTRYPOINT ["python", "ssv-performance-bot.py"]
