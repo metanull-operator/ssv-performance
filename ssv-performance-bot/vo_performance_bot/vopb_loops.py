@@ -81,15 +81,17 @@ class LoopTasks:
         logging.info(f"Sending alert message to channel: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
         try:
-            perf_storage = StorageFactory.get_storage('ssv_performance')
-            perf_data = perf_storage.get_performance_all(self.network)
+            storage = StorageFactory.get_storage('ssv_performance')
+            perf_data_24h = storage.get_latest_performance_data(network, '24h')
+            perf_data_30d = storage.get_latest_performance_data(network, '30d')
+
+            perf_data = merge_operator_performance(perf_data_24h, perf_data_30d)
 
             if not perf_data:
                 logging.warning("Performance data unavailable.")
                 return
 
-            sub_storage = StorageFactory.get_storage('ssv_performance')
-            subscriptions = sub_storage.get_subscriptions_by_type(self.network, 'alerts')
+            subscriptions = storage.get_subscriptions_by_type(self.network, 'alerts')
 
             if not subscriptions:
                 logging.warning("Subscription data unavailable.")
