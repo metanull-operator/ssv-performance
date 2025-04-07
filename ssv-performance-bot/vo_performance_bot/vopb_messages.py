@@ -216,15 +216,19 @@ def compile_vo_threshold_messages(perf_data, extra_message=None, subscriptions=N
 
     messages = []
 
+    mentions_24h = []
     messages.extend(compile_alert_threshold_groups(alerts_24h, "24h"))
     if subscriptions and guild and '24h' in mention_periods:
-        mentions = create_subscriber_mentions(guild, subscriptions, operator_ids_24h, 'alerts', dm_recipients)
-        messages.extend(mentions)
+        mentions_24h = create_subscriber_mentions(guild, subscriptions, operator_ids_24h, 'alerts', dm_recipients)
 
+    mentions_30d = []
     messages.extend(compile_alert_threshold_groups(alerts_30d, "30d"))
     if subscriptions and guild and '30d' in mention_periods:
-        mentions = create_subscriber_mentions(guild, subscriptions, operator_ids_30d, 'alerts', dm_recipients)
-        messages.extend(mentions)
+        mentions_30d = create_subscriber_mentions(guild, subscriptions, operator_ids_30d, 'alerts', dm_recipients)
+
+    mentions = mentions_24h + mentions_30d
+
+    messages.extend(mentions)
 
     # Include an extra message, if configured
     if extra_message and len(extra_message) > 0:
