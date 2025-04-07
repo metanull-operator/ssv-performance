@@ -8,14 +8,15 @@ import asyncio
 
 class LoopTasks:
 
-    def __init__(self, network, bot, channel, notification_time_str, extra_message, allowed_user_ids=[]):
+    def __init__(self, network, bot, channel, notification_time_str, extra_message, dm_recipients=[], mentions_30d=False):
         self.network = network
         self.bot = bot
         self.extra_message = extra_message
         self.channel = channel
         self.notification_time_str = notification_time_str
         self.notification_time = datetime.strptime(notification_time_str, "%H:%M").time()
-        self.allowed_user_ids = allowed_user_ids
+        self.dm_recipients = dm_recipients
+        self.mentions_30d = mentions_30d
 
 
     async def start_tasks(self):
@@ -66,7 +67,7 @@ class LoopTasks:
                 logging.warning(f"Performance data empty for {op_ids} in daily_notification_task()")
                 return
 
-            await send_daily_direct_messages(self.bot, perf_data, subscriptions, self.allowed_user_ids)
+            await send_daily_direct_messages(self.bot, perf_data, subscriptions, self.dm_recipients)
 
         except Exception as e:
             logging.error(f"{type(e).__name__} exception in daily_notification_task(): {e}", exc_info=True)
@@ -90,8 +91,10 @@ class LoopTasks:
             if not subscriptions:
                 logging.warning("Subscription data unavailable.")
 
+            mention_periods = ['24h', '30d'] if self.mentions_30d else ['24h']
+
             await send_vo_threshold_messages(self.channel, perf_data, extra_message=self.extra_message,
-                                             subscriptions=subscriptions)
+                                             subscriptions=subscriptions, mention_periods=mention_periods)
         except Exception as e:
             logging.error(f"{type(e).__name__} exception in performance_status_all_loop(): {e}", exc_info=True)
 

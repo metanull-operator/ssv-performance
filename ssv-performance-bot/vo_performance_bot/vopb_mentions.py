@@ -14,7 +14,7 @@ def mention_member(guild, user_id):
 # Create a one or more messages containing mentions for Discord users
 # that have subscribed to a particular notification type for the given
 # operator IDs
-def create_subscriber_mentions(guild, subscriptions, operator_ids, notification_type, allowed_user_ids=[]):
+def create_subscriber_mentions(guild, subscriptions, operator_ids, notification_type, dm_recipients=[]):
     messages = []
 
     user_ids = get_operator_subscriptions_by_type(subscriptions, operator_ids, notification_type)
@@ -23,7 +23,7 @@ def create_subscriber_mentions(guild, subscriptions, operator_ids, notification_
     for user_id in user_ids:  # Loop through unique, sorted Discord usernames
 
         # For QA purposes, skip users_ids not in allow list
-        if allowed_user_ids and user_id not in allowed_user_ids:
+        if dm_recipients and user_id not in dm_recipients:
             continue
 
         # Get mention text for member
