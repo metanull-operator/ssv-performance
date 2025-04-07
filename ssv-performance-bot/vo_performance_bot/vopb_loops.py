@@ -6,6 +6,22 @@ from vo_performance_bot.vopb_messages import send_daily_direct_messages, send_vo
 import asyncio
 
 
+def merge_operator_performance(dict1, dict2):
+    merged = {}
+
+    for k in set(dict1) | set(dict2):
+        merged[k] = copy.deepcopy(dict1.get(k, {}))
+
+        d2 = dict2.get(k, {})
+        for key, value in d2.items():
+            if isinstance(value, dict) and key in merged[k] and isinstance(merged[k][key], dict):
+                merged[k][key].update(value)
+            else:
+                merged[k][key] = value
+
+    return merged
+
+
 class LoopTasks:
 
     def __init__(self, network, bot, channel, notification_time_str, extra_message, dm_recipients=[], mentions_30d=False):
@@ -74,22 +90,6 @@ class LoopTasks:
 
         except Exception as e:
             logging.error(f"{type(e).__name__} exception in daily_notification_task(): {e}", exc_info=True)
-
-
-    def merge_operator_performance(dict1, dict2):
-        merged = {}
-
-        for k in set(dict1) | set(dict2):
-            merged[k] = copy.deepcopy(dict1.get(k, {}))
-
-            d2 = dict2.get(k, {})
-            for key, value in d2.items():
-                if isinstance(value, dict) and key in merged[k] and isinstance(merged[k][key], dict):
-                    merged[k][key].update(value)
-                else:
-                    merged[k][key] = value
-
-        return merged
 
 
     @tasks.loop(hours=24)
