@@ -128,7 +128,7 @@ def main():
     logging.getLogger().setLevel(args.log_level.upper())
     logging.info(f"Logging level set to {args.log_level.upper()}")
 
-    credentials_file = args.discord_credentials
+    credentials_file = args.google_credentials
     document_name = args.document
     worksheet_name = args.worksheet
 

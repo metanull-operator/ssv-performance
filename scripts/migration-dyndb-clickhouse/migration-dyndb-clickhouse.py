@@ -27,7 +27,7 @@ def get_dynamodb_resource():
 
 
 def migrate_operators(dynamo_table, clickhouse_client, clickhouse_table, network):
-    logging.info("\n🔄 Migrating operators...")
+    logging.info("🔄 Migrating operators...")
     operators = []
     last_key = None
 
@@ -68,7 +68,7 @@ def migrate_operators(dynamo_table, clickhouse_client, clickhouse_table, network
 
 
 def migrate_performance(dynamo_table, clickhouse_client, clickhouse_table, network, chunk_size=100):
-    logging.info("\n🔄 Migrating performance data...")
+    logging.info("🔄 Migrating performance data...")
     performance_data = []
     last_evaluated_key = None
     total_records = 0
@@ -139,7 +139,7 @@ def migrate_performance(dynamo_table, clickhouse_client, clickhouse_table, netwo
 
 def migrate_subscriptions(dynamo_table, clickhouse_client, clickhouse_table, network):
 
-    logging.info("\n🔄 Migrating subscriptions...")
+    logging.info("🔄 Migrating subscriptions...")
     response = dynamo_table.scan()
     subscriptions = [
         (network, int(item['UserID']), int(item['OperatorID']), item['SubscriptionType'])
@@ -167,7 +167,7 @@ def deduplicate_table(client, table_name: str, network: str):
 
 
 def verify_migration(clickhouse_client, network, table_names):
-    logging.info(f"\n🔍 Verifying migration results for network: {network}")
+    logging.info(f"🔍 Verifying migration results for network: {network}")
     for table in table_names:
         try:
             count = clickhouse_client.query(
