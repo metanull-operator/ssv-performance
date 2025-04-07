@@ -227,6 +227,7 @@ def compile_vo_threshold_messages(perf_data, extra_message=None, subscriptions=N
         mentions_30d = create_subscriber_mentions(guild, subscriptions, operator_ids_30d, 'alerts', dm_recipients)
 
     mentions = mentions_24h + mentions_30d
+    mentions = list(dict.fromkeys(mentions))
 
     messages.extend(mentions)
 
