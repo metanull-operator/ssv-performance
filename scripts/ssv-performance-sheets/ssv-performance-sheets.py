@@ -1,7 +1,7 @@
 import argparse
 import logging
 import os
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from clickhouse_connect import create_client
