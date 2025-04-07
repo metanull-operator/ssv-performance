@@ -1,8 +1,15 @@
 import argparse
 import boto3
 import os
+import logging
 from clickhouse_connect import create_client
 from datetime import datetime, timezone
+from time import time
+
+start_time = time()
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
 def get_clickhouse_client():
@@ -16,12 +23,11 @@ def get_clickhouse_client():
 
 
 def get_dynamodb_resource():
-
     return boto3.resource('dynamodb')
 
 
 def migrate_operators(dynamo_table, clickhouse_client, clickhouse_table, network):
-    print("\n🔄 Migrating operators...")
+    logging.info("\n🔄 Migrating operators...")
     operators = []
     last_key = None
 
@@ -58,11 +64,11 @@ def migrate_operators(dynamo_table, clickhouse_client, clickhouse_table, network
             'updated_at'
         ]
     )
-    print(f"✅ Migrated {len(operators)} operators.")
+    logging.info(f"✅ Migrated {len(operators)} operators.")
 
 
 def migrate_performance(dynamo_table, clickhouse_client, clickhouse_table, network, chunk_size=100):
-    print("\n🔄 Migrating performance data...")
+    logging.info("\n🔄 Migrating performance data...")
     performance_data = []
     last_evaluated_key = None
     total_records = 0
@@ -80,22 +86,34 @@ def migrate_performance(dynamo_table, clickhouse_client, clickhouse_table, netwo
             operator_id = int(item['OperatorID'])
 
             for date, value in item.get('Performance24h', {}).items():
+                try:
+                    date_obj = datetime.strptime(date, "%Y-%m-%d").date()
+                except ValueError:
+                    logger.warning("Skipping malformed date '%s' for operator %s", date, operator_id)
+                    continue
+
                 performance_data.append((
                     network,
                     operator_id,
                     '24h',
-                    datetime.strptime(date, "%Y-%m-%d").date(),
+                    date_obj,
                     float(value),
                     "api.ssv.network",
                     datetime.now(timezone.utc)
                 ))
 
             for date, value in item.get('Performance30d', {}).items():
+                try:
+                    date_obj = datetime.strptime(date, "%Y-%m-%d").date()
+                except ValueError:
+                    logger.warning("Skipping malformed date '%s' for operator %s", date, operator_id)
+                    continue
+
                 performance_data.append((
                     network,
                     operator_id,
                     '30d',
-                    datetime.strptime(date, "%Y-%m-%d").date(),
+                    date_obj,
                     float(value),
                     "api.ssv.network",
                     datetime.now(timezone.utc)
@@ -116,12 +134,12 @@ def migrate_performance(dynamo_table, clickhouse_client, clickhouse_table, netwo
         if not last_evaluated_key:
             break
 
-    print("✅ Performance data migration completed!")
+    logging.info("✅ Performance data migration completed!")
 
 
 def migrate_subscriptions(dynamo_table, clickhouse_client, clickhouse_table, network):
 
-    print("\n🔄 Migrating subscriptions...")
+    logging.info("\n🔄 Migrating subscriptions...")
     response = dynamo_table.scan()
     subscriptions = [
         (network, int(item['UserID']), int(item['OperatorID']), item['SubscriptionType'])
@@ -134,31 +152,31 @@ def migrate_subscriptions(dynamo_table, clickhouse_client, clickhouse_table, net
             data=subscriptions,
             column_names=["network", "user_id", "operator_id", "subscription_type"]
         )
-        print(f"✅ Subscriptions migration completed! ({len(subscriptions)} records)")
+        logging.info(f"✅ Subscriptions migration completed! ({len(subscriptions)} records)")
     else:
-        print("ℹ️ No subscriptions found to migrate.")
+        logging.error("ℹ️ No subscriptions found to migrate.")
 
 
 def deduplicate_table(client, table_name: str, network: str):
     try:
         query = f"OPTIMIZE TABLE {table_name} PARTITION %(network)s FINAL"
         client.command(query, {'network': network})
-        print(f"✅ Deduplicated partition '{network}' in table '{table_name}'")
+        logging.info(f"✅ Deduplicated partition '{network}' in table '{table_name}'")
     except Exception as e:
-        print(f"❌ Failed to deduplicate {table_name}: {e}")
+        logging.error(f"❌ Failed to deduplicate {table_name}: {e}")
 
 
 def verify_migration(clickhouse_client, network, table_names):
-    print(f"\n🔍 Verifying migration results for network: {network}")
+    logging.info(f"\n🔍 Verifying migration results for network: {network}")
     for table in table_names:
         try:
             count = clickhouse_client.query(
                 f"SELECT count(*) FROM {table} WHERE network = %(network)s",
                 {'network': network}
             ).result_rows
-            print(f"📊 {table}: {count[0][0]} rows")
+            logging.info(f"📊 {table}: {count[0][0]} rows")
         except Exception as e:
-            print(f"❌ Error verifying {table}: {e}")
+            logging.error(f"❌ Error verifying {table}: {e}")
 
 
 def main():
@@ -170,8 +188,14 @@ def main():
     parser.add_argument('--ch-operators-table', default=os.environ.get('CH_OPERATORS_TABLE', 'operators'))
     parser.add_argument('--ch-performance-table', default=os.environ.get('CH_PERFORMANCE_TABLE', 'performance'))
     parser.add_argument('--ch-subscriptions-table', default=os.environ.get('CH_SUBSCRIPTIONS_TABLE', 'subscriptions'))
-
+    parser.add_argument("--log_level", default=os.environ.get("MIGRATION_LOG_LEVEL", "INFO"),
+                        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+                        help="Set the logging level")
     args = parser.parse_args()
+
+    # Set logging level dynamically
+    logging.getLogger().setLevel(args.log_level.upper())
+    logging.info(f"Logging level set to {args.log_level.upper()}")
 
     dynamodb = get_dynamodb_resource()
     clickhouse_client = get_clickhouse_client()
@@ -195,7 +219,7 @@ def main():
         args.ch_subscriptions_table
     ])
 
-    print("\n🎉 Migration complete!")
+    logger.info("🎉 Migration complete in %.2f seconds.", time() - start_time)
 
 
 if __name__ == "__main__":

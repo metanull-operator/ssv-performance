@@ -13,6 +13,15 @@ FIELD_IS_PRIVATE = 'isPrivate'
 FIELD_VALIDATOR_COUNT = 'ValidatorCount'
 FIELD_ADDRESS = 'Address'
 
+SPREADSHEET_COLUMNS = [
+    FIELD_OPERATOR_ID,
+    FIELD_OPERATOR_NAME,
+    FIELD_IS_VO,
+    FIELD_IS_PRIVATE,
+    FIELD_VALIDATOR_COUNT,
+    FIELD_ADDRESS
+]
+
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -21,7 +30,7 @@ def create_spreadsheet_data(data, performance_data_attribute):
     dates = sorted({d for details in data.values() for d in details[performance_data_attribute]}, reverse=True)
     sorted_entries = sorted(data.items(), key=lambda item: item[1].get(FIELD_OPERATOR_ID, 'Unknown'))
 
-    spreadsheet_data = [['OperatorID', 'Name', 'isVO', 'isPrivate', 'ValidatorCount', 'Address'] + dates]
+    spreadsheet_data = [SPREADSHEET_COLUMNS + dates]
 
     for op_id, details in sorted_entries:
         row = [
@@ -39,14 +48,18 @@ def create_spreadsheet_data(data, performance_data_attribute):
     return spreadsheet_data
 
 
-def get_operator_performance_data(network: str, days: int, metric_type: str):
-    client = create_client(
+def get_clickhouse_client():
+    return create_client(
         host=os.environ.get("CLICKHOUSE_HOST", "localhost"),
         port=int(os.environ.get("CLICKHOUSE_PORT", 8123)),
         username=os.environ.get("CLICKHOUSE_USER"),
         password=os.environ.get("CLICKHOUSE_PASSWORD"),
         database=os.environ.get("CLICKHOUSE_DB", "default")
     )
+
+
+def get_operator_performance_data(network: str, days: int, metric_type: str):
+    client = get_clickhouse_client()
 
     since_date = (date.today() - timedelta(days=days)).isoformat()
 
@@ -92,24 +105,35 @@ def get_operator_performance_data(network: str, days: int, metric_type: str):
     return result
 
 
+def authorize_google_sheets(credentials_file):
+    scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+    credentials = ServiceAccountCredentials.from_json_keyfile_name(credentials_file, scope)
+    return gspread.authorize(credentials)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Export SSV operator performance to Google Sheets")
-    parser.add_argument('-c', '--discord_credentials', type=str, default=os.environ.get('GOOGLE_CREDENTIALS_FILE', '/etc/ssv-performance-sheets/credentials/google-credentials.json'))
+    parser.add_argument('-c', '--google_credentials', type=str, default=os.environ.get('GOOGLE_CREDENTIALS_FILE', '/etc/ssv-performance-sheets/credentials/google-credentials.json'))
     parser.add_argument('-d', '--document', type=str, required=True)
     parser.add_argument('-w', '--worksheet', type=str, required=True)
     parser.add_argument('-n', '--network', type=str, default='mainnet')
     parser.add_argument('--days', type=int, default=os.environ.get('NUMBER_OF_DAYS_TO_UPLOAD', 180), help='How many days of data to include')
     parser.add_argument('--metric', type=str, choices=['24h', '30d'], default='24h', help='Performance metric type')
+    parser.add_argument("--log_level", default=os.environ.get("SHEETS_LOG_LEVEL", "INFO"),
+                        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+                        help="Set the logging level")
     args = parser.parse_args()
+
+    # Set logging level dynamically
+    logging.getLogger().setLevel(args.log_level.upper())
+    logging.info(f"Logging level set to {args.log_level.upper()}")
 
     credentials_file = args.discord_credentials
     document_name = args.document
     worksheet_name = args.worksheet
 
     try:
-        scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-        credentials = ServiceAccountCredentials.from_json_keyfile_name(credentials_file, scope)
-        gc = gspread.authorize(credentials)
+        gc = authorize_google_sheets(credentials_file)
         logging.info("Authenticated with Google Sheets API.")
 
         worksheet = gc.open(document_name).worksheet(worksheet_name)
@@ -136,6 +160,8 @@ def main():
 
     except Exception as e:
         logging.error(f"Error during spreadsheet update: {e}")
+
+    logging.info(f"Completed spreadsheet update for {args.network} at {datetime.utcnow().isoformat()} UTC.")
 
 
 if __name__ == "__main__":

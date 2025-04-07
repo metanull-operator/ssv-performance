@@ -4,9 +4,13 @@ from common.config import *
 
 # Looks for the most recent 24h data point and returns operator details if that data point violates the threshold
 def operator_threshold_alert_24h(operator, threshold):
+
+    logging.debug(f"Operator {operator[FIELD_OPERATOR_ID]}: Checking 24h data point against threshold {threshold}")
+
     try:
         # If we have no data points, then there are no alerts
         if FIELD_PERFORMANCE not in operator or not operator[FIELD_PERFORMANCE]:
+            logging.debug(f"Operator {operator[FIELD_OPERATOR_ID]}: No performance data available")
             return None
 
         # Get the most recent data point for which we have data points for this operator
@@ -22,7 +26,10 @@ def operator_threshold_alert_24h(operator, threshold):
             logging.warning(f"Error converting 24h data point to float for operator {operator[FIELD_OPERATOR_ID]} and date {most_recent_date}: {e}", exc_info=True)
             return None
 
+        logging.debug(f"Operator {operator[FIELD_OPERATOR_ID]}: 24h data point: {data_point}, threshold: {threshold}")
+
         if data_point < threshold:
+            logging.debug(f"Operator {operator[FIELD_OPERATOR_ID]}: 24h data point {data_point} is below threshold {threshold}")
             return {
                 FIELD_OPERATOR_ID: operator[FIELD_OPERATOR_ID],
                 FIELD_OPERATOR_NAME: operator[FIELD_OPERATOR_NAME],

@@ -138,17 +138,26 @@ def create_alerts_24h(perf_data):
     alert_msgs_24h = {threshold: [] for threshold in ALERTS_THRESHOLDS_24H}
     operator_ids = []
 
+    logging.debug(f"Creating 24h alerts for {len(perf_data)} operators")
+
     for op_id in perf_data.keys():
         operator = perf_data[op_id]
 
+        logging.debug(f"Creating 24h alerts for operator {op_id}")
+
         if not operator[FIELD_IS_VO]:
+            logging.debug(f"Operator {op_id} is not a VO")
             continue
 
         validator_count = operator[FIELD_VALIDATOR_COUNT]
         if validator_count is None or int(validator_count) <= 0:
+            logging.debug(f"Operator {op_id} has no validators")
             continue
 
+        logging.debug(f"{alert_msgs_24h}")
+
         for threshold, alert_list in alert_msgs_24h.items():
+            logging.debug(f"Checking operator {op_id} against threshold {threshold}")
             result = operator_threshold_alert_24h(operator, threshold)
             if result and validator_count > 0:
                 operator_ids.append(result[FIELD_OPERATOR_ID])

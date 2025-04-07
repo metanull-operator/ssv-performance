@@ -9,7 +9,7 @@ from discord.ext import commands
 from storage.storage_factory import StorageFactory
 from vo_performance_bot.vopb_loops import LoopTasks
 
-# Configure logging
+# Configure logging with a default level
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def parse_arguments():
@@ -28,6 +28,9 @@ def parse_arguments():
     parser.add_argument("--ch_operators_table", default=os.environ.get("CH_PERFORMANCE_TABLE", "operators"))
     parser.add_argument("--ch_performance_table", default=os.environ.get("CH_PERFORMANCE_TABLE", "performance"))
     parser.add_argument("--ch_subscriptions_table", default=os.environ.get("CH_SUBSCRIPTIONS_TABLE", "subscriptions"))
+    parser.add_argument("--log_level", default=os.environ.get("BOT_LOG_LEVEL", "INFO"),
+                        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+                        help="Set the logging level")
 
     args = parser.parse_args() 
 
@@ -36,7 +39,7 @@ def parse_arguments():
     except ValueError:
         raise ValueError(f"Invalid ID(s) in --dm_recipients: {args.dm_recipients}")
 
-    return args.network, args.discord_token_file, args.channel_id, args.alert_time, args.extra_message, args.ch_operators_table, args.ch_performance_table, args.ch_subscriptions_table, dm_recipients
+    return args.network, args.discord_token_file, args.channel_id, args.alert_time, args.extra_message, args.ch_operators_table, args.ch_performance_table, args.ch_subscriptions_table, dm_recipients, args.log_level
 
 def read_discord_token_from_file(token_file_path):
     try:
@@ -48,11 +51,15 @@ def read_discord_token_from_file(token_file_path):
 
 async def main():
     try:
-        network, discord_token_file, channel_id, alert_time, extra_message, operators_data_table, performance_data_table, subscription_data_table, dm_recipients = parse_arguments()
+        network, discord_token_file, channel_id, alert_time, extra_message, operators_data_table, performance_data_table, subscription_data_table, dm_recipients, log_level = parse_arguments()
     except SystemExit as e:
         if e.code != 0:
             logging.error("Argument parsing failed", exc_info=True)
         sys.exit(e.code)
+
+    # Set logging level dynamically
+    logging.getLogger().setLevel(log_level.upper())
+    logging.info(f"Logging level set to {log_level.upper()}")
 
     try:
         StorageFactory.initialize('ssv_performance', 'ClickHouse')
