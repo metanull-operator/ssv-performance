@@ -82,8 +82,8 @@ class LoopTasks:
 
         try:
             storage = StorageFactory.get_storage('ssv_performance')
-            perf_data_24h = storage.get_latest_performance_data(network, '24h')
-            perf_data_30d = storage.get_latest_performance_data(network, '30d')
+            perf_data_24h = storage.get_latest_performance_data(self.network, '24h')
+            perf_data_30d = storage.get_latest_performance_data(self.network, '30d')
 
             perf_data = merge_operator_performance(perf_data_24h, perf_data_30d)
 
