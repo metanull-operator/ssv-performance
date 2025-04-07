@@ -62,6 +62,8 @@ async def main():
     logging.getLogger().setLevel(log_level.upper())
     logging.info(f"Logging level set to {log_level.upper()}")
 
+    logging.info(f"Daily alert time: {alert_time}")
+
     try:
         StorageFactory.initialize('ssv_performance', 'ClickHouse')
         logging.info("Storage initialized successfully.")
