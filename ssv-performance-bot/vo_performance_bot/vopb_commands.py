@@ -233,7 +233,6 @@ Thresholds displayed are subject to change.
             await ctx.respond("VO Performance Bot commands are not allowed in this channel.", ephemeral=True)
             return
 
-        # Deferring response because query times are getting long
         await ctx.defer()
 
         try:
@@ -264,7 +263,6 @@ Thresholds displayed are subject to change.
             await ctx.respond("VO Performance Bot commands are not allowed in this channel.", ephemeral=True)
             return
 
-        # Deferring response because query times are getting long
         await ctx.defer()
 
         try:

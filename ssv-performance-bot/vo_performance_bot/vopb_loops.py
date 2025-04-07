@@ -4,23 +4,43 @@ from discord.ext import tasks
 from storage.storage_factory import StorageFactory
 from vo_performance_bot.vopb_messages import send_daily_direct_messages, send_vo_threshold_messages
 import asyncio
+import copy
+
+
+def merge_operator_performance(dict1, dict2):
+    merged = {}
+
+    for k in set(dict1) | set(dict2):
+        merged[k] = copy.deepcopy(dict1.get(k, {}))
+
+        d2 = dict2.get(k, {})
+        for key, value in d2.items():
+            if isinstance(value, dict) and key in merged[k] and isinstance(merged[k][key], dict):
+                merged[k][key].update(value)
+            else:
+                merged[k][key] = value
+
+    return merged
 
 
 class LoopTasks:
 
-    def __init__(self, network, bot, channel, notification_time_str, extra_message, allowed_user_ids=[]):
+    def __init__(self, network, bot, channel, notification_time_str, extra_message, dm_recipients=[], mentions_30d=False):
         self.network = network
         self.bot = bot
         self.extra_message = extra_message
         self.channel = channel
         self.notification_time_str = notification_time_str
         self.notification_time = datetime.strptime(notification_time_str, "%H:%M").time()
-        self.allowed_user_ids = allowed_user_ids
+        self.dm_recipients = dm_recipients
+        self.mentions_30d = mentions_30d
 
 
     async def start_tasks(self):
         now = datetime.now()
         target = datetime.combine(now.date(), self.notification_time).replace(second=0, microsecond=0)
+
+        logging.debug(f"Current time: {now}, Target time: {target}")
 
         if self.daily_notification_task.is_running():
             logging.warning("daily_notification_task is already running. Skipping start.")
@@ -32,6 +52,7 @@ class LoopTasks:
             return
 
         if now >= target + timedelta(minutes=1):
+            logging.debug("Target time has passed. Scheduling for tomorrow.")
             target += timedelta(days=1)
 
         delay = (target - now).total_seconds()
@@ -66,7 +87,7 @@ class LoopTasks:
                 logging.warning(f"Performance data empty for {op_ids} in daily_notification_task()")
                 return
 
-            await send_daily_direct_messages(self.bot, perf_data, subscriptions, self.allowed_user_ids)
+            await send_daily_direct_messages(self.bot, perf_data, subscriptions, self.dm_recipients)
 
         except Exception as e:
             logging.error(f"{type(e).__name__} exception in daily_notification_task(): {e}", exc_info=True)
@@ -77,21 +98,25 @@ class LoopTasks:
         logging.info(f"Sending alert message to channel: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
         try:
-            perf_storage = StorageFactory.get_storage('ssv_performance')
-            perf_data = perf_storage.get_performance_all(self.network)
+            storage = StorageFactory.get_storage('ssv_performance')
+            perf_data_24h = storage.get_latest_performance_data(self.network, '24h')
+            perf_data_30d = storage.get_latest_performance_data(self.network, '30d')
+
+            perf_data = merge_operator_performance(perf_data_24h, perf_data_30d)
 
             if not perf_data:
                 logging.warning("Performance data unavailable.")
                 return
 
-            sub_storage = StorageFactory.get_storage('ssv_performance')
-            subscriptions = sub_storage.get_subscriptions_by_type(self.network, 'alerts')
+            subscriptions = storage.get_subscriptions_by_type(self.network, 'alerts')
 
             if not subscriptions:
                 logging.warning("Subscription data unavailable.")
 
+            mention_periods = ['24h', '30d'] if self.mentions_30d else ['24h']
+
             await send_vo_threshold_messages(self.channel, perf_data, extra_message=self.extra_message,
-                                             subscriptions=subscriptions)
+                                             subscriptions=subscriptions, mention_periods=mention_periods)
         except Exception as e:
             logging.error(f"{type(e).__name__} exception in performance_status_all_loop(): {e}", exc_info=True)
 

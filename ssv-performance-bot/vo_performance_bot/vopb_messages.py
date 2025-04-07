@@ -208,7 +208,7 @@ def compile_alert_threshold_groups(alerts, period_label):
 
 # Compile alerts, mentions and any extra message into a single set of separate messages to be sent to Discord.
 # This attempts to push everything into as few messages as possible to not bomb Discord with excessive messages.
-def compile_vo_threshold_messages(perf_data, extra_message=None, display_mentions=False, subscriptions=None, guild=None, allowed_user_ids=[]):
+def compile_vo_threshold_messages(perf_data, extra_message=None, subscriptions=None, guild=None, dm_recipients=[], mention_periods=[]):
 
     # Get alerts for different time periods
     operator_ids_24h, alerts_24h = create_alerts_24h(perf_data)
@@ -216,16 +216,20 @@ def compile_vo_threshold_messages(perf_data, extra_message=None, display_mention
 
     messages = []
 
-    # Bundle up messages for same time periods into titled groups
+    mentions_24h = []
     messages.extend(compile_alert_threshold_groups(alerts_24h, "24h"))
-    messages.extend(compile_alert_threshold_groups(alerts_30d, "30d"))
+    if subscriptions and guild and '24h' in mention_periods:
+        mentions_24h = create_subscriber_mentions(guild, subscriptions, operator_ids_24h, 'alerts', dm_recipients)
 
-    # Add mentions to our messages
-    if display_mentions and subscriptions and guild:
-        # Unique list of operator IDs to find subscribed users
-        operator_ids = list(set(operator_ids_24h + operator_ids_30d))
-        mentions = create_subscriber_mentions(guild, subscriptions, operator_ids, 'alerts', allowed_user_ids)
-        messages.extend(mentions)
+    mentions_30d = []
+    messages.extend(compile_alert_threshold_groups(alerts_30d, "30d"))
+    if subscriptions and guild and '30d' in mention_periods:
+        mentions_30d = create_subscriber_mentions(guild, subscriptions, operator_ids_30d, 'alerts', dm_recipients)
+
+    mentions = mentions_24h + mentions_30d
+    mentions = list(dict.fromkeys(mentions))
+
+    messages.extend(mentions)
 
     # Include an extra message, if configured
     if extra_message and len(extra_message) > 0:
@@ -237,14 +241,14 @@ def compile_vo_threshold_messages(perf_data, extra_message=None, display_mention
     return(bundles)
 
 
-async def send_vo_threshold_messages(channel, perf_data, extra_message=None, subscriptions=None, allowed_user_ids=[]):
+async def send_vo_threshold_messages(channel, perf_data, extra_message=None, subscriptions=None, dm_recipients=[], mention_periods=[]):
 
     try:
         # Only attempt @mentions if we have a guild to query and subscription info
         if channel and hasattr(channel, 'guild') and subscriptions:
-            messages = compile_vo_threshold_messages(perf_data, extra_message=extra_message, display_mentions=True, subscriptions=subscriptions, guild=channel.guild, allowed_user_ids=allowed_user_ids)
+            messages = compile_vo_threshold_messages(perf_data, extra_message=extra_message, subscriptions=subscriptions, guild=channel.guild, dm_recipients=dm_recipients, mention_periods=mention_periods)
         else:
-            messages = compile_vo_threshold_messages(perf_data, extra_message=extra_message, allowed_user_ids=allowed_user_ids)
+            messages = compile_vo_threshold_messages(perf_data, extra_message=extra_message, dm_recipients=dm_recipients)
 
         if messages:
             for message in messages:
@@ -259,7 +263,7 @@ async def send_vo_threshold_messages(channel, perf_data, extra_message=None, sub
 async def respond_vo_threshold_messages(ctx, perf_data, extra_message=None):
 
     try:
-        messages = compile_vo_threshold_messages(perf_data, extra_message=extra_message, display_mentions=False)
+        messages = compile_vo_threshold_messages(perf_data, extra_message=extra_message)
 
         if messages:
             for message in messages:
@@ -326,7 +330,7 @@ def compile_daily_operator_messages(perf_data, subscriptions):
 
 # Gets dict of all messages going out to all users and sends them,
 # breaking messages into chunks less than maximum message length for Discord.
-async def send_daily_direct_messages(bot, perf_data, subscriptions, allowed_user_ids=[]):
+async def send_daily_direct_messages(bot, perf_data, subscriptions, dm_recipients=[]):
     user_messages = compile_daily_operator_messages(perf_data, subscriptions)
 
     # Send out the compiled messages to each user
@@ -338,7 +342,7 @@ async def send_daily_direct_messages(bot, perf_data, subscriptions, allowed_user
             continue
 
         if member:
-            if allowed_user_ids and member.id not in allowed_user_ids:
+            if dm_recipients and member.id not in dm_recipients:
                 continue
 
             bundles = bundle_messages(messages)

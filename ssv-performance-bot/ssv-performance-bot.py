@@ -19,6 +19,7 @@ def parse_arguments():
 
     parser = argparse.ArgumentParser(description="SSV Verified Operator Committee Discord bot")
 
+    parser.add_argument('--mentions_30d', action='store_true')
     parser.add_argument("-n", "--network", default=os.environ.get("NETWORK", "mainnet"))
     parser.add_argument("-d", "--discord_token_file", default=os.environ.get("BOT_DISCORD_TOKEN_FILE"))
     parser.add_argument("-t", "--alert_time", default=os.environ.get("BOT_DAILY_MESSAGE_TIME", "14:00"))
@@ -39,7 +40,7 @@ def parse_arguments():
     except ValueError:
         raise ValueError(f"Invalid ID(s) in --dm_recipients: {args.dm_recipients}")
 
-    return args.network, args.discord_token_file, args.channel_id, args.alert_time, args.extra_message, args.ch_operators_table, args.ch_performance_table, args.ch_subscriptions_table, dm_recipients, args.log_level
+    return args.network, args.discord_token_file, args.channel_id, args.alert_time, args.extra_message, args.ch_operators_table, args.ch_performance_table, args.ch_subscriptions_table, dm_recipients, args.log_level, args.mentions_30d
 
 def read_discord_token_from_file(token_file_path):
     try:
@@ -51,7 +52,7 @@ def read_discord_token_from_file(token_file_path):
 
 async def main():
     try:
-        network, discord_token_file, channel_id, alert_time, extra_message, operators_data_table, performance_data_table, subscription_data_table, dm_recipients, log_level = parse_arguments()
+        network, discord_token_file, channel_id, alert_time, extra_message, operators_data_table, performance_data_table, subscription_data_table, dm_recipients, log_level, mentions_30d = parse_arguments()
     except SystemExit as e:
         if e.code != 0:
             logging.error("Argument parsing failed", exc_info=True)
@@ -60,6 +61,8 @@ async def main():
     # Set logging level dynamically
     logging.getLogger().setLevel(log_level.upper())
     logging.info(f"Logging level set to {log_level.upper()}")
+
+    logging.info(f"Daily alert time: {alert_time}")
 
     try:
         StorageFactory.initialize('ssv_performance', 'ClickHouse')
@@ -85,7 +88,7 @@ async def main():
                 logging.error(f"Cannot get channel {channel_id}")
                 sys.exit(1)
 
-            loop_tasks = LoopTasks(network, bot, channel, alert_time, extra_message, dm_recipients)
+            loop_tasks = LoopTasks(network, bot, channel, alert_time, extra_message, dm_recipients, mentions_30d)
             bot.loop.create_task(loop_tasks.start_tasks())
             logging.info("Loop tasks started successfully.")
         except Exception as e:
