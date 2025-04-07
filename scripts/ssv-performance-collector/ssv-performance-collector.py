@@ -130,7 +130,7 @@ def cleanup_outdated_records(client):
         )
     """
     affected_rows = client.query(count_query).result_rows[0][0]  # Assuming you're using clickhouse-connect
-    logging.info(f"Found {affected_rows} operators with no performance data for the last {OPERATOR_PERFORMANCE_DAYS}. Updating validator count to zero.")
+    logging.info(f"Found {affected_rows} operators with no performance data for the last {OPERATOR_PERFORMANCE_DAYS} days. Updating validator count to zero.")
 
     # Now run the update
     update_query = f"""
