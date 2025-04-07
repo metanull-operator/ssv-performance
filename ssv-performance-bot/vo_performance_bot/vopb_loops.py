@@ -23,6 +23,8 @@ class LoopTasks:
         now = datetime.now()
         target = datetime.combine(now.date(), self.notification_time).replace(second=0, microsecond=0)
 
+        logging.debug(f"Current time: {now}, Target time: {target}")
+
         if self.daily_notification_task.is_running():
             logging.warning("daily_notification_task is already running. Skipping start.")
         if self.performance_status_all_loop.is_running():
@@ -33,6 +35,7 @@ class LoopTasks:
             return
 
         if now >= target + timedelta(minutes=1):
+            logging.debug("Target time has passed. Scheduling for tomorrow.")
             target += timedelta(days=1)
 
         delay = (target - now).total_seconds()
