@@ -233,7 +233,7 @@ def compile_vo_threshold_messages(perf_data, extra_message=None, subscriptions=N
 
     # Include an extra message, if configured
     if extra_message and len(extra_message) > 0:
-        messages.append(extra_message)
+        messages.append("\n" + extra_message)
 
     # Rebundle everything up again to reduce down to the fewest messages to post to Discord
     bundles = bundle_messages(messages)
