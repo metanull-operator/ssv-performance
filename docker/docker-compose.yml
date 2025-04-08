@@ -1,12 +1,9 @@
 version: '3.9'
 
 services:
-  app:
+  ssv-performance-bot:
     image: ssv-performance-bot:latest
-#    build:
-#      context: ..
-#      dockerfile: ssv-performance-bot/Dockerfile
-    container_name: ssv-performance-bot
+    hostname: ssv-performance-bot
     environment:
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
       CLICKHOUSE_HOST: ${CLICKHOUSE_HOST:-clickhouse}
@@ -15,7 +12,7 @@ services:
       BOT_DISCORD_TOKEN_FILE: /etc/vo-performance-bot/credentials/discord-token.txt
       BOT_DISCORD_CHANNEL_ID: ${BOT_DISCORD_CHANNEL_ID}
       BOT_DM_RECIPIENTS: ${BOT_DM_RECIPIENTS}
-      BOT_DAILY_MESSAGE_TIME: ${BOT_DAILY_MESSAGE_TIME:-07:00}      
+      BOT_DAILY_MESSAGE_TIME: ${BOT_DAILY_MESSAGE_TIME:-07:00}
     volumes:
       - ../certs:/certs
       - ../credentials/discord-token.txt:/etc/vo-performance-bot/credentials/discord-token.txt
@@ -27,10 +24,10 @@ services:
 
   clickhouse:
     image: clickhouse/clickhouse-server:latest
-    container_name: clickhouse
+    hostname: clickhouse
     ports:
-      - "8123:8123"  # ClickHouse HTTP interface
-      - "9000:9000"  # ClickHouse native interface
+      - "8124:8123"  # ClickHouse HTTP interface
+      - "9001:9000"  # ClickHouse native interface
     environment:
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
       CLICKHOUSE_HOST: ${CLICKHOUSE_HOST:-clickhouse}
@@ -47,12 +44,11 @@ services:
       start_period: 10s
     networks:
       - ssv-performance-network
-    
+
 
 volumes:
   clickhouse-data:
 
 networks:
   ssv-performance-network:
-    name: vo-performance-network
     driver: bridge
