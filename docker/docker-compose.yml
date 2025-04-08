@@ -26,8 +26,8 @@ services:
     image: clickhouse/clickhouse-server:latest
     hostname: clickhouse
     ports:
-      - "8124:8123"  # ClickHouse HTTP interface
-      - "9001:9000"  # ClickHouse native interface
+      - "8123:8123"  # ClickHouse HTTP interface
+      - "9000:9000"  # ClickHouse native interface
     environment:
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
       CLICKHOUSE_HOST: ${CLICKHOUSE_HOST:-clickhouse}
