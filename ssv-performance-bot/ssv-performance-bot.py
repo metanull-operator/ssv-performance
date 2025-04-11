@@ -77,8 +77,12 @@ async def main():
 
     bot = commands.Bot(command_prefix='!', intents=intents, help_command=None)
 
+    loop_tasks = None
+
     @bot.event
     async def on_ready():
+        global loop_tasks
+        
         logging.info(f'Logged in as {bot.user.name}')
         logging.info(f"Getting channel {channel_id}")
 
@@ -88,9 +92,12 @@ async def main():
                 logging.error(f"Cannot get channel {channel_id}")
                 sys.exit(1)
 
-            loop_tasks = LoopTasks(network, bot, channel, alert_time, extra_message, dm_recipients, mentions_30d)
-            bot.loop.create_task(loop_tasks.start_tasks())
-            logging.info("Loop tasks started successfully.")
+            if loop_tasks is None:
+                loop_tasks = LoopTasks(network, bot, channel, alert_time, extra_message, dm_recipients, mentions_30d)
+                bot.loop.create_task(loop_tasks.start_tasks())
+                logging.info("Loop tasks started successfully.")
+            else:
+                logging.info("Loop tasks already initialized, skipping restart.")
         except Exception as e:
             logging.error(f"Error in on_ready event: {e}", exc_info=True)
             sys.exit(1)
