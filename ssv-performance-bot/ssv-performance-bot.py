@@ -9,6 +9,8 @@ from discord.ext import commands
 from storage.storage_factory import StorageFactory
 from vo_performance_bot.vopb_loops import LoopTasks
 
+loop_tasks = None
+
 # Configure logging with a default level
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -76,8 +78,6 @@ async def main():
     intents.message_content = True
 
     bot = commands.Bot(command_prefix='!', intents=intents, help_command=None)
-
-    loop_tasks = None
 
     @bot.event
     async def on_ready():
