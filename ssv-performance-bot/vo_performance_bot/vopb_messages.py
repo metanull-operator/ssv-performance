@@ -351,8 +351,13 @@ async def send_daily_direct_messages(bot, perf_data, subscriptions, dm_recipient
                 if message:
                     try:
                         await member.send(bundle.strip())
+                    except discord.Forbidden as e:
+                        if e.code == 50007:
+                            logging.warning(f"User {user} has DMs disabled. Skipping DM.")
+                        else:
+                            logging.error(f"Forbidden error sending DM to {user}: {e}", exc_info=True)
                     except Exception as e:
-                        logging.error(f"Failed sending daily operator performance direct message to {user}: {e}", exc_info=True)
+                        logging.error(f"Unexpected error sending DM to {user}: {e}", exc_info=True)
 
 
 # Attempts to send a direct message to a user.
