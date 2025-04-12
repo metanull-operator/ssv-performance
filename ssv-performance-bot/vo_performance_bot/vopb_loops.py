@@ -48,7 +48,7 @@ class LoopTasks:
             logging.warning("performance_status_all_loop is already running. Skipping start.")
 
         if self.daily_notification_task.is_running() and self.performance_status_all_loop.is_running():
-            logging.warning("All expected tasks running. Skipping start delay and task starts.")
+            logging.info("All tasks already running. Skipping start_tasks().")
             return
 
         if now >= target + timedelta(minutes=1):
