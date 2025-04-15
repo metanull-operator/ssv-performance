@@ -3,7 +3,7 @@ from vo_performance_bot.vopb_subscriptions import get_user_subscriptions_by_type
 from vo_performance_bot.vopb_operator_threshold_alerts import *
 from datetime import datetime, timedelta
 from common.config import OPERATOR_24H_HISTORY_COUNT, ALERTS_THRESHOLDS_30D, ALERTS_THRESHOLDS_24H
-
+import discord
 
 # Break messages into < MAX_DISCORD_MESSAGE_LENGTH characters chunks, called bundles
 # Returns list of separate bundles, each < MAX_DISCORD_MESSAGE_LENGTH
