@@ -356,7 +356,7 @@ async def send_daily_direct_messages(bot, perf_data, subscriptions, dm_recipient
                         await member.send(bundle.strip())
                     except discord.Forbidden as e:
                         if e.code == 50007:
-                            logging.warning(f"User {user} has DMs disabled. Skipping DM.")
+                            logging.warning(f"User {member.name}#{member.discriminator}/{member.display_name}/{user} has DMs disabled. Skipping DM.")
                         else:
                             logging.error(f"Forbidden error sending DM to {user}: {e}", exc_info=True)
                     except Exception as e:
