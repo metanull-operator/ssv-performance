@@ -15,7 +15,7 @@ class ClickHouseStorage(DataStorageInterface):
                 self.client = create_client(
                     host=os.environ.get("CLICKHOUSE_HOST", "localhost"),
                     port=int(os.environ.get("CLICKHOUSE_PORT", 8123)),
-                    username=os.environ.get("CLICKHOUSE_USER"),
+                    username=os.environ.get("CLICKHOUSE_USER", "ssv_performance"),
                     password=os.environ.get("CLICKHOUSE_PASSWORD"),
                     database=os.environ.get("CLICKHOUSE_DB", "default")
                 )

@@ -7,14 +7,20 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-ENV CLICKHOUSE_HOST=clickhouse
-ENV CLICKHOUSE_USER=ssv_performance
-ENV CLICKHOUSE_PASSWORD=dsFtsxfSfNKd42uDrkp47gt22cfgG8sh
-
-ENV PYTHONUNBUFFERED=1
-
-ENV BOT_LOG_LEVEL=INFO
-ENV BOT_DAILY_MESSAGE_TIME="1:00"
+# Additional text that will be sent with some bot messages
 ENV BOT_EXTRA_MESSAGE="/subscribe for @mentions on daily alerts or for performance report DMs. /operator for latest performance data. /help for more info."
+
+ENV CLICKHOUSE_PASSWORD=
+
+# Time when the bot will send daily messages
+# Format: HH:MM (24-hour format)
+#ENV BOT_DAILY_MESSAGE_TIME="08:00"
+
+# Log level for the bot
+# Possible values: DEBUG, INFO, WARNING, ERROR, CRITICAL
+#ENV BOT_LOG_LEVEL=INFO
+
+ENV CLICKHOUSE_HOST=clickhouse
+ENV PYTHONUNBUFFERED=1
 
 ENTRYPOINT ["python", "ssv-performance-bot.py"]
