@@ -113,17 +113,17 @@ vi google-credentials.json
 The script must be run once for each Ethereum network and performance period. A separate worksheet is required for each Ethereum network and performance period.
 
 ```bash
-docker run --rm -v ".\credentials\google-credentials.json:/google-credentials.json" --network ssv_performance_vo-performance-network ssv-performance-sheets -d 'ssv_performance_data' -w 'Mainnet 24h' --metric 24h --network mainnet
+docker run --rm -v ".\credentials\google-credentials.json:/google-credentials.json:ro" --network ssv_performance_vo-performance-network ssv-performance-sheets -d 'ssv_performance_data' -w 'Mainnet 24h' --metric 24h --network mainnet
 
-docker run --rm -v ".\credentials\google-credentials.json:/google-credentials.json" --network ssv_performance_vo-performance-network ssv-performance-sheets -d 'ssv_performance_data' -w 'Mainnet 30d' --metric 30d --network mainnet
+docker run --rm -v ".\credentials\google-credentials.json:/google-credentials.json:ro" --network ssv_performance_vo-performance-network ssv-performance-sheets -d 'ssv_performance_data' -w 'Mainnet 30d' --metric 30d --network mainnet
 
-docker run --rm -v ".\credentials\google-credentials.json:/google-credentials.json" --network ssv_performance_vo-performance-network ssv-performance-sheets -d 'ssv_performance_data' -w 'Holesky 24h' --metric 24h --network holesky
+docker run --rm -v ".\credentials\google-credentials.json:/google-credentials.json:ro" --network ssv_performance_vo-performance-network ssv-performance-sheets -d 'ssv_performance_data' -w 'Holesky 24h' --metric 24h --network holesky
 
-docker run --rm -v ".\credentials\google-credentials.json:/google-credentials.json" --network ssv_performance_vo-performance-network ssv-performance-sheets -d 'ssv_performance_data' -w 'Holesky 30d' --metric 30d --network holesky
+docker run --rm -v ".\credentials\google-credentials.json:/google-credentials.json:ro" --network ssv_performance_vo-performance-network ssv-performance-sheets -d 'ssv_performance_data' -w 'Holesky 30d' --metric 30d --network holesky
 
-docker run --rm -v ".\credentials\google-credentials.json:/google-credentials.json" --network ssv_performance_vo-performance-network ssv-performance-sheets -d 'ssv_performance_data' -w 'Hoodi 24h' --metric 24h --network hoodi
+docker run --rm -v ".\credentials\google-credentials.json:/google-credentials.json:ro" --network ssv_performance_vo-performance-network ssv-performance-sheets -d 'ssv_performance_data' -w 'Hoodi 24h' --metric 24h --network hoodi
 
-docker run --rm -v ".\credentials\google-credentials.json:/google-credentials.json" --network ssv_performance_vo-performance-network ssv-performance-sheets -d 'ssv_performance_data' -w 'Hoodi 30d' --metric 30d --network hoodi
+docker run --rm -v ".\credentials\google-credentials.json:/google-credentials.json:ro" --network ssv_performance_vo-performance-network ssv-performance-sheets -d 'ssv_performance_data' -w 'Hoodi 30d' --metric 30d --network hoodi
 ```
 
 Replace `ssv_performance_ssv-performance-network` with the name of the Docker network found earlier, if it isn't the default value shown here. 
@@ -152,7 +152,7 @@ Insert values for `aws_access_key_id` and `aws_secret_access_key`, then save and
 The original DynamoDB database used separate database tables for each Ethereum network. When running `migration-dyndb-clickhouse`, specify the Ethereum network and the DynamoDB source table on the command line.
 
 ```bash
-docker run --rm --network=vo-performance-network -v ".\credentials\aws:/root/.aws" migration-dyndb-clickhouse --network mainnet --dynamo-perf-table=SSVPerformanceData
+docker run --rm --network=vo-performance-network -v ".\credentials\aws:/root/.aws:ro" migration-dyndb-clickhouse --network mainnet --dynamo-perf-table=SSVPerformanceData
 
-docker run --rm --network=vo-performance-network -v ".\credentials\aws:/root/.aws" migration-dyndb-clickhouse --network holesky --dynamo-perf-table=SSVPerformanceDataHolesky	
+docker run --rm --network=vo-performance-network -v ".\credentials\aws:/root/.aws:ro" migration-dyndb-clickhouse --network holesky --dynamo-perf-table=SSVPerformanceDataHolesky	
 ```
