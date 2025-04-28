@@ -1,9 +1,8 @@
 # ssv_performance
 
-Clone the ssv_performance repository into your preferred directory. Here we will use `/opt` as an example.
+Clone the ssv_performance repository into your preferred directory.
 
 ```
-cd /opt
 git clone https://github.com/metanull-operator/ssv_performance
 cd ssv_performance
 ```
@@ -17,10 +16,8 @@ The ssv-performance-bot and ClickHouse database run togther in a docker compose 
 Use your preferred text editor for these commands. Here we will use `vi`.
 
 ```
-cd docker
 cp .env.sample .env
 vi .env
-cd ..
 ```
 
 Set the following environment variables in `.env`:
@@ -40,28 +37,36 @@ cd ..
 
 Enter the Discord token then save and exit.
 
+### Build ssv-performance-bot Image
+
+```
+cd ssv-performance-bot
+docker build -t ssv-performance-bot .
+cd ..
+```
+
 ### Start the Applications
 
 To start the ssv-performance-bot and ClickHouse database:
 
-```
-docker compose -f docker/docker-compose.yml -p ssv-performance up --build -d
+```bash
+docker compose -p ssv-performance up --build -d
 ```
 
 To stop the ssv-performance-bot and ClickHouse database:
 
-```
-docker compose -f docker/docker-compose.yml -p ssv-performance down
+```bash
+docker compose -p ssv-performance down
 ```
 ### Find Docker Network Name
 
-Find the Docker network for ClickHouse. You will need this to connect other scripts to ClickHouse.
+The default Docker network should be named `ssv_performance_ssv-performance-network`, but please confirm the network name. The correct network name is required for other scripts to connect to ClickHouse.
 
 ```bash
 docker network ls
 ```
 
-The network you need will end with `ssv-performance-network`. If you have not changed the default name of the repository directory, the value will likely be `ssv_performance_ssv-performance-network`.
+If you have not modified the `docker-compose.yml` file, the correct network name should end with `ssv-performance-network`.
 
 ## ssv-performance-collector
 
@@ -106,7 +111,15 @@ vi google-credentials.json
 
 ### ClickHouse Password
 
+### Build Image
 
+```
+cd scripts/ssv-performance-sheets
+docker build -t ssv-performance-sheets .
+vi Dockerfile
+```
+
+If you set `CLICKHOUSE_PASSWORD` in `docker/.env` then you must update that value in the `Dockerfile` or include the password in the `CLICKHOUSE_PASSWORD` environment variable when the collector is run.
 
 ### Run ssv-performance-sheets
 
@@ -130,9 +143,70 @@ Replace `ssv_performance_ssv-performance-network` with the name of the Docker ne
 
 Create cronjobs to run the command daily for each network and performance period. These cronjobs should run after the `ssv-performance-collector` cronjobs.
 
+### Run migration-dyndb-clickhouse
+
+The original DynamoDB database used separate database tables for each Ethereum network. When running `migration-dyndb-clickhouse`, specify the Ethereum network and the DynamoDB source table on the command line.
+
+```bash
+docker run --rm --network=vo-performance-network -v ".\credentials\aws:/root/.aws:ro" migration-dyndb-clickhouse --network mainnet --dynamo-perf-table=SSVPerformanceData
+
+docker run --rm --network=vo-performance-network -v ".\credentials\aws:/root/.aws:ro" migration-dyndb-clickhouse --network holesky --dynamo-perf-table=SSVPerformanceDataHolesky	
+```
+
+
+
+## Importing ClickHouse SQL Data
+
+### Export Source Data
+
+Confirm your source ClickHouse container name.
+
+```bash
+docker ps
+```
+
+If you are exporting data for another to import, the following commands will export the data from the source ClickHouse container, one table at a time.
+
+```bash
+docker exec -i ssv_performance_clickhouse-1 clickhouse-client --database=default --query="SELECT * FROM operators FORMAT SQLInsert">  operators.sql
+docker exec -i ssv_performance_clickhouse-1 clickhouse-client --database=default --query="SELECT * FROM performance FORMAT SQLInsert" > performance.sql
+docker exec -i ssv_performance_clickhouse-1 clickhouse-client --database=default --query="SELECT * FROM performance FORMAT SQLInsert" > subscriptions.sql
+docker exec -i ssv_performance_clickhouse-1 clickhouse-client --database=default --query="SELECT * FROM performance FORMAT SQLInsert" > import_state.sql
+```
+
+### Import Source Data
+
+Confirm your destination ClickHouse container name.
+
+```bash
+docker ps
+```
+
+If you are receiving source data to import, the following commands will import the data into the destination ClickHouse container, one table at a time.
+
+```bash
+docker exec -i ssv_performance_clickhouse-2 clickhouse-client --database=default < operators.sql
+docker exec -i ssv_performance_clickhouse-2 clickhouse-client --database=default < performance.sql
+docker exec -i ssv_performance_clickhouse-2 clickhouse-client --database=default < subscriptions.sql
+docker exec -i ssv_performance_clickhouse-2 clickhouse-client --database=default < import_state.sql
+```
+
+### Optimize the Tables
+
+The ClickHouse database tables use the `ReplacingMergeTree` engine. Running `OPTIMIZE TABLE` on these tables will force a merge of duplicate records.
+
+```bash
+docker exec ssv_performance_clickhouse-1 clickhouse-client --database=default --query="OPTIMIZE TABLE operators FINAL"
+docker exec ssv_performance_clickhouse-1 clickhouse-client --database=default --query="OPTIMIZE TABLE performance FINAL"
+docker exec ssv_performance_clickhouse-1 clickhouse-client --database=default --query="OPTIMIZE TABLE subscriptions FINAL"
+docker exec ssv_performance_clickhouse-1 clickhouse-client --database=default --query="OPTIMIZE TABLE import_state FINAL"
+```
+
 ## migration-dyndb-clickhouse
 
-This data migration script will transfer performance data from the existing AWS DynamoDB database to the new ClickHouse database. It must be run once for each Ethereum network migrated (mainnet/holesky).
+This data migration script will transfer performance data from the existing AWS DynamoDB database to the new ClickHouse database. It must be run once for each Ethereum network migrated (mainnet/holesky). 
+
+This is deprecated, because the data has already been migrated in production to a new ClickHouse database. See the instruction above for importing.
 
 ### Store AWS Credentials
 
@@ -147,12 +221,12 @@ Insert values for `aws_access_key_id` and `aws_secret_access_key`, then save and
 
 
 
-### Run migration-dyndb-clickhouse
-
-The original DynamoDB database used separate database tables for each Ethereum network. When running `migration-dyndb-clickhouse`, specify the Ethereum network and the DynamoDB source table on the command line.
+### Build Image
 
 ```bash
-docker run --rm --network=vo-performance-network -v ".\credentials\aws:/root/.aws:ro" migration-dyndb-clickhouse --network mainnet --dynamo-perf-table=SSVPerformanceData
-
-docker run --rm --network=vo-performance-network -v ".\credentials\aws:/root/.aws:ro" migration-dyndb-clickhouse --network holesky --dynamo-perf-table=SSVPerformanceDataHolesky	
+cd scripts/migration-dyndb-clickhouse
+docker build -t ssv-performance-collector .
+vi Dockerfile
 ```
+
+If you set `CLICKHOUSE_PASSWORD` in `docker/.env` then you must update that value in the `Dockerfile` or include the password in the `CLICKHOUSE_PASSWORD` environment variable when the collector is run.
