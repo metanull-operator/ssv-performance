@@ -9,14 +9,13 @@ services:
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
       CLICKHOUSE_HOST: ${CLICKHOUSE_HOST:-clickhouse}
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-ssv_performance}
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
-      BOT_DISCORD_TOKEN_FILE: /etc/vo-performance-bot/credentials/discord-token.txt
       BOT_DISCORD_CHANNEL_ID: ${BOT_DISCORD_CHANNEL_ID}
       BOT_DM_RECIPIENTS: ${BOT_DM_RECIPIENTS}
       BOT_DAILY_MESSAGE_TIME: ${BOT_DAILY_MESSAGE_TIME:-08:00}
     volumes:
       - ../certs:/certs
       - ../credentials/discord-token.txt:/etc/vo-performance-bot/credentials/discord-token.txt
+      - ../credentials/clickhouse-password.txt:/etc/ssv-performance-bot/clickhouse-password.txt
     depends_on:
       clickhouse:
         condition: service_healthy
@@ -26,14 +25,12 @@ services:
   clickhouse:
     image: clickhouse/clickhouse-server:latest
     hostname: clickhouse
-    ports:
-      - "8123:8123"  # ClickHouse HTTP interface
-      - "9000:9000"  # ClickHouse native interface
     environment:
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
       CLICKHOUSE_HOST: ${CLICKHOUSE_HOST:-clickhouse}
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-ssv_performance}
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
+      CLICKHOUSE_PASSWORD_FILE: ${CLICKHOUSE_PASSWORD_FILE:-../credentials/clickhouse-password.txt}
+    entrypoint: ["/docker-entrypoint-initdb.d/clickhouse-entrypoint.sh"]
     volumes:
       - clickhouse-data:/var/lib/clickhouse
       - ../clickhouse-init:/docker-entrypoint-initdb.d

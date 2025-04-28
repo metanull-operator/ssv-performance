@@ -10,7 +10,7 @@ COPY . .
 # Additional text that will be sent with some bot messages
 ENV BOT_EXTRA_MESSAGE="/subscribe for @mentions on daily alerts or for performance report DMs. /operator for latest performance data. /help for more info."
 
-ENV CLICKHOUSE_PASSWORD=
+ENV CLICKHOUSE_PASSWORD_FILE=/etc/ssv-performance-bot/clickhouse-password.txt
 
 # Time when the bot will send daily messages
 # Format: HH:MM (24-hour format)
