@@ -29,11 +29,13 @@ services:
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
       CLICKHOUSE_HOST: ${CLICKHOUSE_HOST:-clickhouse}
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-ssv_performance}
-      CLICKHOUSE_PASSWORD_FILE: ${CLICKHOUSE_PASSWORD_FILE:-../credentials/clickhouse-password.txt}
-    entrypoint: ["/docker-entrypoint-initdb.d/clickhouse-entrypoint.sh"]
+      CLICKHOUSE_PASSWORD_FILE: /etc/ssv-performance-bot/clickhouse-password.txt
+    entrypoint: ["/usr/local/bin/clickhouse-entrypoint.sh"]
     volumes:
       - clickhouse-data:/var/lib/clickhouse
+      - ../clickhouse-init/clickhouse-entrypoint.sh:/usr/local/bin/clickhouse-entrypoint.sh:ro
       - ../clickhouse-init:/docker-entrypoint-initdb.d
+      - ../credentials/clickhouse-password.txt:/etc/ssv-performance-bot/clickhouse-password.txt:ro
     healthcheck:
       test: ["CMD", "clickhouse-client", "--host=localhost", "--query", "SELECT 1"]
       interval: 5s
