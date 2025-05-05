@@ -7,16 +7,16 @@ services:
     hostname: ssv-performance-bot
     environment:
       NETWORK: ${NETWORK:-mainnet}
-      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
       CLICKHOUSE_HOST: ${CLICKHOUSE_HOST:-clickhouse}
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-ssv_performance}
       BOT_DISCORD_CHANNEL_ID: ${BOT_DISCORD_CHANNEL_ID}
-      BOT_DM_RECIPIENTS: ${BOT_DM_RECIPIENTS}
+      BOT_DM_RECIPIENTS: ${BOT_DM_RECIPIENTS:-}
       BOT_DAILY_MESSAGE_TIME: ${BOT_DAILY_MESSAGE_TIME:-08:00}
+      CLICKHOUSE_PASSWORD_FILE: /etc/ssv-performance-bot/clickhouse-password.txt
     volumes:
       - ./certs:/certs
-      - ./entrypoint.sh:/usr/local/bin/entrypoint.sh:ro
-      - ./credentials/discord-token.txt:/etc/vo-performance-bot/credentials/discord-token.txt:ro
+      - ./ssv-performance-bot/entrypoint.sh:/usr/local/bin/entrypoint.sh:ro
+      - ./credentials/discord-token.txt:/etc/ssv-performance-bot/discord-token.txt:ro
       - ./credentials/clickhouse-password.txt:/etc/ssv-performance-bot/clickhouse-password.txt:ro
     depends_on:
       clickhouse:
@@ -32,16 +32,15 @@ services:
       CLICKHOUSE_HOST: ${CLICKHOUSE_HOST:-clickhouse}
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-ssv_performance}
       CLICKHOUSE_PASSWORD_FILE: /etc/ssv-performance-bot/clickhouse-password.txt
-    entrypoint: ["/usr/local/bin/clickhouse-entrypoint.sh"]
     volumes:
       - clickhouse-data:/var/lib/clickhouse
-      - ./clickhouse-init/clickhouse-entrypoint.sh:/usr/local/bin/clickhouse-entrypoint.sh:ro
-      - ./clickhouse-init:/docker-entrypoint-initdb.d
+      - ./clickhouse-init/init.sql:/docker-entrypoint-initdb.d/init.sql
       - ./credentials/clickhouse-password.txt:/etc/ssv-performance-bot/clickhouse-password.txt:ro
+      - ./clickhouse-init/healthcheck.sh:/usr/local/bin/healthcheck.sh:ro
     healthcheck:
-      test: ["CMD", "clickhouse-client", "--host=localhost", "--query", "SELECT 1"]
-      interval: 5s
-      timeout: 3s
+      test: ["CMD", "/usr/local/bin/healthcheck.sh"]
+      interval: 2s
+      timeout: 2s
       retries: 5
       start_period: 10s
     networks:

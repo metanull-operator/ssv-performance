@@ -24,7 +24,7 @@ def parse_arguments():
     parser.add_argument('--mentions_30d', action='store_true')
     parser.add_argument("--network", default=os.environ.get("NETWORK", "mainnet"))
     parser.add_argument("--clickhouse_password_file", default=os.environ.get("CLICKHOUSE_PASSWORD_FILE", '/etc/ssv-performance-bot/clickhouse_password.txt'))
-    parser.add_argument("--discord_token_file", default=os.environ.get("BOT_DISCORD_TOKEN_FILE", '/etc/ssv-performance-bot/discord_token.txt'))
+    parser.add_argument("--discord_token_file", default=os.environ.get("BOT_DISCORD_TOKEN_FILE", '/etc/ssv-performance-bot/discord-token.txt'))
     parser.add_argument("--alert_time", default=os.environ.get("BOT_DAILY_MESSAGE_TIME", "14:00"))
     parser.add_argument("--channel_id", default=os.environ.get("BOT_DISCORD_CHANNEL_ID"))
     parser.add_argument("--extra_message", default=os.environ.get("BOT_EXTRA_MESSAGE"))

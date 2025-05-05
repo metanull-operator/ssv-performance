@@ -13,7 +13,7 @@ PARTITION BY network
 ORDER BY (network, operator_id);
 
 
-CREATE TABLE performance (
+CREATE TABLE IF NOT EXISTS default.performance (
     network String,
     operator_id UInt32,
     metric_type String,
