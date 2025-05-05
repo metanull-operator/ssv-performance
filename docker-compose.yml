@@ -2,7 +2,7 @@ version: '3.9'
 
 services:
   ssv-performance-bot:
-    image: ssv-performance-bot:latest
+    image: ssv-performance-bot:${SSV_PERFORMANCE_BOT_VERSION:-latest}
     entrypoint: ["/usr/local/bin/entrypoint.sh"]
     hostname: ssv-performance-bot
     environment:
@@ -25,7 +25,7 @@ services:
       - ssv-performance-network
 
   clickhouse:
-    image: clickhouse/clickhouse-server:latest
+    image: clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-latest}
     hostname: clickhouse
     environment:
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
