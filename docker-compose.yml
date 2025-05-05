@@ -3,6 +3,7 @@ version: '3.9'
 services:
   ssv-performance-bot:
     image: ssv-performance-bot:latest
+    entrypoint: ["/usr/local/bin/entrypoint.sh"]
     hostname: ssv-performance-bot
     environment:
       NETWORK: ${NETWORK:-mainnet}
@@ -14,6 +15,7 @@ services:
       BOT_DAILY_MESSAGE_TIME: ${BOT_DAILY_MESSAGE_TIME:-08:00}
     volumes:
       - ./certs:/certs
+      - ./entrypoint.sh:/usr/local/bin/entrypoint.sh:ro
       - ./credentials/discord-token.txt:/etc/vo-performance-bot/credentials/discord-token.txt:ro
       - ./credentials/clickhouse-password.txt:/etc/ssv-performance-bot/clickhouse-password.txt:ro
     depends_on:
