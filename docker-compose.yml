@@ -13,9 +13,9 @@ services:
       BOT_DM_RECIPIENTS: ${BOT_DM_RECIPIENTS}
       BOT_DAILY_MESSAGE_TIME: ${BOT_DAILY_MESSAGE_TIME:-08:00}
     volumes:
-      - ../certs:/certs
-      - ../credentials/discord-token.txt:/etc/vo-performance-bot/credentials/discord-token.txt
-      - ../credentials/clickhouse-password.txt:/etc/ssv-performance-bot/clickhouse-password.txt
+      - ./certs:/certs
+      - ./credentials/discord-token.txt:/etc/vo-performance-bot/credentials/discord-token.txt:ro
+      - ./credentials/clickhouse-password.txt:/etc/ssv-performance-bot/clickhouse-password.txt:ro
     depends_on:
       clickhouse:
         condition: service_healthy
