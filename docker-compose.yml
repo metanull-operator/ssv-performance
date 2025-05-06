@@ -37,6 +37,8 @@ services:
       - ./clickhouse-init/init.sql:/docker-entrypoint-initdb.d/init.sql
       - ./credentials/clickhouse-password.txt:/etc/ssv-performance-bot/clickhouse-password.txt:ro
       - ./clickhouse-init/healthcheck.sh:/usr/local/bin/healthcheck.sh:ro
+      - ./sql-import:/sql-import:ro
+      - ./scripts/clickhouse-import/clickhouse-import.sh:/usr/local/bin/clickhouse-import.sh:ro
     healthcheck:
       test: ["CMD", "/usr/local/bin/healthcheck.sh"]
       interval: 2s

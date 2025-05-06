@@ -191,6 +191,12 @@ docker exec -i ssv_performance_clickhouse-2 clickhouse-client --database=default
 docker exec -i ssv_performance_clickhouse-2 clickhouse-client --database=default < import_state.sql
 ```
 
+### clickhouse-import.sh
+
+```bash
+docker exec -it ssv-performance-clickhouse-1 clickhouse-import.sh
+```
+
 ### Optimize the Tables
 
 The ClickHouse database tables use the `ReplacingMergeTree` engine. Running `OPTIMIZE TABLE` on these tables will force a merge of duplicate records.
