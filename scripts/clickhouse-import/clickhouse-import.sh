@@ -14,15 +14,27 @@ else
   export CLICKHOUSE_PASSWORD=""
 fi
 
-# Check directory
+# Verify directory
 if [[ ! -d "$SQL_DIR" ]]; then
-  echo "SQL import directory not found: $SQL_DIR"
+  echo "❌ SQL import directory not found: $SQL_DIR"
   exit 1
 fi
 
-# Run all .sql files in order
-echo "Running SQL scripts from $SQL_DIR..."
+echo "📥 Running SQL scripts from $SQL_DIR..."
+
 for file in "$SQL_DIR"/*.sql; do
-  echo "→ Running $(basename "$file")"
-  clickhouse-client --host="$CLICKHOUSE_HOST" --user="$CLICKHOUSE_USER" --database="$CLICKHOUSE_DATABASE" < "$file"
+  BASENAME=$(basename "$file")
+  TABLENAME="${BASENAME%.sql}"
+
+  echo "→ Importing $BASENAME into table '$TABLENAME'..."
+
+  # Replace 'INSERT INTO table' with actual table name and pipe into client
+  sed "s/INSERT INTO table/INSERT INTO $TABLENAME/" "$file" \
+    | clickhouse-client \
+        --host="$CLICKHOUSE_HOST" \
+        --user="$CLICKHOUSE_USER" \
+        --database="$CLICKHOUSE_DATABASE"
+
 done
+
+echo "✅ All imports completed."
