@@ -35,6 +35,13 @@ for file in "$SQL_DIR"/*.sql; do
         --user="$CLICKHOUSE_USER" \
         --database="$CLICKHOUSE_DATABASE"
 
+  echo "⚙️  Optimizing table '$TABLENAME'..."
+  clickhouse-client \
+    --host="$CLICKHOUSE_HOST" \
+    --user="$CLICKHOUSE_USER" \
+    --database="$CLICKHOUSE_DATABASE" \
+    --query="OPTIMIZE TABLE $TABLENAME FINAL"
+
 done
 
 echo "✅ All imports completed."

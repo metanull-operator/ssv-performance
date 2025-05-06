@@ -1,0 +1,1 @@
+Files with the `.sql` file extension in the `sql-import/` directory will be imported into the Clickhouse database when running the clickhouse-import script.
