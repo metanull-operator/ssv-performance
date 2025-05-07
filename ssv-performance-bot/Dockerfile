@@ -37,6 +37,7 @@ RUN chmod +x /entrypoint.sh
 # Environment variables
 ENV BOT_EXTRA_MESSAGE="/subscribe for @mentions on daily alerts or for performance report DMs. /operator for latest performance data. /help for more info."
 ENV CLICKHOUSE_PASSWORD_FILE=/etc/ssv-performance-bot/clickhouse-password.txt
+ENV DISCORD_TOKEN_FILE=/etc/ssv-performance-bot/discord-token.txt
 ENV CLICKHOUSE_HOST=clickhouse
 ENV PYTHONUNBUFFERED=1
 
