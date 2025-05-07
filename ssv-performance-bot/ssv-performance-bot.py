@@ -77,7 +77,9 @@ async def main():
 
     try:
         clickhouse_password = read_clickhouse_password_from_file(clickhouse_password_file)
+        logging.info("Retrieved ClickHouse password from password file.")
     except Exception as e:
+        logging.info("Unable to retrieve ClickHouse password from file, trying environment variable instead.")
         clickhouse_password = os.environ.get("CLICKHOUSE_PASSWORD")
 
     try:
