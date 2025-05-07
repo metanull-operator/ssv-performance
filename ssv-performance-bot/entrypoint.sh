@@ -1,5 +1,5 @@
 #!/bin/bash
-set -euo pipefail
+set -eo pipefail
 
 # If CLICKHOUSE_PASSWORD_FILE is set and the file exists
 if [ -n "$CLICKHOUSE_PASSWORD_FILE" ] && [ -f "$CLICKHOUSE_PASSWORD_FILE" ]; then
