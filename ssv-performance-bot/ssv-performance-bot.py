@@ -53,6 +53,14 @@ def read_discord_token_from_file(token_file_path):
         logging.error(f"Unable to retrieve Discord token: {e}", exc_info=True)
         sys.exit(1)
 
+def read_clickhouse_password_from_file(password_file_path):
+    try:
+        with open(password_file_path, 'r') as file:
+            return file.read().strip()
+    except Exception as e:
+        logging.error(f"Unable to retrieve Clickhouse password: {e}", exc_info=True)
+        sys.exit(1)
+
 async def main():
     try:
         network, discord_token_file, channel_id, alert_time, extra_message, operators_data_table, performance_data_table, subscription_data_table, dm_recipients, log_level, mentions_30d = parse_arguments()
@@ -68,7 +76,12 @@ async def main():
     logging.info(f"Daily alert time: {alert_time}")
 
     try:
-        StorageFactory.initialize('ssv_performance', 'ClickHouse')
+        clickhouse_password = read_clickhouse_password_from_file(clickhouse_password_file)
+    except Exception as e:
+        clickhouse_password = os.environ.get("CLICKHOUSE_PASSWORD")
+
+    try:
+        StorageFactory.initialize('ssv_performance', 'ClickHouse', password=clickhouse_password)
         logging.info("Storage initialized successfully.")
     except Exception as e:
         logging.error(f"Error initializing storage: {e}", exc_info=True)
@@ -112,6 +125,10 @@ async def main():
 
     try:
         discord_token = read_discord_token_from_file(discord_token_file)
+    except Exception as e:
+        discord_token = os.environ.get("BOT_DISCORD_TOKEN")
+
+    try:    
         await bot.start(discord_token)
     except Exception as e:
         logging.error(f"Error starting bot: {e}", exc_info=True)

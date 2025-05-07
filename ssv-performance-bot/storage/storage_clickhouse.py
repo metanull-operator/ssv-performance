@@ -16,7 +16,7 @@ class ClickHouseStorage(DataStorageInterface):
                     host=os.environ.get("CLICKHOUSE_HOST", "localhost"),
                     port=int(os.environ.get("CLICKHOUSE_PORT", 8123)),
                     username=os.environ.get("CLICKHOUSE_USER", "ssv_performance"),
-                    password=os.environ.get("CLICKHOUSE_PASSWORD"),
+                    password=os.environ.get(kwargs.get("password")),
                     database=os.environ.get("CLICKHOUSE_DB", "default")
                 )
                 break  # Success!
