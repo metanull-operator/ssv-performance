@@ -46,20 +46,12 @@ def parse_arguments():
     return args.network, args.discord_token_file, args.channel_id, args.alert_time, args.extra_message, args.ch_operators_table, args.ch_performance_table, args.ch_subscriptions_table, dm_recipients, args.log_level, args.mentions_30d
 
 def read_discord_token_from_file(token_file_path):
-    try:
-        with open(token_file_path, 'r') as file:
-            return file.read().strip()
-    except Exception as e:
-        logging.error(f"Unable to retrieve Discord token: {e}", exc_info=True)
-        sys.exit(1)
+    with open(token_file_path, 'r') as file:
+        return file.read().strip()
 
 def read_clickhouse_password_from_file(password_file_path):
-    try:
-        with open(password_file_path, 'r') as file:
-            return file.read().strip()
-    except Exception as e:
-        logging.error(f"Unable to retrieve Clickhouse password: {e}", exc_info=True)
-        sys.exit(1)
+    with open(password_file_path, 'r') as file:
+        return file.read().strip()
 
 async def main():
     try:
@@ -77,7 +69,6 @@ async def main():
 
     try:
         clickhouse_password = read_clickhouse_password_from_file(clickhouse_password_file)
-        logging.info("Retrieved ClickHouse password from password file.")
     except Exception as e:
         logging.info("Unable to retrieve ClickHouse password from file, trying environment variable instead.")
         clickhouse_password = os.environ.get("CLICKHOUSE_PASSWORD")
@@ -128,6 +119,7 @@ async def main():
     try:
         discord_token = read_discord_token_from_file(discord_token_file)
     except Exception as e:
+        logging.info("Unable to retrieve Discord token from file, trying environment variable instead.")
         discord_token = os.environ.get("BOT_DISCORD_TOKEN")
 
     try:    
