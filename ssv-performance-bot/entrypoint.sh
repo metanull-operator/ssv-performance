@@ -1,14 +1,12 @@
 #!/bin/bash
 set -eo pipefail
 
-# If CLICKHOUSE_PASSWORD_FILE is set and the file exists
-if [ -n "$CLICKHOUSE_PASSWORD_FILE" ] && [ -f "$CLICKHOUSE_PASSWORD_FILE" ]; then
+if [ -n "${CLICKHOUSE_PASSWORD_FILE:-}" ] && [ -f "$CLICKHOUSE_PASSWORD_FILE" ]; then
   export CLICKHOUSE_PASSWORD=$(< "$CLICKHOUSE_PASSWORD_FILE")
 fi
 
-# If DISCORD_TOKEN_FILE is set and the file exists
-if [ -n "$DISCORD_TOKEN_FILE" ] && [ -f "$DISCORD_TOKEN_FILE" ]; then
-  export BOT_DISCORD_TOKEN=$(< "$DISCORD_TOKEN_FILE")
+if [ -n "${DISCORD_TOKEN_FILE:-}" ] && [ -f "$DISCORD_TOKEN_FILE" ]; then
+  export DISCORD_TOKEN=$(< "$DISCORD_TOKEN_FILE")
 fi
 
 echo "[entrypoint] Arguments received: $@"

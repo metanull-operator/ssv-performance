@@ -12,7 +12,7 @@ services:
       BOT_DAILY_MESSAGE_TIME: ${BOT_DAILY_MESSAGE_TIME:-08:00}
       CLICKHOUSE_PASSWORD_FILE: /etc/ssv-performance-bot/clickhouse-password.txt
     volumes:
-      - ./certs:/certs
+      - ./certs:/certs:ro
       - ./ssv-performance-bot/entrypoint.sh:/usr/local/bin/entrypoint.sh:ro
       - ./credentials/discord-token.txt:/etc/ssv-performance-bot/discord-token.txt:ro
       - ./credentials/clickhouse-password.txt:/etc/ssv-performance-bot/clickhouse-password.txt:ro

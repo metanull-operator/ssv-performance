@@ -54,7 +54,7 @@ Replace <USERNAME> and <GROUP> with the username and group that the Docker conta
 
 The ssv-performance-bot requires permission for Discord channel access and a token for API access. Generate the Discord token and put the contents in `credentials/discord-token.txt`. See our [Discord token documentation](docs/discord-token.md) for details on configuring Discord API access and generating a Discord token.
 
-```
+```bash
 vi credentials/discord-token.txt
 ```
 
@@ -64,7 +64,7 @@ Enter the Discord token, then save and exit.
 
 A password for the ClickHouse database must be stored in `credentials/clickhouse-password.txt`. This password will be used as the initial password for the `ssv_performance` ClickHouse user. The password cannot be left blank.
 
-```
+```bash
 vi credentials/clickhouse-password.txt
 ```
 
@@ -74,7 +74,7 @@ Enter your new ClickHouse password, then save and exit.
 
 Build the ssv-performance-bot Docker image.
 
-```
+```bash
 docker build -t ssv-performance-bot:latest ./ssv-performance-bot
 ```
 
@@ -94,18 +94,16 @@ docker compose -p ssv-performance down
 
 ## Data Migration
 
-If you are migrating performance data from the legacy AWS DynamoDB database, please [see the migration-dyndb-clickhouse](scripts/migration-dyndb-clickhouse/README.md) documentation.
-
-If you are migrating performance data from another ClickHouse database instance, please [see the clickhouse-import](scripts/clickhouse-import/README.md) documentation.
+See the [clickhouse-import README](scripts/clickhouse-import/README.md) for the steps to import performance data SQL files from one ClickHouse database to another.
 
 ## ssv-performance-collector
 
-ssv-performance-collector gathers SSV network performance data from api.ssv.network and stores that data in the ClickHouse database. The ClickHouse database must be running to collect performance data. It is recommended to run this script daily as a cronjob. A separate instance must be run for each Ethereum network for which data is being collected.
+ssv-performance-collector gathers SSV network performance data from api.ssv.network and stores it in the ClickHouse database. Create a daily cronjob for each network for which you want to collect performance data. The ClickHouse database must be running to collect performance data.
 
-See the [ssv-performance-collector documentation](scripts/ssv-performance-collector/README.md) for more details.
+See the [ssv-performance-collector README](scripts/ssv-performance-collector/README.md) for more details.
 
 ## ssv-performance-sheets
 
 ssv-performance-sheets copies SSV performance data from the ClickHouse database to a Google Sheet. Each Google Sheets will contain the performance data for a single Ethereum network and performance period (24h/30d). It is recommended to run this script daily as a cronjob. A separate instance must be run for each Ethereum network and performance period copied to Google Sheets.
 
-See the [ssv-performance-sheets documentation](scripts/ssv-performance-sheets/README.md) for more details.
+See the [ssv-performance-sheets README](scripts/ssv-performance-sheets/README.md) for more details.
