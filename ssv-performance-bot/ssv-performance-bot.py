@@ -24,7 +24,7 @@ def parse_arguments():
     parser.add_argument('--mentions_30d', action='store_true')
     parser.add_argument("--network", default=os.environ.get("NETWORK", "mainnet"))
     parser.add_argument("--clickhouse_password_file", default=os.environ.get("CLICKHOUSE_PASSWORD_FILE", ""))
-    parser.add_argument("--discord_token_file", default=os.environ.get("BOT_DISCORD_TOKEN_FILE", ""))
+    parser.add_argument("--discord_token_file", default=os.environ.get("DISCORD_TOKEN_FILE", ""))
     parser.add_argument("--alert_time", default=os.environ.get("BOT_DAILY_MESSAGE_TIME", "14:00"))
     parser.add_argument("--channel_id", default=os.environ.get("BOT_DISCORD_CHANNEL_ID"))
     parser.add_argument("--extra_message", default=os.environ.get("BOT_EXTRA_MESSAGE"))
@@ -120,7 +120,7 @@ async def main():
         discord_token = read_discord_token_from_file(discord_token_file)
     except Exception as e:
         logging.info("Unable to retrieve Discord token from file, trying environment variable instead.")
-        discord_token = os.environ.get("BOT_DISCORD_TOKEN")
+        discord_token = os.environ.get("DISCORD_TOKEN")
 
     try:    
         await bot.start(discord_token)
