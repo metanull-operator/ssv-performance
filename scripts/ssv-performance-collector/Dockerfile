@@ -40,7 +40,9 @@ ENV CLICKHOUSE_PASSWORD=
 #ENV OPERATOR_PERFORMANCE_DAYS=7
 
 # Interoperability and logging
+ENV CLICKHOUSE_PASSWORD_FILE=/etc/ssv-performance-bot/clickhouse-password.txt
 ENV CLICKHOUSE_HOST=clickhouse
 ENV PYTHONUNBUFFERED=1
 
-ENTRYPOINT ["python", "ssv-performance-collector.py"]
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["python", "ssv-performance-collector.py"]

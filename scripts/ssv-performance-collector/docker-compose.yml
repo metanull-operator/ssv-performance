@@ -1,0 +1,19 @@
+services:
+  ssv-performance-collector:
+    image: ssv-performance-collector:${SSV_PERFORMANCE_BOT_VERSION:-latest}
+    entrypoint: ["/usr/local/bin/entrypoint.sh"]
+    hostname: ssv-performance-collector
+    environment:
+      NETWORK: ${NETWORK:-mainnet}
+      CLICKHOUSE_HOST: ${CLICKHOUSE_HOST:-clickhouse}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-ssv_performance}
+      CLICKHOUSE_PASSWORD_FILE: /etc/ssv-performance-collector/clickhouse-password.txt
+    volumes:
+      - ./ssv-performance-collector/entrypoint.sh:/usr/local/bin/entrypoint.sh:ro
+      - ./credentials/clickhouse-password.txt:/etc/ssv-performance-collector/clickhouse-password.txt:ro
+    networks:
+      - ssv-performance-network
+
+networks:
+  ssv-performance-network:
+    driver: bridge
