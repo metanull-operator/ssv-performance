@@ -68,6 +68,8 @@ def insert_clickhouse_performance_data(client, network, clickhouse_table_operato
     for operator_id, operator in operators.items():
         performance_24h = operator["performance"]['24h']
         performance_30d = operator["performance"]['30d']
+        operator_fee = operator.get("operator_fee", None)
+        validator_count = operator.get("validators_count", None)
 
         is_vo = 1 if operator.get("type", "") == "verified_operator" else 0
         is_private = 1 if operator.get("is_private", False) else 0
@@ -78,7 +80,8 @@ def insert_clickhouse_performance_data(client, network, clickhouse_table_operato
             operator.get("name", ""),
             is_vo,
             is_private,
-            operator.get("validators_count", 0),
+            validator_count,
+            operator_fee,
             operator.get("owner_address", ""),
             now
         ))
@@ -92,6 +95,26 @@ def insert_clickhouse_performance_data(client, network, clickhouse_table_operato
             source,
             datetime.now(timezone.utc)
         ))
+
+        if operator_fee is not None:
+            operator_fees_rows.append((
+                network,
+                operator_id,
+                target_date,
+                operator_fee,
+                source,
+                datetime.now(timezone.utc)
+            ))
+
+        if validator_count is not None:
+            validator_counts_rows.appent((
+                network,
+                operator_id,
+                target_date,
+                validator_count,
+                source,
+                datetime.now(timezone.utc)
+            ))
 
         performance_rows.append((
             network, 
@@ -113,6 +136,13 @@ def insert_clickhouse_performance_data(client, network, clickhouse_table_operato
         'network', 'operator_id', 'metric_type', 'metric_date', 'metric_value', 'source', 'updated_at'
     ])
 
+    client.insert(clickhouse_table_performance, operator_fees_rows, column_names=[
+        'network', 'operator_id', 'metric_date', 'operator_fee', 'source', 'updated_at'
+    ])
+
+    client.insert(clickhouse_table_performance, validator_counts_rows, column_names=[
+        'network', 'operator_id', 'metric_date', 'validator_count', 'source', 'updated_at'
+    ])    
 
 from datetime import datetime, timedelta, timezone
 
@@ -129,7 +159,7 @@ def cleanup_outdated_records(client):
             WHERE metric_date >= toDate('{cutoff_date}')
         )
     """
-    affected_rows = client.query(count_query).result_rows[0][0]  # Assuming you're using clickhouse-connect
+    affected_rows = client.query(count_query).result_rows[0][0]  
     logging.info(f"Found {affected_rows} operators with no performance data for the last {OPERATOR_PERFORMANCE_DAYS} days. Updating validator count to zero.")
 
     # Now run the update
