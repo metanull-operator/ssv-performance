@@ -33,7 +33,9 @@ CREATE TABLE IF NOT EXISTS default.operator_fees (
     operator_fee Float64,
     source String,
     updated_at DateTime DEFAULT now()
-)
+) ENGINE = ReplacingMergeTree(updated_at)
+PARTITION BY network
+ORDER BY (network, operator_id, metric_date, source);
 
 CREATE TABLE IF NOT EXISTS default.validator_counts (
     network String,
@@ -42,7 +44,9 @@ CREATE TABLE IF NOT EXISTS default.validator_counts (
     validator_count UInt32,
     source String,
     updated_at DateTime DEFAULT now()
-)
+) ENGINE = ReplacingMergeTree(updated_at)
+PARTITION BY network
+ORDER BY (network, operator_id, metric_date, source);
 
 CREATE TABLE IF NOT EXISTS default.subscriptions (
     network String,
