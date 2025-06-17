@@ -1,5 +1,25 @@
 FROM python:3.11-slim
 
+# Build-time args for UID/GID
+ARG PROCESS_UID=30002
+ARG PROCESS_GID=30002
+ARG PROCESS_USER=collector
+ARG PROCESS_GROUP=collector
+
+# Install dependencies and gosu for privilege dropping
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gosu \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user and group safely
+RUN set -eux; \
+    if ! getent group "${PROCESS_GID}" >/dev/null; then \
+        groupadd -g "${PROCESS_GID}" "${PROCESS_GROUP}"; \
+    fi; \
+    if ! id -u "${PROCESS_UID}" >/dev/null 2>&1; then \
+        useradd -u "${PROCESS_UID}" -g "${PROCESS_GID}" -m -s /bin/bash "${PROCESS_USER}"; \
+    fi
+
 WORKDIR /app
 
 COPY requirements.txt .

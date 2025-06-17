@@ -1,10 +1,10 @@
 FROM python:3.11-slim
 
 # Build-time args for UID/GID
-ARG BOT_UID=30001
-ARG BOT_GID=30001
-ARG BOT_USER=bot
-ARG BOT_GROUP=bot
+ARG PROCESS_UID=30001
+ARG PROCESS_GID=30001
+ARG PROCESS_USER=bot
+ARG PROCESS_GROUP=bot
 
 # Install dependencies and gosu for privilege dropping
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -13,11 +13,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Create non-root user and group safely
 RUN set -eux; \
-    if ! getent group "${BOT_GID}" >/dev/null; then \
-        groupadd -g "${BOT_GID}" "${BOT_GROUP}"; \
+    if ! getent group "${PROCESS_GID}" >/dev/null; then \
+        groupadd -g "${PROCESS_GID}" "${PROCESS_GROUP}"; \
     fi; \
-    if ! id -u "${BOT_UID}" >/dev/null 2>&1; then \
-        useradd -u "${BOT_UID}" -g "${BOT_GID}" -m -s /bin/bash "${BOT_USER}"; \
+    if ! id -u "${PROCESS_UID}" >/dev/null 2>&1; then \
+        useradd -u "${PROCESS_UID}" -g "${PROCESS_GID}" -m -s /bin/bash "${PROCESS_USER}"; \
     fi
 
 # Set working directory
