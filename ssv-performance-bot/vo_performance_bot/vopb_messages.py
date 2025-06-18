@@ -367,7 +367,11 @@ def iqr_bucket_lines_with_zero_handling(values, fees, num_buckets=5, iqr_multipl
     inlier_fees = [(fee, op) for fee, op in non_zero_fees if fee <= upper_bound]
     outlier_fees = [(fee, op) for fee, op in non_zero_fees if fee > upper_bound]
 
-    min_val = min(fee for fee, _ in inlier_fees)
+    if zero_fees:
+        min_val = min(fee for fee, _ in inlier_fees)
+    else:
+        # No 0.00 SSV operators, so start from actual minimum fee in all data
+        min_val = min(fee for fee, _ in inlier_fees + outlier_fees)
     max_val = max(fee for fee, _ in inlier_fees)
     bucket_size = (max_val - min_val) / (num_buckets or 1)
 
@@ -398,9 +402,8 @@ def iqr_bucket_lines_with_zero_handling(values, fees, num_buckets=5, iqr_multipl
         outlier_count = len(outlier_fees)
         outlier_min = min(fee for fee, _ in outlier_fees)
         outlier_max = max(fee for fee, _ in outlier_fees)
-        lines.append(
-            f"> {upper_bound:.2f} SSV  {'█' * 20} ({outlier_count}) — High-end outliers {outlier_min:.2f}–{outlier_max:.2f} SSV"
-        )
+        lines.append(f"Outliers > {upper_bound:.2f} SSV  {'█' * 20} ({outlier_count}) ({outlier_min:.2f}–{outlier_max:.2f})")
+
 
     return lines
 
