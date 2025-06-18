@@ -265,7 +265,7 @@ async def send_vo_threshold_messages(channel, perf_data, extra_message=None, sub
         logging.error(f"Failed to send VO threshold messages: {e}", exc_info=True)
 
 
-def dynamic_bucket_lines(values, fees, num_buckets=3):
+def dynamic_bucket_lines(values, fees, num_buckets=10):
     min_fee = min(values)
     max_fee = max(values)
     if min_fee == max_fee:
