@@ -598,12 +598,13 @@ def compile_fee_messages(fee_data, extra_message=None):
 
         return [
             f"**{label} Operators (SSV/year)**",
-            f"- Count: {count}",
-            f"- Average Fee: {mean:.2f} SSV",
-            f"- Median Fee: {median:.2f} SSV",
-            f"- Lowest Fee: {lowest[1][FIELD_OPERATOR_NAME]} (ID {lowest[1][FIELD_OPERATOR_ID]}) – {lowest[0]:.2f} SSV",
-            f"- Highest Fee: {highest[1][FIELD_OPERATOR_NAME]} (ID {highest[1][FIELD_OPERATOR_ID]}) – {highest[0]:.2f} SSV",
-            "- Fee Distribution:"
+            f"*{count} operators*",
+            f"- Average Fee: {mean:.2f}",
+            f"- Median Fee: {median:.2f}",
+            f"- Lowest Fee: {lowest[1][FIELD_OPERATOR_NAME]} (ID {lowest[1][FIELD_OPERATOR_ID]}) – {lowest[0]:.2f}",
+            f"- Highest Fee: {highest[1][FIELD_OPERATOR_NAME]} (ID {highest[1][FIELD_OPERATOR_ID]}) – {highest[0]:.2f}",
+            f"-# {count} operators",
+            "## Fee Distribution"
         ] + bucket_lines
 
 
