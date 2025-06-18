@@ -449,6 +449,8 @@ def iqr_bucket_lines_with_zero_handling1(values, fees, num_buckets=5, iqr_multip
         lines.append(f"Outliers > {upper_bound:.2f} SSV  {'█' * 20} ({outlier_count}) ({outlier_min:.2f}–{outlier_max:.2f})")
 
 
+    lines = ["```"] + lines + ["```"]
+
     return lines
 
 
@@ -475,8 +477,8 @@ def render_bucket_lines(buckets_with_ranges, zero_count, outliers, max_segments=
         outlier_min = min(fee for fee, _ in outliers)
         outlier_max = max(fee for fee, _ in outliers)
         bar = build_bar(count)
-        label = f"> {outlier_min:.2f} SSV"
-        lines.append(f"{label:<16} {bar:<20} ({count}) — High-end outliers up to {outlier_max:.2f} SSV")
+        label = f"\u200B> {outlier_min:.2f} SSV"
+        lines.append(f"{label:<16} {bar:<20} ({count}) ({outlier_min:.2f}-{outlier_max:.2f})")
 
     return lines
 
