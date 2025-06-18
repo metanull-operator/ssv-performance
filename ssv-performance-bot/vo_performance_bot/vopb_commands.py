@@ -8,7 +8,8 @@ from vo_performance_bot.vopb_messages import (
     create_subscriptions_message,
     send_operator_performance_messages,
     respond_vo_threshold_messages,
-    send_direct_message_test
+    send_direct_message_test,
+    respond_fee_messages
 )
 
 
