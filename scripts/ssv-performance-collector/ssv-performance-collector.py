@@ -10,6 +10,10 @@ OPERATOR_PERFORMANCE_DAYS = int(os.environ.get('OPERATOR_PERFORMANCE_DAYS', 7)) 
 REQUESTS_PER_MINUTE = int(os.environ.get('REQUESTS_PER_MINUTE', 20)) # Total requests to API per minute
 REQUEST_DELAY = 60 / REQUESTS_PER_MINUTE
 
+BLOCKS_PER_DAY = 7200
+DAYS_PER_YEAR = 365
+BLOCKS_PER_YEAR = BLOCKS_PER_DAY * DAYS_PER_YEAR
+
 IMPORT_SOURCE = os.environ.get("IMPORT_SOURCE", 'api.ssv.network')
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -70,12 +74,15 @@ def insert_clickhouse_performance_data(client, network, clickhouse_table_operato
     for operator_id, operator in operators.items():
         performance_24h = operator["performance"]['24h']
         performance_30d = operator["performance"]['30d']
-        operator_fee = operator.get("fee", None)
-        print(f"Fee: {operator_fee}")
         validator_count = operator.get("validators_count", None)
 
         is_vo = 1 if operator.get("type", "") == "verified_operator" else 0
         is_private = 1 if operator.get("is_private", False) else 0
+
+        operator_fee = operator.get("fee", None)
+        if operator_fee is not None:
+            operator_fee = float(operator_fee)
+            operator_fee = (fee * BLOCKS_PER_YEAR) / 1e18
 
         operator_rows.append((
             network,
