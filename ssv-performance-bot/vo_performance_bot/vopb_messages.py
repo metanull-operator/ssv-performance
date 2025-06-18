@@ -467,9 +467,11 @@ def render_bucket_lines(buckets_with_ranges, zero_count, outliers, fees, mean, m
     max_label = f"Outliers > {max_fee:.2f}"
     label_width = len(max_label) + 1
 
+    count_width = 8
+
     if zero_count > 0:
         bar = build_bar(zero_count)
-        lines.append(f"{'0.00':>{label_width}} {bar:<{max_segments}} ({zero_count})")
+        lines.append(f"{'0.00':>{label_width}} {bar:<{max_segments}} ({zero_count:<{count_width}})")
 
     for b, lower, upper in buckets_with_ranges:
         label = f"{lower:.2f}–{upper:.2f}"
@@ -482,7 +484,7 @@ def render_bucket_lines(buckets_with_ranges, zero_count, outliers, fees, mean, m
             markers.append("median")
 
         marker_str = f"  ⟵ {', '.join(markers)}" if markers else ""
-        lines.append(f"{label:>{label_width}} {bar:<{max_segments}} ({len(b)}){marker_str}")
+        lines.append(f"{label:>{label_width}} {bar:<{max_segments}} ({len(b)}){marker_str:<{count_width}}")
 
     if outliers:
         count = len(outliers)
