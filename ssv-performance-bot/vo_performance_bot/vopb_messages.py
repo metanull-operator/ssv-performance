@@ -435,7 +435,7 @@ def iqr_bucket_lines_with_zero_handling1(values, fees, num_buckets=5, iqr_multip
     if zero_fees:
         bar = "█" * int((len(zero_fees) / max_count) * 20)
         count_str = f"({len(zero_fees)})"
-        lines.append(f"0.00 SSV       {bar:<20} {count_str:<8}")
+        lines.append(f"0.00 SSV       {bar:<20} {count_str:<16}")
 
     for i, b in enumerate(buckets):
         lower = min_val + i * bucket_size
@@ -443,7 +443,7 @@ def iqr_bucket_lines_with_zero_handling1(values, fees, num_buckets=5, iqr_multip
         b_len = len(b)
         bar = "█" * int((b_len / max_count) * 20)
         count_str = f"({b_len})"
-        lines.append(f"{lower:.2f}–{upper:.2f} SSV  {bar:<20}  {count_str:<8})")
+        lines.append(f"{lower:.2f}–{upper:.2f} SSV  {bar:<20}  {count_str:<16})")
 
     if outlier_fees:
         outlier_count = len(outlier_fees)
