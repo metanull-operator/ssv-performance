@@ -460,7 +460,7 @@ def compile_fee_messages(fee_data, extra_message=None):
         else:
             public_fees.append((fee, operator))
 
-    def summarize(label, fees, num_buckets=5, irq_multiplier=1.5):
+    def summarize(label, fees, num_buckets=5, iqr_multiplier=1.5):
         if not fees:
             return [f"No {label} operators found."]
 
@@ -470,7 +470,7 @@ def compile_fee_messages(fee_data, extra_message=None):
         lowest = sorted_fees[0]
         count = len(values)
 
-        bucket_lines = iqr_bucket_lines_with_zero_handling(values, fees, num_buckets=num_buckets, irq_multiplier=irq_multiplier)
+        bucket_lines = iqr_bucket_lines_with_zero_handling(values, fees, num_buckets=num_buckets, iqr_multiplier=iqr_multiplier)
 
         return [
             f"**{label} Operators (SSV/year)**",
@@ -482,9 +482,9 @@ def compile_fee_messages(fee_data, extra_message=None):
             "- Fee Distribution (equal buckets):"
         ] + bucket_lines
 
-    messages.extend(summarize("Public", public_fees, irq_multiplier=1.5))
+    messages.extend(summarize("Public", public_fees, iqr_multiplier=1.5))
     messages.append("")  # spacing
-    messages.extend(summarize("Private", private_fees, irq_multiplier=2.5))
+    messages.extend(summarize("Private", private_fees, iqr_multiplier=2.5))
 
     if extra_message:
         messages.append("")
