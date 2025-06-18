@@ -222,7 +222,7 @@ Thresholds displayed are subject to change.
 
         try:
             storage = StorageFactory.get_storage('ssv_performance')
-            fee_data = storage.get_latest_fee_data()
+            fee_data = storage.get_latest_fee_data(network)
 
             if not fee_data:
                 logging.error(f"alerts() fee_data empty [077188]")
