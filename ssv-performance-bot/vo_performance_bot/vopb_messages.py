@@ -471,8 +471,17 @@ def render_bucket_lines(buckets_with_ranges, zero_count, outliers, fees, mean, m
 
     if zero_count > 0:
         bar = build_bar(zero_count)
+
+        markers = []
+        if mean is not None and mean == 0:
+            markers.append("mean")
+        if median is not None and median == 0:
+            markers.append("median")
+
+        marker_str = f"⟵ {', '.join(markers)}" if markers else ""
         count_str = f"({zero_count})"
-        lines.append(f"{'0.00':>{label_width}} {bar:<{max_segments}} {count_str:<{count_width}}")
+        lines.append(f"{'0.00':>{label_width}} {bar:<{max_segments}} {count_str:<{count_width}}{marker_str}")
+
 
     for b, lower, upper in buckets_with_ranges:
         label = f"{lower:.2f}–{upper:.2f}"
@@ -480,9 +489,9 @@ def render_bucket_lines(buckets_with_ranges, zero_count, outliers, fees, mean, m
         bar = build_bar(b_len)
 
         markers = []
-        if mean is not None and lower <= mean <= upper:
+        if mean is not None and mean != 0 and lower <= mean <= upper:
             markers.append("mean")
-        if median is not None and lower <= median <= upper:
+        if median is not None and median != 0 and lower <= median <= upper:
             markers.append("median")
 
         marker_str = f"⟵ {', '.join(markers)}" if markers else ""
