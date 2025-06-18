@@ -168,6 +168,53 @@ def create_alerts_24h(perf_data):
     return operator_ids, alert_msgs_24h
 
 
+import statistics
+
+
+def compile_fee_messages(fee_data, extra_message=None):
+    messages = []
+
+    public_fees = []
+    private_fees = []
+
+    for operator in fee_data.values():
+        fee = operator.get("operator_fee")
+        is_private = operator.get("is_private")
+        if fee is None:
+            continue
+        if is_private:
+            private_fees.append((fee, operator))
+        else:
+            public_fees.append((fee, operator))
+
+    def summarize(label, fees):
+        if not fees:
+            return [f"No {label} operators found."]
+        values = [f[0] for f in fees]
+        sorted_fees = sorted(fees, key=lambda x: x[0])
+        highest = sorted_fees[-1]
+        lowest = sorted_fees[0]
+        return [
+            f"**{label} Operators**",
+            f"- Count: {len(values)}",
+            f"- Average Fee: {statistics.mean(values) * 100:.2f}%",
+            f"- Median Fee: {statistics.median(values) * 100:.2f}%",
+            f"- Std Deviation: {statistics.stdev(values) * 100:.2f}%" if len(values) > 1 else "- Std Deviation: N/A",
+            f"- Highest Fee: {highest[1]['operator_name']} ({highest[1]['operator_id']}) - {highest[0] * 100:.2f}%",
+            f"- Lowest Fee: {lowest[1]['operator_name']} ({lowest[1]['operator_id']}) - {lowest[0] * 100:.2f}%"
+        ]
+
+    messages.extend(summarize("Public", public_fees))
+    messages.append("")  # spacing
+    messages.extend(summarize("Private", private_fees))
+
+    if extra_message:
+        messages.append("")
+        messages.append(extra_message)
+
+    return bundle_messages(messages)
+
+
 def create_alerts_30d(perf_data):
     alert_msgs_30d = {threshold: [] for threshold in ALERTS_THRESHOLDS_30D}
     operator_ids = []
@@ -261,6 +308,21 @@ async def send_vo_threshold_messages(channel, perf_data, extra_message=None, sub
             await channel.send(f'No performance alerts for {current_date}.')
     except Exception as e:
         logging.error(f"Failed to send VO threshold messages: {e}", exc_info=True)
+
+
+async def respond_fee_messages(ctx, fee_data, extra_message=None):
+
+    try:
+        messages = compile_fee_messages(fee_data, extra_message=extra_message)
+
+        if messages:
+            for message in messages:
+                # Note assumption that defer() was previously called.
+                await ctx.followup.send(message.strip(), ephemeral=False)
+        else:
+            await ctx.followup.send(f'Fee data not found.', ephemeral=True)
+    except Exception as e:
+        logging.error(f"Failed to respond with fee data message: {e}", exc_info=True)
 
 
 async def respond_vo_threshold_messages(ctx, perf_data, extra_message=None):

@@ -208,6 +208,34 @@ Thresholds displayed are subject to change.
             logging.error(f"Error fetching operator performance: {e}", exc_info=True)
             await ctx.respond("An error occurred while fetching operator performance data.", ephemeral=True)
 
+
+    @bot.slash_command(name='fees', description='Show current fee information')
+    async def fees(ctx):
+
+        logging.info("/fees called")
+
+        if not allowed_channel(ctx):
+            await ctx.respond("VO Performance Bot commands are not allowed in this channel.", ephemeral=True)
+            return
+
+        await ctx.defer()
+
+        try:
+            storage = StorageFactory.get_storage('ssv_performance')
+            fee_data = storage.get_latest_fee_data()
+
+            if not fee_data:
+                logging.error(f"alerts() fee_data empty [077188]")
+                await ctx.followup.send("Fee data not available.", ephemeral=True)
+                return
+
+            await respond_fee_message(ctx, perf_data, extra_message=extra_message)
+
+        except Exception as e:
+            logging.error(f"Error fetching fee information: {e}", exc_info=True)
+            await ctx.followup.send("An error occurred while fetching fee data.", ephemeral=True)
+
+
     def merge_operator_performance(dict1, dict2):
         merged = {}
 

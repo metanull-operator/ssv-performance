@@ -47,6 +47,14 @@ services:
       - ssv-performance-network
 
 
+#command: |
+#  sh -c '
+#    echo "0 12 * * * root python /app/ssv-performance-collector.py >> /var/log/cron.log 2>&1" > /etc/cron.d/ssv-collector &&
+#    chmod 0644 /etc/cron.d/ssv-collector &&
+#    touch /var/log/cron.log &&
+#    cron -f
+#  '
+
 volumes:
   clickhouse-data:
 
