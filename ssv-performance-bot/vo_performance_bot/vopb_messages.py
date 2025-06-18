@@ -460,7 +460,7 @@ def compile_fee_messages(fee_data, extra_message=None):
         else:
             public_fees.append((fee, operator))
 
-    def summarize(label, fees):
+    def summarize(label, fees, irq_multiplier=1.5):
         if not fees:
             return [f"No {label} operators found."]
 
