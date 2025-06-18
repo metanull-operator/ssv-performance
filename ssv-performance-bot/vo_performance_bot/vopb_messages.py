@@ -599,12 +599,11 @@ def compile_fee_messages(fee_data, extra_message=None):
         return [
             f"**{label} Operators (SSV/year)**",
             f"*{count} operators*",
-            f"- Average Fee: {mean:.2f}",
+            f"- Mean Fee: {mean:.2f}",
             f"- Median Fee: {median:.2f}",
-            f"- Lowest Fee: {lowest[1][FIELD_OPERATOR_NAME]} (ID {lowest[1][FIELD_OPERATOR_ID]}) – {lowest[0]:.2f}",
-            f"- Highest Fee: {highest[1][FIELD_OPERATOR_NAME]} (ID {highest[1][FIELD_OPERATOR_ID]}) – {highest[0]:.2f}",
-            f"-# {count} operators",
-            "## Fee Distribution"
+            f"- Lowest Fee: {lowest[0]:.2f} - {lowest[1][FIELD_OPERATOR_NAME]} (ID: {lowest[1][FIELD_OPERATOR_ID]}, Validators: {lowest[1][FIELD_VALIDATOR_COUNT]})",
+            f"- Highest Fee: {highest[0]:.2f} - {highest[1][FIELD_OPERATOR_NAME]} (ID: {highest[1][FIELD_OPERATOR_ID]}, Validators: {highest[1][FIELD_VALIDATOR_COUNT]})",
+            "### Fee Distribution"
         ] + bucket_lines
 
 
