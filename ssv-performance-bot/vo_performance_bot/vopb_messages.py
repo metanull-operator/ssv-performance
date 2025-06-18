@@ -179,8 +179,8 @@ def compile_fee_messages(fee_data, extra_message=None):
 
     for operator in fee_data.values():
         print("getting fee operator")
-        fee = operator.get("operator_fee")
-        is_private = operator.get("is_private")
+        fee = operator.get(FIELD_OPERATOR_FEE)
+        is_private = operator.get(FIELD_IS_PRIVATE)
         if fee is None:
             continue
         if is_private:
