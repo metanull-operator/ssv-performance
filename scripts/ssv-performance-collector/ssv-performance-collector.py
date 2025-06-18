@@ -62,6 +62,8 @@ def fetch_and_filter_data(base_url, page_size):
 def insert_clickhouse_performance_data(client, network, clickhouse_table_operators, clickhouse_table_performance, operators, target_date, source):
     performance_rows = []
     operator_rows = []
+    validator_counts_rows = []
+    operator_fees_rows = []
 
     now = datetime.now(timezone.utc)
 
