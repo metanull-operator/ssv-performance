@@ -274,6 +274,16 @@ def iqr_bucket_lines_with_zero_handling(values, fees, num_buckets=5, iqr_multipl
 
     non_zero_values = [fee for fee, _ in non_zero_fees]
 
+    if len(non_zero_values) < 2:
+        # Fallback: treat all values as in a single flat bucket
+        all_fees = zero_fees + non_zero_fees
+        values = [fee for fee, _ in all_fees]
+        min_fee = min(values)
+        max_fee = max(values)
+
+        # Construct a single bucket with the entire dataset
+        return [values], [(min_fee, max_fee)], len(zero_fees), []
+
     # IQR-based outlier detection
     q1 = statistics.quantiles(non_zero_values, n=4)[0]
     q3 = statistics.quantiles(non_zero_values, n=4)[2]
