@@ -265,6 +265,48 @@ async def send_vo_threshold_messages(channel, perf_data, extra_message=None, sub
         logging.error(f"Failed to send VO threshold messages: {e}", exc_info=True)
 
 
+def iqr_bucket_lines(values, fees, num_buckets=5):
+    q1 = statistics.quantiles(values, n=4)[0]
+    q3 = statistics.quantiles(values, n=4)[2]
+    iqr = q3 - q1
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
+
+    # Clip to actual min/max if IQR range is too narrow
+    inlier_values = [v for v in values if lower_bound <= v <= upper_bound]
+    if len(set(inlier_values)) < num_buckets:
+        return dynamic_bucket_lines(values, fees, num_buckets)
+
+    min_val = min(inlier_values)
+    max_val = max(inlier_values)
+    bucket_size = (max_val - min_val) / num_buckets
+
+    buckets = [[] for _ in range(num_buckets)]
+    outliers = []
+
+    for fee, op in fees:
+        if fee < lower_bound or fee > upper_bound:
+            outliers.append((fee, op))
+            continue
+        i = int((fee - min_val) / bucket_size)
+        if i == num_buckets:  # edge case for max_val
+            i -= 1
+        buckets[i].append(fee)
+
+    max_count = max(len(b) for b in buckets) or 1
+    lines = []
+    for i, b in enumerate(buckets):
+        lower = min_val + i * bucket_size
+        upper = lower + bucket_size
+        bar = "█" * int((len(b) / max_count) * 20)
+        lines.append(f"{lower:.2f}–{upper:.2f} SSV  {bar:<20} ({len(b)})")
+
+    if outliers:
+        lines.append(f"{len(outliers)} operators above/below typical range (outliers not shown)")
+
+    return lines
+
+
 def dynamic_bucket_lines(values, fees, num_buckets=10):
     min_fee = min(values)
     max_fee = max(values)
@@ -330,7 +372,7 @@ def compile_fee_messages(fee_data, extra_message=None):
         lowest = sorted_fees[0]
         count = len(values)
 
-        bucket_lines = dynamic_bucket_lines(values, fees)
+        bucket_lines = iqr_bucket_lines(values, fees)
 
         return [
             f"**{label} Operators (SSV/year)**",
