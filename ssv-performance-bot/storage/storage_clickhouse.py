@@ -45,6 +45,45 @@ class ClickHouseStorage(DataStorageInterface):
         return perf_data
 
 
+    def get_latest_fee_data(self, network):
+        query = """
+            SELECT 
+                o.operator_id,
+                o.operator_name,
+                o.is_vo,
+                o.is_private,
+                o.validator_count,
+                o.address,
+                o.operator_fee
+                o.metric_date,
+            FROM operators o
+            WHERE o.network = %(network)s
+        """
+
+        params = {
+            'network': network        # e.g., 'mainnet'
+        }
+
+        rows = self.client.query(query, parameters=params).result_rows
+
+        fee_data = {}
+        for row in rows:
+            operator_id = row[0]
+            if operator_id not in fee_data:
+                fee_data[operator_id] = {
+                    FIELD_OPERATOR_ID: row[0],
+                    FIELD_OPERATOR_NAME: row[1],
+                    FIELD_IS_VO: row[2],
+                    FIELD_IS_PRIVATE: row[3],
+                    FIELD_VALIDATOR_COUNT: row[4],
+                    FIELD_ADDRESS: row[5],
+                    FIELD_OPERATOR_FEE: row[6],
+                    FIELD_OPERATOR_FEE_DATE: row[7]
+                }
+
+        return fee_data
+
+
     def get_latest_performance_data(self, network, period):
         query = """
             SELECT 
