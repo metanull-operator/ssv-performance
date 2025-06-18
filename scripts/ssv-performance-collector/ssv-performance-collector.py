@@ -136,11 +136,11 @@ def insert_clickhouse_performance_data(client, network, clickhouse_table_operato
         'network', 'operator_id', 'metric_type', 'metric_date', 'metric_value', 'source', 'updated_at'
     ])
 
-    client.insert(clickhouse_table_performance, operator_fees_rows, column_names=[
+    client.insert('operator_fees', operator_fees_rows, column_names=[
         'network', 'operator_id', 'metric_date', 'operator_fee', 'source', 'updated_at'
     ])
 
-    client.insert(clickhouse_table_performance, validator_counts_rows, column_names=[
+    client.insert('validator_counts', validator_counts_rows, column_names=[
         'network', 'operator_id', 'metric_date', 'validator_count', 'source', 'updated_at'
     ])    
 
