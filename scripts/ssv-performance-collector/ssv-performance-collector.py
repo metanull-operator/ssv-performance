@@ -218,4 +218,4 @@ def main():
     deduplicate_table(client, 'validator_counts', args.network)
 
 if __name__ == "__main__":
-    main()1G
+    main()
