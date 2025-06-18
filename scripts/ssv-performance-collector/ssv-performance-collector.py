@@ -107,7 +107,7 @@ def insert_clickhouse_performance_data(client, network, clickhouse_table_operato
             ))
 
         if validator_count is not None:
-            validator_counts_rows.appent((
+            validator_counts_rows.append((
                 network,
                 operator_id,
                 target_date,
