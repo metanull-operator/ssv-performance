@@ -265,6 +265,45 @@ async def send_vo_threshold_messages(channel, perf_data, extra_message=None, sub
         logging.error(f"Failed to send VO threshold messages: {e}", exc_info=True)
 
 
+def dynamic_bucket_lines(values, fees, num_buckets=3):
+    min_fee = min(values)
+    max_fee = max(values)
+    if min_fee == max_fee:
+        # Degenerate case: all values the same
+        return [f"All operators charge the same fee: {min_fee:.2f} SSV"]
+
+    bucket_size = (max_fee - min_fee) / num_buckets
+    bucket_counts = [0 for _ in range(num_buckets)]
+    bucket_ranges = []
+
+    # Build ranges like: (0.0, 2.0), (2.0, 4.0), ...
+    for i in range(num_buckets):
+        lower = min_fee + i * bucket_size
+        upper = lower + bucket_size
+        bucket_ranges.append((lower, upper))
+
+    # Count values in each bucket
+    for val in values:
+        for i, (lower, upper) in enumerate(bucket_ranges):
+            if i == num_buckets - 1:
+                # Include upper bound in last bucket
+                if lower <= val <= upper:
+                    bucket_counts[i] += 1
+                    break
+            elif lower <= val < upper:
+                bucket_counts[i] += 1
+                break
+
+    max_count = max(bucket_counts) or 1
+    lines = []
+    for i, (lower, upper) in enumerate(bucket_ranges):
+        count = bucket_counts[i]
+        bar = "█" * int((count / max_count) * 20)
+        lines.append(f"{lower:.2f}–{upper:.2f} SSV  {bar:<20} ({count})")
+
+    return lines
+
+
 def compile_fee_messages(fee_data, extra_message=None):
     messages = []
 
@@ -291,21 +330,8 @@ def compile_fee_messages(fee_data, extra_message=None):
         lowest = sorted_fees[0]
         count = len(values)
 
-        # Fee bucket histogram (feel free to customize ranges/emojis)
-        fee_buckets = {
-            "🟩 0–3 SSV": 0,
-            "🟨 3–6 SSV": 0,
-            "🟥 >6 SSV": 0,
-        }
-        for val in values:
-            if val < 3:
-                fee_buckets["🟩 0–3 SSV"] += 1
-            elif val <= 6:
-                fee_buckets["🟨 3–6 SSV"] += 1
-            else:
-                fee_buckets["🟥 >6 SSV"] += 1
+        bucket_lines = dynamic_bucket_lines(values, fees)
 
-        bucket_strs = [f"{emoji}: {count}" for emoji, count in fee_buckets.items()]
         return [
             f"**{label} Operators (SSV/year)**",
             f"- Count: {count}",
@@ -313,8 +339,8 @@ def compile_fee_messages(fee_data, extra_message=None):
             f"- Median Fee: {statistics.median(values):.2f} SSV",
             f"- Lowest Fee: {lowest[1][FIELD_OPERATOR_NAME]} (ID {lowest[1][FIELD_OPERATOR_ID]}) – {lowest[0]:.2f} SSV",
             f"- Highest Fee: {highest[1][FIELD_OPERATOR_NAME]} (ID {highest[1][FIELD_OPERATOR_ID]}) – {highest[0]:.2f} SSV",
-            f"- Fee Buckets: {' | '.join(bucket_strs)}"
-        ]
+            "- Fee Distribution (equal buckets):"
+        ] + bucket_lines
 
     messages.extend(summarize("Public", public_fees))
     messages.append("")  # spacing
