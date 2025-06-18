@@ -230,7 +230,7 @@ Thresholds displayed are subject to change.
                 await ctx.followup.send("Fee data not available.", ephemeral=True)
                 return
 
-            await respond_fee_messages(ctx, perf_data, extra_message=extra_message)
+            await respond_fee_messages(ctx, fee_data, extra_message=extra_message)
 
         except Exception as e:
             logging.error(f"Error fetching fee information: {e}", exc_info=True)
