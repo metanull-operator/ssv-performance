@@ -201,8 +201,8 @@ def compile_fee_messages(fee_data, extra_message=None):
             f"- Average Fee: {statistics.mean(values) * 100:.2f}%",
             f"- Median Fee: {statistics.median(values) * 100:.2f}%",
             f"- Std Deviation: {statistics.stdev(values) * 100:.2f}%" if len(values) > 1 else "- Std Deviation: N/A",
-            f"- Highest Fee: {highest[1]['operator_name']} ({highest[1]['operator_id']}) - {highest[0] * 100:.2f}%",
-            f"- Lowest Fee: {lowest[1]['operator_name']} ({lowest[1]['operator_id']}) - {lowest[0] * 100:.2f}%"
+            f"- Highest Fee: {highest[1][FIELD_OPERATOR_NAME]} ({highest[1][FIELD_OPERATOR_ID]}) - {highest[0] * 100:.2f}%",
+            f"- Lowest Fee: {lowest[1][FIELD_OPERATOR_NAME]} ({lowest[1][FIELD_OPERATOR_ID]}) - {lowest[0] * 100:.2f}%"
         ]
 
     messages.extend(summarize("Public", public_fees))
