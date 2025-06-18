@@ -140,7 +140,7 @@ def main():
         return
 
     try:
-        perf_data = get_operator_performance_data(network=args.network, days=args.days, metric_type=args.metric)
+        perf_data = get_operator_validator_count_data(network=args.network, days=args.days, metric_type=args.metric)
         logging.info("Retrieved performance data from ClickHouse.")
 
     except Exception as e:
