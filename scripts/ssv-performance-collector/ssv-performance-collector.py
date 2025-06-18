@@ -216,6 +216,8 @@ def main():
 
     deduplicate_table(client, args.ch_operators_table, args.network)
     deduplicate_table(client, args.ch_performance_table, args.network)
+    deduplicate_table(client, 'operator_fees', args.network)
+    deduplicate_table(client, 'validator_counts', args.network)
 
 if __name__ == "__main__":
     main()
