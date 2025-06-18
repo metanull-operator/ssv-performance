@@ -55,7 +55,7 @@ class ClickHouseStorage(DataStorageInterface):
                 o.validator_count,
                 o.address,
                 o.operator_fee,
-                o.metric_date
+                o.updated_at
             FROM operators o
             WHERE o.network = %(network)s
         """
