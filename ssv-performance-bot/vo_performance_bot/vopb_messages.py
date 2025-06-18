@@ -573,7 +573,7 @@ def compile_fee_messages(fee_data, extra_message=None):
             zero_count=zero_count,
             outliers=outliers,
             fees=fees,
-            max_segments=40
+            max_segments=40,
             mean=mean,
             median=median
         )
