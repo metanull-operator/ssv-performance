@@ -198,11 +198,11 @@ def compile_fee_messages(fee_data, extra_message=None):
         return [
             f"**{label} Operators**",
             f"- Count: {len(values)}",
-            f"- Average Fee: {statistics.mean(values) * 100:.2f}%",
-            f"- Median Fee: {statistics.median(values) * 100:.2f}%",
-            f"- Std Deviation: {statistics.stdev(values) * 100:.2f}%" if len(values) > 1 else "- Std Deviation: N/A",
-            f"- Highest Fee: {highest[1][FIELD_OPERATOR_NAME]} ({highest[1][FIELD_OPERATOR_ID]}) - {highest[0] * 100:.2f}%",
-            f"- Lowest Fee: {lowest[1][FIELD_OPERATOR_NAME]} ({lowest[1][FIELD_OPERATOR_ID]}) - {lowest[0] * 100:.2f}%"
+            f"- Average Fee: {statistics.mean(values) * 100:.2f} SSV/year",
+            f"- Median Fee: {statistics.median(values) * 100:.2f} SSV/year",
+            f"- Std Deviation: {statistics.stdev(values) * 100:.2f} SSV/year" if len(values) > 1 else "- Std Deviation: N/A",
+            f"- Highest Fee: {highest[1][FIELD_OPERATOR_NAME]} ({highest[1][FIELD_OPERATOR_ID]}) - {highest[0] * 100:.2f} SSV/year",
+            f"- Lowest Fee: {lowest[1][FIELD_OPERATOR_NAME]} ({lowest[1][FIELD_OPERATOR_ID]}) - {lowest[0] * 100:.2f} SSV/year"
         ]
 
     messages.extend(summarize("Public", public_fees))
