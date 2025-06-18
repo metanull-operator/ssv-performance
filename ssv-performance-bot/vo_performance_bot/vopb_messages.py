@@ -4,6 +4,8 @@ from vo_performance_bot.vopb_operator_threshold_alerts import *
 from datetime import datetime, timedelta
 from common.config import OPERATOR_24H_HISTORY_COUNT, ALERTS_THRESHOLDS_30D, ALERTS_THRESHOLDS_24H
 import discord
+import statistics
+
 
 # Break messages into < MAX_DISCORD_MESSAGE_LENGTH characters chunks, called bundles
 # Returns list of separate bundles, each < MAX_DISCORD_MESSAGE_LENGTH
@@ -168,53 +170,6 @@ def create_alerts_24h(perf_data):
     return operator_ids, alert_msgs_24h
 
 
-import statistics
-
-
-def compile_fee_messages(fee_data, extra_message=None):
-    messages = []
-
-    public_fees = []
-    private_fees = []
-
-    for operator in fee_data.values():
-        fee = operator.get(FIELD_OPERATOR_FEE)
-        is_private = operator.get(FIELD_IS_PRIVATE)
-        if fee is None:
-            continue
-        if is_private:
-            private_fees.append((fee, operator))
-        else:
-            public_fees.append((fee, operator))
-
-    def summarize(label, fees):
-        if not fees:
-            return [f"No {label} operators found."]
-        values = [f[0] for f in fees]
-        sorted_fees = sorted(fees, key=lambda x: x[0])
-        highest = sorted_fees[-1]
-        lowest = sorted_fees[0]
-        return [
-            f"**{label} Operators**",
-            f"- Count: {len(values)}",
-            f"- Average Fee: {statistics.mean(values):.2f} SSV/year",
-            f"- Median Fee: {statistics.median(values):.2f} SSV/year",
-            f"- Std Deviation: {statistics.stdev(values):.2f} SSV/year" if len(values) > 1 else "- Std Deviation: N/A",
-            f"- Highest Fee: {highest[1][FIELD_OPERATOR_NAME]} ({highest[1][FIELD_OPERATOR_ID]}) - {highest[0]:.2f} SSV/year",
-            f"- Lowest Fee: {lowest[1][FIELD_OPERATOR_NAME]} ({lowest[1][FIELD_OPERATOR_ID]}) - {lowest[0]:.2f} SSV/year"
-        ]
-
-    messages.extend(summarize("Public", public_fees))
-    messages.append("")  # spacing
-    messages.extend(summarize("Private", private_fees))
-
-    if extra_message:
-        messages.append("")
-        messages.append(extra_message)
-
-    return bundle_messages(messages)
-
-
 def create_alerts_30d(perf_data):
     alert_msgs_30d = {threshold: [] for threshold in ALERTS_THRESHOLDS_30D}
     operator_ids = []
@@ -310,17 +265,77 @@ async def send_vo_threshold_messages(channel, perf_data, extra_message=None, sub
         logging.error(f"Failed to send VO threshold messages: {e}", exc_info=True)
 
 
-async def respond_fee_messages(ctx, fee_data, extra_message=None):
+def compile_fee_messages(fee_data, extra_message=None):
+    messages = []
 
+    public_fees = []
+    private_fees = []
+
+    for operator in fee_data.values():
+        fee = operator.get(FIELD_OPERATOR_FEE)
+        is_private = operator.get(FIELD_IS_PRIVATE)
+        if fee is None:
+            continue
+        if is_private:
+            private_fees.append((fee, operator))
+        else:
+            public_fees.append((fee, operator))
+
+    def summarize(label, fees):
+        if not fees:
+            return [f"No {label} operators found."]
+
+        values = [f[0] for f in fees]
+        sorted_fees = sorted(fees, key=lambda x: x[0])
+        highest = sorted_fees[-1]
+        lowest = sorted_fees[0]
+        count = len(values)
+
+        # Fee bucket histogram (feel free to customize ranges/emojis)
+        fee_buckets = {
+            "🟩 0–3 SSV": 0,
+            "🟨 3–6 SSV": 0,
+            "🟥 >6 SSV": 0,
+        }
+        for val in values:
+            if val < 3:
+                fee_buckets["🟩 0–3 SSV"] += 1
+            elif val <= 6:
+                fee_buckets["🟨 3–6 SSV"] += 1
+            else:
+                fee_buckets["🟥 >6 SSV"] += 1
+
+        bucket_strs = [f"{emoji}: {count}" for emoji, count in fee_buckets.items()]
+        return [
+            f"**{label} Operators (SSV/year)**",
+            f"- Count: {count}",
+            f"- Average Fee: {statistics.mean(values):.2f} SSV",
+            f"- Median Fee: {statistics.median(values):.2f} SSV",
+            f"- Lowest Fee: {lowest[1][FIELD_OPERATOR_NAME]} (ID {lowest[1][FIELD_OPERATOR_ID]}) – {lowest[0]:.2f} SSV",
+            f"- Highest Fee: {highest[1][FIELD_OPERATOR_NAME]} (ID {highest[1][FIELD_OPERATOR_ID]}) – {highest[0]:.2f} SSV",
+            f"- Fee Buckets: {' | '.join(bucket_strs)}"
+        ]
+
+    messages.extend(summarize("Public", public_fees))
+    messages.append("")  # spacing
+    messages.extend(summarize("Private", private_fees))
+
+    if extra_message:
+        messages.append("")
+        messages.append(extra_message)
+
+    return bundle_messages(messages)
+
+
+async def respond_fee_messages(ctx, fee_data, extra_message=None):
     try:
         messages = compile_fee_messages(fee_data, extra_message=extra_message)
 
         if messages:
             for message in messages:
-                # Note assumption that defer() was previously called.
                 await ctx.followup.send(message.strip(), ephemeral=False)
         else:
-            await ctx.followup.send(f'Fee data not found.', ephemeral=True)
+            await ctx.followup.send("Fee data not found.", ephemeral=True)
     except Exception as e:
         logging.error(f"Failed to respond with fee data message: {e}", exc_info=True)
 
