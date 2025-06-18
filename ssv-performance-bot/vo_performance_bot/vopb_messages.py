@@ -307,33 +307,45 @@ def iqr_bucket_lines(values, fees, num_buckets=5):
     return lines
 
 
-def iqr_bucket_lines_with_outlier_summary(values, fees, num_buckets=5):
-    q1 = statistics.quantiles(values, n=4)[0]
-    q3 = statistics.quantiles(values, n=4)[2]
+def iqr_bucket_lines_with_zero_handling(values, fees, num_buckets=3, iqr_multiplier=1.5):
+    zero_fees = [(fee, op) for fee, op in fees if fee == 0]
+    non_zero_fees = [(fee, op) for fee, op in fees if fee > 0]
+
+    if not non_zero_fees:
+        return [f"All operators charge 0.00 SSV."]
+
+    non_zero_values = [fee for fee, _ in non_zero_fees]
+
+    # IQR-based outlier detection
+    q1 = statistics.quantiles(non_zero_values, n=4)[0]
+    q3 = statistics.quantiles(non_zero_values, n=4)[2]
     iqr = q3 - q1
-    upper_bound = q3 + 1.5 * iqr
+    upper_bound = q3 + iqr_multiplier * iqr
 
-    # Only consider fees ≥ 0 for main buckets
-    inlier_fees = [(fee, op) for fee, op in fees if fee <= upper_bound]
-    outlier_fees = [(fee, op) for fee, op in fees if fee > upper_bound]
+    inlier_fees = [(fee, op) for fee, op in non_zero_fees if fee <= upper_bound]
+    outlier_fees = [(fee, op) for fee, op in non_zero_fees if fee > upper_bound]
 
-    if len(set(fee for fee, _ in inlier_fees)) < num_buckets:
-        return dynamic_bucket_lines(values, fees, num_buckets)
+    min_val = min(fee for fee, _ in inlier_fees)
+    max_val = max(fee for fee, _ in inlier_fees)
+    bucket_size = (max_val - min_val) / (num_buckets or 1)
 
-    inlier_values = [fee for fee, _ in inlier_fees]
-    min_val = min(inlier_values)
-    max_val = max(inlier_values)
-    bucket_size = (max_val - min_val) / num_buckets
-
+    # Build buckets
     buckets = [[] for _ in range(num_buckets)]
     for fee, _ in inlier_fees:
         i = int((fee - min_val) / bucket_size)
-        if i == num_buckets:  # edge case for max_val
+        if i == num_buckets:
             i -= 1
         buckets[i].append(fee)
 
-    max_count = max(len(b) for b in buckets) or 1
+    max_count = max(
+        [len(b) for b in buckets] + [len(zero_fees)]
+    ) or 1  # include 0-fee count in scaling
+
     lines = []
+    if zero_fees:
+        bar = "█" * int((len(zero_fees) / max_count) * 20)
+        lines.append(f"0.00 SSV       {bar:<20} ({len(zero_fees)})")
+
     for i, b in enumerate(buckets):
         lower = min_val + i * bucket_size
         upper = lower + bucket_size
@@ -344,7 +356,9 @@ def iqr_bucket_lines_with_outlier_summary(values, fees, num_buckets=5):
         outlier_count = len(outlier_fees)
         outlier_min = min(fee for fee, _ in outlier_fees)
         outlier_max = max(fee for fee, _ in outlier_fees)
-        lines.append(f"> {upper_bound:.2f} SSV  {'█' * 20} ({outlier_count}) — High-end outliers {outlier_min:.2f}–{outlier_max:.2f} SSV")
+        lines.append(
+            f"> {upper_bound:.2f} SSV  {'█' * 20} ({outlier_count}) — High-end outliers {outlier_min:.2f}–{outlier_max:.2f} SSV"
+        )
 
     return lines
 
