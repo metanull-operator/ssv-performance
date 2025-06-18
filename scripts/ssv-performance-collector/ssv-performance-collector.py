@@ -82,7 +82,7 @@ def insert_clickhouse_performance_data(client, network, clickhouse_table_operato
         operator_fee = operator.get("fee", None)
         if operator_fee is not None:
             operator_fee = float(operator_fee)
-            operator_fee = (fee * BLOCKS_PER_YEAR) / 1e18
+            operator_fee = (operator_fee * BLOCKS_PER_YEAR) / 1e18
 
         operator_rows.append((
             network,

@@ -28,7 +28,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 RUN chmod +x /app/entrypoint.sh
 
-ENV CLICKHOUSE_PASSWORD=
+#ENV CLICKHOUSE_PASSWORD=
 
 # Number of outbound API calls per minute
 #ENV REQUESTS_PER_MINUTE=20
