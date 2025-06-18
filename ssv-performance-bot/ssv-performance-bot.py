@@ -90,6 +90,8 @@ async def main():
     async def on_ready():
         global loop_tasks
         
+        await bot.sync_commands()
+
         logging.info(f'Logged in as {bot.user.name}')
         logging.info(f"Getting channel {channel_id}")
 
