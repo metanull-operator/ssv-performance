@@ -460,14 +460,18 @@ def render_bucket_lines(buckets_with_ranges, zero_count, outliers, max_segments=
             return ""
         return "█" * max(1, int((count / max_count) * max_segments))
 
+    max_fee = max([fee for fee, _ in fees])
+    max_label = f"Outliers > {max_fee:.2f}"
+    label_width = len(max_label) + 1
+
     if zero_count > 0:
         bar = build_bar(zero_count)
-        lines.append(f"{'0.00':>16} {bar:<20} ({zero_count})")
+        lines.append(f"{'0.00':>{label_width}} {bar:<20} ({zero_count})")
 
     for b, lower, upper in buckets_with_ranges:
         label = f"{lower:.2f}–{upper:.2f}"
         bar = build_bar(len(b))
-        lines.append(f"{label:>16} {bar:<20} ({len(b)})")
+        lines.append(f"{label:>{label_width}} {bar:<20} ({len(b)})")
 
     if outliers:
         count = len(outliers)
@@ -475,7 +479,7 @@ def render_bucket_lines(buckets_with_ranges, zero_count, outliers, max_segments=
         outlier_max = max(fee for fee, _ in outliers)
         bar = build_bar(count)
         label = f"Outliers > {outlier_min:.2f}"
-        lines.append(f"{label:>16} {bar:<20} ({count}) ({outlier_min:.2f}-{outlier_max:.2f})")
+        lines.append(f"{label:>{label_width}} {bar:<20} ({count}) ({outlier_min:.2f}-{outlier_max:.2f})")
 
     lines = ["```"] + lines + ["```"]
 
@@ -557,6 +561,7 @@ def compile_fee_messages(fee_data, extra_message=None):
             buckets_with_ranges=[(bucket, lower, upper) for bucket, (lower, upper) in zip(buckets, bucket_ranges)],
             zero_count=zero_count,
             outliers=outliers,
+            max_segments=40
         )
 
         return [
@@ -570,9 +575,9 @@ def compile_fee_messages(fee_data, extra_message=None):
         ] + bucket_lines
 
 
-    messages.extend(summarize("Public", public_fees, iqr_multiplier=1.5))
+    messages.extend(summarize("Public", public_fees, iqr_multiplier=1.5, num_buckets=10))
     messages.append("")  # spacing
-    messages.extend(summarize("Private", private_fees, iqr_multiplier=2.5))
+    messages.extend(summarize("Private", private_fees, iqr_multiplier=2.5, num_buckets=5))
 
     if extra_message:
         messages.append("")
