@@ -458,7 +458,7 @@ def render_bucket_lines(buckets_with_ranges, zero_count, outliers, fees, max_seg
     def build_bar(count):
         if count == 0:
             return ""
-        return "▇" * max(1, int((count / max_count) * max_segments))
+        return "■" * max(1, int((count / max_count) * max_segments))
 
     max_fee = max([fee for fee, _ in fees])
     max_label = f"Outliers > {max_fee:.2f}"
