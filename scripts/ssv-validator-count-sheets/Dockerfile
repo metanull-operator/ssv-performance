@@ -19,8 +19,8 @@ ENV CLICKHOUSE_PASSWORD=
 
 # Interoperability and logging
 ENV GOOGLE_CREDENTIALS_FILE=/google-credentials.json
-ENV CLICKHOUSE_PASSWORD_FILE=/etc/ssv-performance-sheets/clickhouse-password.txt
+ENV CLICKHOUSE_PASSWORD_FILE=/etc/ssv-validator-sheets/clickhouse-password.txt
 ENV CLICKHOUSE_HOST=clickhouse
 ENV PYTHONUNBUFFERED=1
 
-ENTRYPOINT ["python", "ssv-performance-sheets.py"]
+ENTRYPOINT ["python", "ssv-validator-sheets.py"]
