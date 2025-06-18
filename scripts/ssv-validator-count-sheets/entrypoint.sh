@@ -6,7 +6,7 @@ if [ -n "${CLICKHOUSE_PASSWORD_FILE:-}" ] && [ -f "$CLICKHOUSE_PASSWORD_FILE" ];
 fi
 
 if [[ $# -eq 0 ]]; then
-  set -- python ssv-performance-sheets.py
+  set -- python ssv-validator-count-sheets.py
 fi
 
 exec gosu sheets "$@"
