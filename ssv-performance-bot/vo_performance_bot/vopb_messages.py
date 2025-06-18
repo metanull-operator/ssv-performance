@@ -349,7 +349,7 @@ def iqr_bucket_lines_with_outlier_summary(values, fees, num_buckets=5):
     return lines
 
 
-def iqr_bucket_lines_with_zero_handling(values, fees, num_buckets=3, iqr_multiplier=1.5):
+def iqr_bucket_lines_with_zero_handling(values, fees, num_buckets=5, iqr_multiplier=1.5):
     zero_fees = [(fee, op) for fee, op in fees if fee == 0]
     non_zero_fees = [(fee, op) for fee, op in fees if fee > 0]
 
@@ -460,7 +460,7 @@ def compile_fee_messages(fee_data, extra_message=None):
         else:
             public_fees.append((fee, operator))
 
-    def summarize(label, fees, irq_multiplier=1.5):
+    def summarize(label, fees, num_buckets=5, irq_multiplier=1.5):
         if not fees:
             return [f"No {label} operators found."]
 
@@ -470,7 +470,7 @@ def compile_fee_messages(fee_data, extra_message=None):
         lowest = sorted_fees[0]
         count = len(values)
 
-        bucket_lines = iqr_bucket_lines_with_zero_handling(values, fees, irq_multiplier)
+        bucket_lines = iqr_bucket_lines_with_zero_handling(values, fees, num_buckets=num_buckets, irq_multiplier=irq_multiplier)
 
         return [
             f"**{label} Operators (SSV/year)**",
