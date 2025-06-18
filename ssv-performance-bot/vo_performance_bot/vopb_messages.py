@@ -354,6 +354,50 @@ def iqr_bucket_lines_with_zero_handling(values, fees, num_buckets=5, iqr_multipl
     non_zero_fees = [(fee, op) for fee, op in fees if fee > 0]
 
     if not non_zero_fees:
+        return [], [], len(zero_fees), []
+
+    non_zero_values = [fee for fee, _ in non_zero_fees]
+
+    # IQR-based outlier detection
+    q1 = statistics.quantiles(non_zero_values, n=4)[0]
+    q3 = statistics.quantiles(non_zero_values, n=4)[2]
+    iqr = q3 - q1
+    upper_bound = q3 + iqr_multiplier * iqr
+
+    inlier_fees = [(fee, op) for fee, op in non_zero_fees if fee <= upper_bound]
+    outlier_fees = [(fee, op) for fee, op in non_zero_fees if fee > upper_bound]
+
+    if zero_fees:
+        min_val = min(fee for fee, _ in inlier_fees)
+    else:
+        min_val = min(fee for fee, _ in inlier_fees + outlier_fees)
+
+    max_val = max(fee for fee, _ in inlier_fees)
+    bucket_size = (max_val - min_val) / (num_buckets or 1)
+
+    # Build buckets and ranges
+    buckets = [[] for _ in range(num_buckets)]
+    bucket_ranges = []
+
+    for i in range(num_buckets):
+        lower = min_val + i * bucket_size
+        upper = lower + bucket_size
+        bucket_ranges.append((lower, upper))
+
+    for fee, _ in inlier_fees:
+        i = int((fee - min_val) / bucket_size)
+        if i == num_buckets:
+            i -= 1
+        buckets[i].append(fee)
+
+    return buckets, bucket_ranges, len(zero_fees), outlier_fees
+
+
+def iqr_bucket_lines_with_zero_handling1(values, fees, num_buckets=5, iqr_multiplier=1.5):
+    zero_fees = [(fee, op) for fee, op in fees if fee == 0]
+    non_zero_fees = [(fee, op) for fee, op in fees if fee > 0]
+
+    if not non_zero_fees:
         return [f"All operators charge 0.00 SSV."]
 
     non_zero_values = [fee for fee, _ in non_zero_fees]
@@ -404,6 +448,35 @@ def iqr_bucket_lines_with_zero_handling(values, fees, num_buckets=5, iqr_multipl
         outlier_max = max(fee for fee, _ in outlier_fees)
         lines.append(f"Outliers > {upper_bound:.2f} SSV  {'█' * 20} ({outlier_count}) ({outlier_min:.2f}–{outlier_max:.2f})")
 
+
+    return lines
+
+
+def render_bucket_lines(buckets_with_ranges, zero_count, outliers, max_segments=20):
+    max_count = max([len(b) for b, _, _ in buckets_with_ranges] + [zero_count, len(outliers)])
+    lines = []
+
+    def build_bar(count):
+        if count == 0:
+            return ""
+        return "█" * max(1, int((count / max_count) * max_segments))
+
+    if zero_count > 0:
+        bar = build_bar(zero_count)
+        lines.append(f"{'0.00 SSV':<16} {bar:<20} ({zero_count})")
+
+    for b, lower, upper in buckets_with_ranges:
+        label = f"{lower:.2f}–{upper:.2f} SSV"
+        bar = build_bar(len(b))
+        lines.append(f"{label:<16} {bar:<20} ({len(b)})")
+
+    if outliers:
+        count = len(outliers)
+        outlier_min = min(fee for fee, _ in outliers)
+        outlier_max = max(fee for fee, _ in outliers)
+        bar = build_bar(count)
+        label = f"> {outlier_min:.2f} SSV"
+        lines.append(f"{label:<16} {bar:<20} ({count}) — High-end outliers up to {outlier_max:.2f} SSV")
 
     return lines
 
@@ -473,7 +546,17 @@ def compile_fee_messages(fee_data, extra_message=None):
         lowest = sorted_fees[0]
         count = len(values)
 
-        bucket_lines = iqr_bucket_lines_with_zero_handling(values, fees, num_buckets=num_buckets, iqr_multiplier=iqr_multiplier)
+        # Get structured buckets
+        buckets, bucket_ranges, zero_count, outliers = iqr_bucket_lines_with_zero_handling(
+            values, fees, num_buckets=num_buckets, iqr_multiplier=iqr_multiplier
+        )
+
+        # Render aligned bar lines
+        bucket_lines = render_bucket_lines(
+            buckets_with_ranges=[(bucket, lower, upper) for bucket, (lower, upper) in zip(buckets, bucket_ranges)],
+            zero_count=zero_count,
+            outliers=outliers,
+        )
 
         return [
             f"**{label} Operators (SSV/year)**",
@@ -482,8 +565,9 @@ def compile_fee_messages(fee_data, extra_message=None):
             f"- Median Fee: {statistics.median(values):.2f} SSV",
             f"- Lowest Fee: {lowest[1][FIELD_OPERATOR_NAME]} (ID {lowest[1][FIELD_OPERATOR_ID]}) – {lowest[0]:.2f} SSV",
             f"- Highest Fee: {highest[1][FIELD_OPERATOR_NAME]} (ID {highest[1][FIELD_OPERATOR_ID]}) – {highest[0]:.2f} SSV",
-            "- Fee Distribution (equal buckets):"
+            "- Fee Distribution:"
         ] + bucket_lines
+
 
     messages.extend(summarize("Public", public_fees, iqr_multiplier=1.5))
     messages.append("")  # spacing
