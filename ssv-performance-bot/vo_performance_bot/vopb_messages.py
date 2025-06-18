@@ -265,90 +265,6 @@ async def send_vo_threshold_messages(channel, perf_data, extra_message=None, sub
         logging.error(f"Failed to send VO threshold messages: {e}", exc_info=True)
 
 
-def iqr_bucket_lines(values, fees, num_buckets=5):
-    q1 = statistics.quantiles(values, n=4)[0]
-    q3 = statistics.quantiles(values, n=4)[2]
-    iqr = q3 - q1
-    lower_bound = q1 - 1.5 * iqr
-    upper_bound = q3 + 1.5 * iqr
-
-    # Clip to actual min/max if IQR range is too narrow
-    inlier_values = [v for v in values if lower_bound <= v <= upper_bound]
-    if len(set(inlier_values)) < num_buckets:
-        return dynamic_bucket_lines(values, fees, num_buckets)
-
-    min_val = min(inlier_values)
-    max_val = max(inlier_values)
-    bucket_size = (max_val - min_val) / num_buckets
-
-    buckets = [[] for _ in range(num_buckets)]
-    outliers = []
-
-    for fee, op in fees:
-        if fee < lower_bound or fee > upper_bound:
-            outliers.append((fee, op))
-            continue
-        i = int((fee - min_val) / bucket_size)
-        if i == num_buckets:  # edge case for max_val
-            i -= 1
-        buckets[i].append(fee)
-
-    max_count = max(len(b) for b in buckets) or 1
-    lines = []
-    for i, b in enumerate(buckets):
-        lower = min_val + i * bucket_size
-        upper = lower + bucket_size
-        bar = "█" * int((len(b) / max_count) * 20)
-        lines.append(f"{lower:.2f}–{upper:.2f} SSV  {bar:<20} ({len(b)})")
-
-    if outliers:
-        lines.append(f"{len(outliers)} operators above/below typical range (outliers not shown)")
-
-    return lines
-
-
-def iqr_bucket_lines_with_outlier_summary(values, fees, num_buckets=5):
-    q1 = statistics.quantiles(values, n=4)[0]
-    q3 = statistics.quantiles(values, n=4)[2]
-    iqr = q3 - q1
-    upper_bound = q3 + 1.5 * iqr
-
-    # Only consider fees ≥ 0 for main buckets
-    inlier_fees = [(fee, op) for fee, op in fees if fee <= upper_bound]
-    outlier_fees = [(fee, op) for fee, op in fees if fee > upper_bound]
-
-    if len(set(fee for fee, _ in inlier_fees)) < num_buckets:
-        return dynamic_bucket_lines(values, fees, num_buckets)
-
-    inlier_values = [fee for fee, _ in inlier_fees]
-    min_val = min(inlier_values)
-    max_val = max(inlier_values)
-    bucket_size = (max_val - min_val) / num_buckets
-
-    buckets = [[] for _ in range(num_buckets)]
-    for fee, _ in inlier_fees:
-        i = int((fee - min_val) / bucket_size)
-        if i == num_buckets:  # edge case for max_val
-            i -= 1
-        buckets[i].append(fee)
-
-    max_count = max(len(b) for b in buckets) or 1
-    lines = []
-    for i, b in enumerate(buckets):
-        lower = min_val + i * bucket_size
-        upper = lower + bucket_size
-        bar = "█" * int((len(b) / max_count) * 20)
-        lines.append(f"{lower:.2f}–{upper:.2f} SSV  {bar:<20} ({len(b)})")
-
-    if outlier_fees:
-        outlier_count = len(outlier_fees)
-        outlier_min = min(fee for fee, _ in outlier_fees)
-        outlier_max = max(fee for fee, _ in outlier_fees)
-        lines.append(f"> {upper_bound:.2f} SSV  {'█' * 20} ({outlier_count}) — High-end outliers {outlier_min:.2f}–{outlier_max:.2f} SSV")
-
-    return lines
-
-
 def iqr_bucket_lines_with_zero_handling(values, fees, num_buckets=5, iqr_multiplier=1.5):
     zero_fees = [(fee, op) for fee, op in fees if fee == 0]
     non_zero_fees = [(fee, op) for fee, op in fees if fee > 0]
@@ -391,67 +307,6 @@ def iqr_bucket_lines_with_zero_handling(values, fees, num_buckets=5, iqr_multipl
         buckets[i].append(fee)
 
     return buckets, bucket_ranges, len(zero_fees), outlier_fees
-
-
-def iqr_bucket_lines_with_zero_handling1(values, fees, num_buckets=5, iqr_multiplier=1.5):
-    zero_fees = [(fee, op) for fee, op in fees if fee == 0]
-    non_zero_fees = [(fee, op) for fee, op in fees if fee > 0]
-
-    if not non_zero_fees:
-        return [f"All operators charge 0.00 SSV."]
-
-    non_zero_values = [fee for fee, _ in non_zero_fees]
-
-    # IQR-based outlier detection
-    q1 = statistics.quantiles(non_zero_values, n=4)[0]
-    q3 = statistics.quantiles(non_zero_values, n=4)[2]
-    iqr = q3 - q1
-    upper_bound = q3 + iqr_multiplier * iqr
-
-    inlier_fees = [(fee, op) for fee, op in non_zero_fees if fee <= upper_bound]
-    outlier_fees = [(fee, op) for fee, op in non_zero_fees if fee > upper_bound]
-
-    if zero_fees:
-        min_val = min(fee for fee, _ in inlier_fees)
-    else:
-        # No 0.00 SSV operators, so start from actual minimum fee in all data
-        min_val = min(fee for fee, _ in inlier_fees + outlier_fees)
-    max_val = max(fee for fee, _ in inlier_fees)
-    bucket_size = (max_val - min_val) / (num_buckets or 1)
-
-    # Build buckets
-    buckets = [[] for _ in range(num_buckets)]
-    for fee, _ in inlier_fees:
-        i = int((fee - min_val) / bucket_size)
-        if i == num_buckets:
-            i -= 1
-        buckets[i].append(fee)
-
-    max_count = max(
-        [len(b) for b in buckets] + [len(zero_fees)]
-    ) or 1  # include 0-fee count in scaling
-
-    lines = []
-    if zero_fees:
-        bar = "█" * int((len(zero_fees) / max_count) * 20)
-        count_str = f"({len(zero_fees)})"
-        lines.append(f"0.00 SSV       {bar:<20} {count_str:<16}")
-
-    for i, b in enumerate(buckets):
-        lower = min_val + i * bucket_size
-        upper = lower + bucket_size
-        b_len = len(b)
-        bar = "█" * int((b_len / max_count) * 20)
-        count_str = f"({b_len})"
-        lines.append(f"{lower:.2f}–{upper:.2f} SSV  {bar:<20}  {count_str:<16})")
-
-    if outlier_fees:
-        outlier_count = len(outlier_fees)
-        outlier_min = min(fee for fee, _ in outlier_fees)
-        outlier_max = max(fee for fee, _ in outlier_fees)
-        lines.append(f"Outliers > {upper_bound:.2f} SSV  {'█' * 20} ({outlier_count}) ({outlier_min:.2f}–{outlier_max:.2f})")
-
-    return lines
 
 
 def render_bucket_lines(buckets_with_ranges, zero_count, outliers, fees, mean, median, max_segments=20):
@@ -557,15 +412,33 @@ def compile_fee_messages(fee_data, extra_message=None):
     public_fees = []
     private_fees = []
 
+    public_vo_fees = []
+    public_non_vo_fees = []
+    private_vo_fees = []
+    private_non_vo_fees = []
+
     for operator in fee_data.values():
         fee = operator.get(FIELD_OPERATOR_FEE)
         is_private = operator.get(FIELD_IS_PRIVATE)
+        is_vo = operator.get(FIELD_IS_VO)
         if fee is None:
             continue
+
+        item = (fee, operator)
+
         if is_private:
-            private_fees.append((fee, operator))
+            private_fees.append(item)
+            if is_vo:
+                private_vo_fees.append(item)
+            else:
+                private_non_vo_fees.append(item)
         else:
-            public_fees.append((fee, operator))
+            public_fees.append(item)
+            if is_vo:
+                public_vo_fees.append(item)
+            else:
+                public_non_vo_fees.append(item)
+
 
     def summarize(label, fees, num_buckets=5, iqr_multiplier=1.5):
         if not fees:
@@ -607,9 +480,20 @@ def compile_fee_messages(fee_data, extra_message=None):
         ] + bucket_lines
 
 
-    messages.extend(summarize("Public", public_fees, iqr_multiplier=1.5, num_buckets=10))
-    messages.append("")  # spacing
-    messages.extend(summarize("Private", private_fees, iqr_multiplier=2.5, num_buckets=5))
+    # Public breakdown
+    messages.extend(summarize("Public (All)", public_fees, iqr_multiplier=1.5, num_buckets=10))
+    messages.append("")
+    messages.extend(summarize("Public (Verified)", public_vo_fees, iqr_multiplier=1.5, num_buckets=10))
+    messages.append("")
+    messages.extend(summarize("Public (Unverified)", public_non_vo_fees, iqr_multiplier=1.5, num_buckets=10))
+    messages.append("")
+
+    # Private breakdown
+    messages.extend(summarize("Private (All)", private_fees, iqr_multiplier=2.5, num_buckets=5))
+    messages.append("")
+    messages.extend(summarize("Private (Verified)", private_vo_fees, iqr_multiplier=2.5, num_buckets=5))
+    messages.append("")
+    messages.extend(summarize("Private (Unverified)", private_non_vo_fees, iqr_multiplier=2.5, num_buckets=5))
 
     if extra_message:
         messages.append("")
