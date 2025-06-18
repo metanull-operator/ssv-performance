@@ -451,7 +451,7 @@ def iqr_bucket_lines_with_zero_handling1(values, fees, num_buckets=5, iqr_multip
     return lines
 
 
-def render_bucket_lines(buckets_with_ranges, zero_count, outliers, max_segments=20):
+def render_bucket_lines(buckets_with_ranges, zero_count, outliers, fees, max_segments=20):
     max_count = max([len(b) for b, _, _ in buckets_with_ranges] + [zero_count, len(outliers)])
     lines = []
 
@@ -561,6 +561,7 @@ def compile_fee_messages(fee_data, extra_message=None):
             buckets_with_ranges=[(bucket, lower, upper) for bucket, (lower, upper) in zip(buckets, bucket_ranges)],
             zero_count=zero_count,
             outliers=outliers,
+            fees=fees,
             max_segments=40
         )
 
