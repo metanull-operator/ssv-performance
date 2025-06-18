@@ -6,7 +6,7 @@ if [ -n "${CLICKHOUSE_PASSWORD_FILE:-}" ] && [ -f "$CLICKHOUSE_PASSWORD_FILE" ];
 fi
 
 if [[ $# -eq 0 ]]; then
-  set -- ssv-performance-collector.py
+  set -- python ssv-performance-collector.py
 fi
 
 exec gosu collector "$@"
