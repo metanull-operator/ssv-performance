@@ -128,7 +128,7 @@ def insert_clickhouse_performance_data(client, network, clickhouse_table_operato
             datetime.now(timezone.utc)
         ))
 
-    logging.info(f"Inserting/updating {len(operator_rows)} operator records and {len(performance_rows)} performance records into database.")
+    logging.info(f"Inserting/updating {len(operator_rows)} operator records, {len(performance_rows)} performance records, {len(validator_counts_rows)} validator count records, and {len(operator_fees_rows)} operator fee records into database.")
 
     client.insert(clickhouse_table_operators, operator_rows, column_names=[
         'network', 'operator_id', 'operator_name', 'is_vo', 'is_private', 'validator_count', 'operator_fee', 'address', 'updated_at'
@@ -145,8 +145,6 @@ def insert_clickhouse_performance_data(client, network, clickhouse_table_operato
     client.insert('validator_counts', validator_counts_rows, column_names=[
         'network', 'operator_id', 'metric_date', 'validator_count', 'source', 'updated_at'
     ])    
-
-from datetime import datetime, timedelta, timezone
 
 def cleanup_outdated_records(client):
     cutoff_date = (datetime.now(timezone.utc) - timedelta(days=OPERATOR_PERFORMANCE_DAYS)).strftime('%Y-%m-%d')
@@ -220,4 +218,4 @@ def main():
     deduplicate_table(client, 'validator_counts', args.network)
 
 if __name__ == "__main__":
-    main()
+    main()1G
