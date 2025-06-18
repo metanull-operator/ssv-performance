@@ -155,7 +155,7 @@ class ClickHouseStorage(DataStorageInterface):
                 pd.metric_date,
                 pd.metric_value,
                 pd.metric_type,
-                o.fee
+                o.operator_fee
             FROM (
                 SELECT 
                     *,

@@ -178,7 +178,6 @@ def compile_fee_messages(fee_data, extra_message=None):
     private_fees = []
 
     for operator in fee_data.values():
-        print("getting fee operator")
         fee = operator.get(FIELD_OPERATOR_FEE)
         is_private = operator.get(FIELD_IS_PRIVATE)
         if fee is None:
@@ -198,11 +197,11 @@ def compile_fee_messages(fee_data, extra_message=None):
         return [
             f"**{label} Operators**",
             f"- Count: {len(values)}",
-            f"- Average Fee: {statistics.mean(values) * 100:.2f} SSV/year",
-            f"- Median Fee: {statistics.median(values) * 100:.2f} SSV/year",
-            f"- Std Deviation: {statistics.stdev(values) * 100:.2f} SSV/year" if len(values) > 1 else "- Std Deviation: N/A",
-            f"- Highest Fee: {highest[1][FIELD_OPERATOR_NAME]} ({highest[1][FIELD_OPERATOR_ID]}) - {highest[0] * 100:.2f} SSV/year",
-            f"- Lowest Fee: {lowest[1][FIELD_OPERATOR_NAME]} ({lowest[1][FIELD_OPERATOR_ID]}) - {lowest[0] * 100:.2f} SSV/year"
+            f"- Average Fee: {statistics.mean(values):.2f} SSV/year",
+            f"- Median Fee: {statistics.median(values):.2f} SSV/year",
+            f"- Std Deviation: {statistics.stdev(values):.2f} SSV/year" if len(values) > 1 else "- Std Deviation: N/A",
+            f"- Highest Fee: {highest[1][FIELD_OPERATOR_NAME]} ({highest[1][FIELD_OPERATOR_ID]}) - {highest[0]:.2f} SSV/year",
+            f"- Lowest Fee: {lowest[1][FIELD_OPERATOR_NAME]} ({lowest[1][FIELD_OPERATOR_ID]}) - {lowest[0]:.2f} SSV/year"
         ]
 
     messages.extend(summarize("Public", public_fees))
