@@ -131,7 +131,7 @@ def insert_clickhouse_performance_data(client, network, clickhouse_table_operato
     logging.info(f"Inserting/updating {len(operator_rows)} operator records and {len(performance_rows)} performance records into database.")
 
     client.insert(clickhouse_table_operators, operator_rows, column_names=[
-        'network', 'operator_id', 'operator_name', 'is_vo', 'is_private', 'validator_count', 'address', 'updated_at'
+        'network', 'operator_id', 'operator_name', 'is_vo', 'is_private', 'validator_count', 'operator_fee', 'address', 'updated_at'
     ])
 
     client.insert(clickhouse_table_performance, performance_rows, column_names=[
