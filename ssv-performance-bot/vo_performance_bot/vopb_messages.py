@@ -307,7 +307,7 @@ def iqr_bucket_lines(values, fees, num_buckets=5):
     return lines
 
 
-def iqr_bucket_lines_with_outlier_summary(values, fees, num_buckets=3):
+def iqr_bucket_lines_with_outlier_summary(values, fees, num_buckets=5):
     q1 = statistics.quantiles(values, n=4)[0]
     q3 = statistics.quantiles(values, n=4)[2]
     iqr = q3 - q1
