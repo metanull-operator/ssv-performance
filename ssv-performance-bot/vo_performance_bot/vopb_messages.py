@@ -471,7 +471,15 @@ def render_bucket_lines(buckets_with_ranges, zero_count, outliers, fees, max_seg
     for b, lower, upper in buckets_with_ranges:
         label = f"{lower:.2f}–{upper:.2f}"
         bar = build_bar(len(b))
-        lines.append(f"{label:>{label_width}} {bar:<{max_segments}} ({len(b)})")
+
+        markers = []
+        if mean is not None and lower <= mean <= upper:
+            markers.append("mean")
+        if median is not None and lower <= median <= upper:
+            markers.append("median")
+
+        marker_str = f"  ⟵ {', '.join(markers)}" if markers else ""
+        lines.append(f"{label:>{label_width}} {bar:<{max_segments}} ({len(b)}){marker_str}")
 
     if outliers:
         count = len(outliers)
@@ -556,6 +564,9 @@ def compile_fee_messages(fee_data, extra_message=None):
             values, fees, num_buckets=num_buckets, iqr_multiplier=iqr_multiplier
         )
 
+        mean = statistics.mean(values)
+        median = statistics.median(values)        
+
         # Render aligned bar lines
         bucket_lines = render_bucket_lines(
             buckets_with_ranges=[(bucket, lower, upper) for bucket, (lower, upper) in zip(buckets, bucket_ranges)],
@@ -563,13 +574,15 @@ def compile_fee_messages(fee_data, extra_message=None):
             outliers=outliers,
             fees=fees,
             max_segments=40
+            mean=mean,
+            median=median
         )
 
         return [
             f"**{label} Operators (SSV/year)**",
             f"- Count: {count}",
-            f"- Average Fee: {statistics.mean(values):.2f} SSV",
-            f"- Median Fee: {statistics.median(values):.2f} SSV",
+            f"- Average Fee: {mean:.2f} SSV",
+            f"- Median Fee: {median:.2f} SSV",
             f"- Lowest Fee: {lowest[1][FIELD_OPERATOR_NAME]} (ID {lowest[1][FIELD_OPERATOR_ID]}) – {lowest[0]:.2f} SSV",
             f"- Highest Fee: {highest[1][FIELD_OPERATOR_NAME]} (ID {highest[1][FIELD_OPERATOR_ID]}) – {highest[0]:.2f} SSV",
             "- Fee Distribution:"
