@@ -70,7 +70,8 @@ def insert_clickhouse_performance_data(client, network, clickhouse_table_operato
     for operator_id, operator in operators.items():
         performance_24h = operator["performance"]['24h']
         performance_30d = operator["performance"]['30d']
-        operator_fee = operator.get("operator_fee", None)
+        operator_fee = operator.get("fee", None)
+        print(f"Fee: {operator_fee}")
         validator_count = operator.get("validators_count", None)
 
         is_vo = 1 if operator.get("type", "") == "verified_operator" else 0
