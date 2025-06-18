@@ -485,7 +485,7 @@ def render_bucket_lines(buckets_with_ranges, zero_count, outliers, fees, mean, m
         if median is not None and lower <= median <= upper:
             markers.append("median")
 
-        marker_str = f"  ⟵ {', '.join(markers)}" if markers else ""
+        marker_str = f"⟵ {', '.join(markers)}" if markers else ""
         count_str = f"({b_len})"
         lines.append(f"{label:>{label_width}} {bar:<{max_segments}} {count_str:<{count_width}}{marker_str}")
 
