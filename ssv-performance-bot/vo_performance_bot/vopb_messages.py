@@ -482,9 +482,9 @@ def compile_fee_messages(fee_data, extra_message=None):
             "- Fee Distribution (equal buckets):"
         ] + bucket_lines
 
-    messages.extend(summarize("Public", public_fees, 1.5))
+    messages.extend(summarize("Public", public_fees, num_buckets=5, irq_multiplier=1.5))
     messages.append("")  # spacing
-    messages.extend(summarize("Private", private_fees, 2.5))
+    messages.extend(summarize("Private", private_fees, num_buckets=5, irq_multiplier=2.5))
 
     if extra_message:
         messages.append("")
