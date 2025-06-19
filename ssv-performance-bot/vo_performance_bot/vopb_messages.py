@@ -365,7 +365,7 @@ def render_bucket_lines(buckets_with_ranges, zero_count, outliers, fees, mean, m
 #        count_str = f"({zero_count}/{validator_count})"
         count_str = f"({zero_count})"
 
-        lines.append(f"{'0.00':>{label_width}} {bar:<{max_segments}} {count_str:<{count_width}}{marker_str}")
+        lines.append(f"{'0.00':>{label_width}} {bar:<{max_segments}} {count_str:<{count_width}} {marker_str}")
 
 
     for b, lower, upper in buckets_with_ranges:
@@ -385,7 +385,7 @@ def render_bucket_lines(buckets_with_ranges, zero_count, outliers, fees, mean, m
 #        count_str = f"({b_len}/{validator_count})"
         count_str = f"({b_len})"
 
-        lines.append(f"{label:>{label_width}} {bar:<{max_segments}} {count_str:<{count_width}}{marker_str}")
+        lines.append(f"{label:>{label_width}} {bar:<{max_segments}} {count_str:<{count_width}} {marker_str}")
 
     if outliers:
         count = len(outliers)
