@@ -48,18 +48,23 @@ def create_spreadsheet_data(data, performance_data_attribute):
     return spreadsheet_data
 
 
-def get_clickhouse_client():
+def read_clickhouse_password_from_file(password_file_path):
+    with open(password_file_path, 'r') as file:
+        return file.read().strip()
+    
+
+def get_clickhouse_client(clickhouse_password):
     return create_client(
         host=os.environ.get("CLICKHOUSE_HOST", "localhost"),
         port=int(os.environ.get("CLICKHOUSE_PORT", 8123)),
-        username=os.environ.get("CLICKHOUSE_USER"),
-        password=os.environ.get("CLICKHOUSE_PASSWORD"),
+        username=os.environ.get("CLICKHOUSE_USER", "ssv_performance"),
+        password=clickhouse_password,
         database=os.environ.get("CLICKHOUSE_DB", "default")
     )
 
 
-def get_operator_performance_data(network: str, days: int, metric_type: str):
-    client = get_clickhouse_client()
+def get_operator_performance_data(network: str, days: int, metric_type: str, clickhouse_password: str):
+    client = get_clickhouse_client(clickhouse_password=clickhouse_password)
 
     since_date = (date.today() - timedelta(days=days)).isoformat()
 
@@ -114,6 +119,7 @@ def authorize_google_sheets(credentials_file):
 def main():
     parser = argparse.ArgumentParser(description="Export SSV operator performance to Google Sheets")
     parser.add_argument('-c', '--google_credentials', type=str, default=os.environ.get('GOOGLE_CREDENTIALS_FILE', '/etc/ssv-performance-sheets/credentials/google-credentials.json'))
+    parser.add_argument('-p', '--clickhouse_password', type=str, default=os.environ.get('CLICKHOUSE_PASSWORD_FILE', '/etc/ssv-performance-sheets/credentials/clickhouse-password.txt'))
     parser.add_argument('-d', '--document', type=str, required=True)
     parser.add_argument('-w', '--worksheet', type=str, required=True)
     parser.add_argument('-n', '--network', type=str, default='mainnet')
@@ -128,9 +134,16 @@ def main():
     logging.getLogger().setLevel(args.log_level.upper())
     logging.info(f"Logging level set to {args.log_level.upper()}")
 
+    clickhouse_password_file = args.clickhouse_password
     credentials_file = args.google_credentials
     document_name = args.document
     worksheet_name = args.worksheet
+
+    try:
+        clickhouse_password = read_clickhouse_password_from_file(clickhouse_password_file)
+    except Exception as e:
+        logging.info("Unable to retrieve ClickHouse password from file, trying environment variable instead.")
+        clickhouse_password = os.environ.get("CLICKHOUSE_PASSWORD")
 
     try:
         gc = authorize_google_sheets(credentials_file)
@@ -144,7 +157,7 @@ def main():
         return
 
     try:
-        perf_data = get_operator_performance_data(network=args.network, days=args.days, metric_type=args.metric)
+        perf_data = get_operator_performance_data(network=args.network, days=args.days, metric_type=args.metric, clickhouse_password=clickhouse_password)
         logging.info("Retrieved performance data from ClickHouse.")
 
     except Exception as e:

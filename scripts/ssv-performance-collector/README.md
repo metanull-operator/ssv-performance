@@ -24,6 +24,8 @@ Run the collector once for each Ethereum network for which you want to collect p
 docker run --rm --network=ssv-performance_ssv-performance-network ssv-performance-collector --network mainnet
 docker run --rm --network=ssv_performance_ssv-performance-network ssv-performance-collector --network holesky
 docker run --rm --network=ssv_performance_ssv-performance-network ssv-performance-collector --network hoodi
+
+docker run --rm -it -v "./credentials/clickhouse-password.txt:/clickhouse-password.txt" --network ssv-performance_ssv-performance-network ssv-performance-collector:latest --network mainnet
 ```
 
 Create cronjobs to run the command daily for each network.

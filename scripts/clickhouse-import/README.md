@@ -60,5 +60,8 @@ Replace `ssv-performance-clickhouse-1` in the commands below with the name of yo
 Run the `clickhouse-import.sh` script in the destination ClickHouse container. This script will import all `.sql` files in the `sql-import/` directory into the ClickHouse database.
 
 ```bash
+docker build  -t ssv-performance-collector:latest scripts/ssv-performance-collector/
 docker exec -it ssv-performance-clickhouse-1 clickhouse-import.sh
+
+docker exec -i ssv-performance-clickhouse-1 clickhouse-import.sh
 ```

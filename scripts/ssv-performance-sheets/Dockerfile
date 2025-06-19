@@ -2,10 +2,8 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
 COPY . .
+RUN pip install --no-cache-dir -r requirements.txt
 RUN chmod +x /app/entrypoint.sh
 
 #ENV CLICKHOUSE_PASSWORD=
@@ -23,4 +21,5 @@ ENV CLICKHOUSE_PASSWORD_FILE=/clickhouse-password.txt
 ENV CLICKHOUSE_HOST=clickhouse
 ENV PYTHONUNBUFFERED=1
 
-ENTRYPOINT ["python", "ssv-performance-sheets.py"]
+ENTRYPOINT ["/app/entrypoint.sh"]
+CMD []
