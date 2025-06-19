@@ -310,11 +310,12 @@ def iqr_bucket_lines_with_zero_handling(values, fees, num_buckets=5, iqr_multipl
         bucket_ranges.append((lower, upper))
 
     for fee, op in inlier_fees:
+        if fee == 0:
+            continue  # Skip zero-fee operators (already handled separately)
         i = int((fee - min_val) / bucket_size)
         if i == num_buckets:
             i -= 1
-        buckets[i].append((fee, op))  # ✅ Now 'op' is defined
-
+        buckets[i].append((fee, op))
 
     return buckets, bucket_ranges, len(zero_fees), outlier_fees
 
@@ -510,11 +511,11 @@ def compile_fee_messages(fee_data, extra_message=None):
     messages.append("")
 
     # Private breakdown
-    messages.extend(summarize("Private (All)", private_fees, iqr_multiplier=2.5, num_buckets=5))
+    messages.extend(summarize("All Private", private_fees, iqr_multiplier=2.5, num_buckets=5))
     messages.append("")
-    messages.extend(summarize("Private (Verified)", private_vo_fees, iqr_multiplier=2.5, num_buckets=5))
+    messages.extend(summarize("Private Verified", private_vo_fees, iqr_multiplier=2.5, num_buckets=5))
     messages.append("")
-    messages.extend(summarize("Private (Unverified)", private_non_vo_fees, iqr_multiplier=2.5, num_buckets=5))
+    messages.extend(summarize("Private Unverified", private_non_vo_fees, iqr_multiplier=2.5, num_buckets=5))
 
     if extra_message:
         messages.append("")
