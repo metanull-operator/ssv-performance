@@ -403,8 +403,10 @@ def render_bucket_lines(buckets_with_ranges, zero_count, outliers, fees, mean, m
         label = f">= {outlier_min:.2f}"
 #        label_width = len(label) + 1
 
+        single_plural = '' if count == 1 else 's'
+
         if outlier_min == outlier_max:
-            outlier_info = f"⟵ outlier: {outlier_min:.2f}"
+            outlier_info = f"⟵ outlier{single_plural}: {outlier_min:.2f}"
         else:
             outlier_info = f"⟵ outliers: {outlier_min:.2f}-{outlier_max:.2f}"
 
@@ -498,7 +500,6 @@ def compile_fee_messages(fee_data, extra_message=None):
 #            lines.append(f"- Lowest Fee: {lowest_fee:.2f} — shared by {len(lowest_operators)} operators")
             example_op = random.choice(lowest_operators)
             lines.append(f"- Lowest Fee: {lowest_fee:.2f} - {example_op[FIELD_OPERATOR_NAME]} (ID: {example_op[FIELD_OPERATOR_ID]}, Validators: {example_op[FIELD_VALIDATOR_COUNT]}) and {len(lowest_operators)-1} other operator(s)")
-
 
         # Highest Fee (as-is)
         lines.append(
