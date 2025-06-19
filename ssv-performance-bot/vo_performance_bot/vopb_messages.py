@@ -349,7 +349,10 @@ def render_bucket_lines(buckets_with_ranges, zero_count, outliers, fees, mean, m
             markers.append("median")
 
         marker_str = f"⟵ {', '.join(markers)}" if markers else ""
-        count_str = f"({zero_count})"
+
+        validator_count = sum(op[FIELD_VALIDATOR_COUNT] for fee, op in fees if fee == 0)
+        count_str = f"({zero_count}/{validator_count})"
+
         lines.append(f"{'0.00':>{label_width}} {bar:<{max_segments}} {count_str:<{count_width}}{marker_str}")
 
 
@@ -366,6 +369,9 @@ def render_bucket_lines(buckets_with_ranges, zero_count, outliers, fees, mean, m
 
         marker_str = f"⟵ {', '.join(markers)}" if markers else ""
 
+        validator_count = sum(op[FIELD_VALIDATOR_COUNT] for fee, op in b)
+        count_str = f"({b_len}/{validator_count})"
+
         validator_count = validator_sum(outliers)
         count_str = f"({count}/{validator_count})"
         lines.append(f"{label:>{label_width}} {bar:<{max_segments}} {count_str:<{count_width}}{marker_str}")
@@ -375,7 +381,8 @@ def render_bucket_lines(buckets_with_ranges, zero_count, outliers, fees, mean, m
         outlier_min = min(fee for fee, _ in outliers)
         outlier_max = max(fee for fee, _ in outliers)
         bar = build_bar(count)
-        count_str = f"({count})"
+        validator_count = sum(op[FIELD_VALIDATOR_COUNT] for fee, op in outliers)
+        count_str = f"({count}/{validator_count})"
         label = f"Outliers > {outlier_min:.2f}"
         lines.append(f"{label:>{label_width}} {bar:<{max_segments}} {count_str:<{count_width}}⟵ range: {outlier_min:.2f}-{outlier_max:.2f}")
 
