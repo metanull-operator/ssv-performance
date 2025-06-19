@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from common.config import OPERATOR_24H_HISTORY_COUNT, ALERTS_THRESHOLDS_30D, ALERTS_THRESHOLDS_24H
 import discord
 import statistics
+import random
 
 
 # Break messages into < MAX_DISCORD_MESSAGE_LENGTH characters chunks, called bundles
@@ -470,7 +471,10 @@ def compile_fee_messages(fee_data, extra_message=None):
                 f"- Lowest Fee: {lowest_fee:.2f} - {op[FIELD_OPERATOR_NAME]} (ID: {op[FIELD_OPERATOR_ID]}, Validators: {op[FIELD_VALIDATOR_COUNT]})"
             )
         else:
-            lines.append(f"- Lowest Fee: {lowest_fee:.2f} — shared by {len(lowest_operators)} operators")
+#            lines.append(f"- Lowest Fee: {lowest_fee:.2f} — shared by {len(lowest_operators)} operators")
+            example_op = random.choice(lowest_operators)
+            lines.append(f"- Lowest Fee: {lowest_fee:.2f} - {op[FIELD_OPERATOR_NAME]} (ID: {op[FIELD_OPERATOR_ID]}, Validators: {op[FIELD_VALIDATOR_COUNT]}) and {len(lowest_operators)} other operator(s)")
+
 
         # Highest Fee (as-is)
         lines.append(
@@ -484,11 +488,11 @@ def compile_fee_messages(fee_data, extra_message=None):
         return bundle_messages(lines)
 
     # Public breakdown
-    messages.extend(summarize("All Public Operators", public_fees, iqr_multiplier=1.5, num_buckets=10))
+    messages.extend(summarize("All Public", public_fees, iqr_multiplier=1.5, num_buckets=10))
     messages.append("")
-    messages.extend(summarize("Public Verified Operators", public_vo_fees, iqr_multiplier=1.5, num_buckets=10))
+    messages.extend(summarize("Public Verified", public_vo_fees, iqr_multiplier=1.5, num_buckets=10))
     messages.append("")
-    messages.extend(summarize("Public Unverified Operators", public_non_vo_fees, iqr_multiplier=1.5, num_buckets=10))
+    messages.extend(summarize("Public Unverified", public_non_vo_fees, iqr_multiplier=1.5, num_buckets=10))
     messages.append("")
 
     # Private breakdown
