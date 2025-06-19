@@ -289,7 +289,8 @@ def iqr_bucket_lines_with_zero_handling(values, fees, num_buckets=5, iqr_multipl
     iqr = q3 - q1
     upper_bound = q3 + iqr_multiplier * iqr
 
-    inlier_fees = [(fee, op) for fee, op in non_zero_fees if fee <= upper_bound]
+#    inlier_fees = [(fee, op) for fee, op in non_zero_fees if fee <= upper_bound]
+    inlier_fees = [(fee, op) for fee, op in non_zero_fees if 0 < fee <= upper_bound]
     outlier_fees = [(fee, op) for fee, op in non_zero_fees if fee > upper_bound]
 
     if zero_fees:
@@ -316,6 +317,9 @@ def iqr_bucket_lines_with_zero_handling(values, fees, num_buckets=5, iqr_multipl
         if i == num_buckets:
             i -= 1
         buckets[i].append((fee, op))
+
+    assert len(zero_fees) + sum(len(b) for b in buckets) + len(outlier_fees) == len(fees), \
+        "Mismatch in total operator counts"
 
     return buckets, bucket_ranges, len(zero_fees), outlier_fees
 
