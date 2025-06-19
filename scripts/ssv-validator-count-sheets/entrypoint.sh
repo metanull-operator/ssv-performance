@@ -7,12 +7,12 @@ fi
 
 # If no arguments passed, use default command from environment
 if [[ $# -eq 0 && -n "$DEFAULT_CMD" ]]; then
-  set -- python ssv-validator-count-sheets.py
+  set -- $DEFAULT_CMD
 fi
 
 # If first argument starts with "-", assume it's flags for the default command
 if [[ "$1" =~ ^- && -n "$DEFAULT_CMD" ]]; then
-  set -- python ssv-validator-count-sheets.py "$@"
+  set -- $DEFAULT_CMD "$@"
 fi
 
-exec gosu sheets "$@"
+exec gosu "${PROCESS_USER:-app}" "$@"
