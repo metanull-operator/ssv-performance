@@ -479,7 +479,7 @@ def compile_fee_messages(fee_data, extra_message=None):
             median=median
         )
 
-        return [
+        return bundle_messages([
             f"**{label} Operators (SSV/year)**",
             f"*{count} operators*",
             f"- Mean Fee: {mean:.2f}",
@@ -487,7 +487,7 @@ def compile_fee_messages(fee_data, extra_message=None):
             f"- Lowest Fee: {lowest[0]:.2f} - {lowest[1][FIELD_OPERATOR_NAME]} (ID: {lowest[1][FIELD_OPERATOR_ID]}, Validators: {lowest[1][FIELD_VALIDATOR_COUNT]})",
             f"- Highest Fee: {highest[0]:.2f} - {highest[1][FIELD_OPERATOR_NAME]} (ID: {highest[1][FIELD_OPERATOR_ID]}, Validators: {highest[1][FIELD_VALIDATOR_COUNT]})",
             "### Fee Distribution"
-        ] + bucket_lines
+        ] + bucket_lines)
 
 
     # Public breakdown
