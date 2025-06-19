@@ -76,7 +76,7 @@ def get_operator_validator_count_data(network: str, days: int, clickhouse_passwo
             v.metric_date,
             v.validator_count
         FROM operators o
-        LEFT JOIN validator_counts p
+        LEFT JOIN validator_counts v
             ON o.operator_id = v.operator_id AND o.network = v.network
         WHERE 
             o.network = %(network)s AND 
