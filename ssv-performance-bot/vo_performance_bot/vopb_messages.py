@@ -349,7 +349,8 @@ def render_bucket_lines(buckets_with_ranges, zero_count, outliers, fees, mean, m
         marker_str = f"⟵ {', '.join(markers)}" if markers else ""
 
         validator_count = sum(op[FIELD_VALIDATOR_COUNT] for fee, op in fees if fee == 0)
-        count_str = f"({zero_count}/{validator_count})"
+#        count_str = f"({zero_count}/{validator_count})"
+        count_str = f"({zero_count})"
 
         lines.append(f"{'0.00':>{label_width}} {bar:<{max_segments}} {count_str:<{count_width}}{marker_str}")
 
@@ -368,7 +369,8 @@ def render_bucket_lines(buckets_with_ranges, zero_count, outliers, fees, mean, m
         marker_str = f"⟵ {', '.join(markers)}" if markers else ""
 
         validator_count = sum(op[FIELD_VALIDATOR_COUNT] for fee, op in b)
-        count_str = f"({b_len}/{validator_count})"
+#        count_str = f"({b_len}/{validator_count})"
+        count_str = f"({b_len})"
 
         lines.append(f"{label:>{label_width}} {bar:<{max_segments}} {count_str:<{count_width}}{marker_str}")
 
@@ -378,52 +380,14 @@ def render_bucket_lines(buckets_with_ranges, zero_count, outliers, fees, mean, m
         outlier_max = max(fee for fee, _ in outliers)
         bar = build_bar(count)
         validator_count = sum(op[FIELD_VALIDATOR_COUNT] for fee, op in outliers)
-        count_str = f"({count}/{validator_count})"
+#        count_str = f"({count}/{validator_count})"
+        count_str = f"({count})"
         label = f"Outliers > {outlier_min:.2f}"
         lines.append(f"{label:>{label_width}} {bar:<{max_segments}} {count_str:<{count_width}}⟵ range: {outlier_min:.2f}-{outlier_max:.2f}")
 
     lines = ["```"] + lines + ["```"]
 
     return bundle_messages(lines)
-
-
-def dynamic_bucket_lines(values, fees, num_buckets=10):
-    min_fee = min(values)
-    max_fee = max(values)
-    if min_fee == max_fee:
-        # Degenerate case: all values the same
-        return [f"All operators charge the same fee: {min_fee:.2f} SSV"]
-
-    bucket_size = (max_fee - min_fee) / num_buckets
-    bucket_counts = [0 for _ in range(num_buckets)]
-    bucket_ranges = []
-
-    # Build ranges like: (0.0, 2.0), (2.0, 4.0), ...
-    for i in range(num_buckets):
-        lower = min_fee + i * bucket_size
-        upper = lower + bucket_size
-        bucket_ranges.append((lower, upper))
-
-    # Count values in each bucket
-    for val in values:
-        for i, (lower, upper) in enumerate(bucket_ranges):
-            if i == num_buckets - 1:
-                # Include upper bound in last bucket
-                if lower <= val <= upper:
-                    bucket_counts[i] += 1
-                    break
-            elif lower <= val < upper:
-                bucket_counts[i] += 1
-                break
-
-    max_count = max(bucket_counts) or 1
-    lines = []
-    for i, (lower, upper) in enumerate(bucket_ranges):
-        count = bucket_counts[i]
-        bar = "█" * int((count / max_count) * 20)
-        lines.append(f"{lower:.2f}–{upper:.2f} SSV  {bar:<20} ({count})")
-
-    return lines
 
 
 def compile_fee_messages(fee_data, extra_message=None):
@@ -489,23 +453,42 @@ def compile_fee_messages(fee_data, extra_message=None):
             median=median
         )
 
-        return bundle_messages([
+        lines = [
             f"**{label} Operators (SSV/year)**",
             f"*{count} operators*",
             f"- Mean Fee: {mean:.2f}",
             f"- Median Fee: {median:.2f}",
-            f"- Lowest Fee: {lowest[0]:.2f} - {lowest[1][FIELD_OPERATOR_NAME]} (ID: {lowest[1][FIELD_OPERATOR_ID]}, Validators: {lowest[1][FIELD_VALIDATOR_COUNT]})",
-            f"- Highest Fee: {highest[0]:.2f} - {highest[1][FIELD_OPERATOR_NAME]} (ID: {highest[1][FIELD_OPERATOR_ID]}, Validators: {highest[1][FIELD_VALIDATOR_COUNT]})",
-            "### Fee Distribution (ID/Validators)"
-        ] + bucket_lines)
+        ]
 
+        # Handle Lowest Fee
+        lowest_fee = lowest[0]
+        lowest_operators = [op for fee, op in fees if fee == lowest_fee]
+
+        if len(lowest_operators) == 1:
+            op = lowest_operators[0]
+            lines.append(
+                f"- Lowest Fee: {lowest_fee:.2f} - {op[FIELD_OPERATOR_NAME]} (ID: {op[FIELD_OPERATOR_ID]}, Validators: {op[FIELD_VALIDATOR_COUNT]})"
+            )
+        else:
+            lines.append(f"- Lowest Fee: {lowest_fee:.2f} — shared by {len(lowest_operators)} operators")
+
+        # Highest Fee (as-is)
+        lines.append(
+            f"- Highest Fee: {highest[0]:.2f} - {highest[1][FIELD_OPERATOR_NAME]} "
+            f"(ID: {highest[1][FIELD_OPERATOR_ID]}, Validators: {highest[1][FIELD_VALIDATOR_COUNT]})"
+        )
+
+        lines.append("### Fee Distribution (Operators)")
+        lines += bucket_lines
+
+        return bundle_messages(lines)
 
     # Public breakdown
-    messages.extend(summarize("Public (All)", public_fees, iqr_multiplier=1.5, num_buckets=10))
+    messages.extend(summarize("All Public Operators", public_fees, iqr_multiplier=1.5, num_buckets=10))
     messages.append("")
-    messages.extend(summarize("Public (Verified)", public_vo_fees, iqr_multiplier=1.5, num_buckets=10))
+    messages.extend(summarize("Public Verified Operators", public_vo_fees, iqr_multiplier=1.5, num_buckets=10))
     messages.append("")
-    messages.extend(summarize("Public (Unverified)", public_non_vo_fees, iqr_multiplier=1.5, num_buckets=10))
+    messages.extend(summarize("Public Unverified Operators", public_non_vo_fees, iqr_multiplier=1.5, num_buckets=10))
     messages.append("")
 
     # Private breakdown
