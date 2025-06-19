@@ -332,14 +332,23 @@ def render_bucket_lines(buckets_with_ranges, zero_count, outliers, fees, mean, m
             return ""
         return "■" * max(1, int((count / max_count) * max_segments))
 
-    max_fee = max([fee for fee, _ in fees])
-    max_label = f">= {max_fee:.2f}"
-    label_width = len(max_label) + 1
-
  #   count_width = 8
 
     all_counts = [zero_count] + [len(b) for b, _, _ in buckets_with_ranges] + [len(outliers)]
     count_width = max(len(str(c)) for c in all_counts) + 2
+
+    labels = ["0.00"]  # zero bucket label
+
+    # Add range labels
+    for _, lower, upper in buckets_with_ranges:
+        labels.append(f"{lower:.2f}–{upper:.2f}")
+
+    # Add outlier label if any
+    if outliers:
+        outlier_min = min(fee for fee, _ in outliers)
+        labels.append(f">= {outlier_min:.2f}")
+
+    label_width = max(len(label) for label in labels) + 1
 
     if zero_count > 0:
         bar = build_bar(zero_count)
@@ -386,8 +395,10 @@ def render_bucket_lines(buckets_with_ranges, zero_count, outliers, fees, mean, m
         validator_count = sum(op[FIELD_VALIDATOR_COUNT] for fee, op in outliers)
 #        count_str = f"({count}/{validator_count})"
         count_str = f"({count})"
-        label = f"Outliers > {outlier_min:.2f}"
-        lines.append(f"{label:>{label_width}} {bar:<{max_segments}} {count_str:<{count_width}} ⟵ range: {outlier_min:.2f}-{outlier_max:.2f}")
+        label = f">= {outlier_min:.2f}"
+#        label_width = len(label) + 1
+
+        lines.append(f"{label:>{label_width}} {bar:<{max_segments}} {count_str:<{count_width}}⟵ range: {outlier_min:.2f}-{outlier_max:.2f}")
 
     lines = ["```"] + lines + ["```"]
 
