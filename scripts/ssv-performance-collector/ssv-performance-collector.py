@@ -18,12 +18,12 @@ IMPORT_SOURCE = os.environ.get("IMPORT_SOURCE", 'api.ssv.network')
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-def get_clickhouse_client():
+def get_clickhouse_client(clickhouse_password):
     return create_client(
         host=os.environ.get("CLICKHOUSE_HOST", "localhost"),
         port=int(os.environ.get("CLICKHOUSE_PORT", 8123)),
         username=os.environ.get("CLICKHOUSE_USER", "ssv_performance"),
-        password=os.environ.get("CLICKHOUSE_PASSWORD"),
+        password=clickhouse_password,
         database=os.environ.get("CLICKHOUSE_DB", "default")
     )
 
@@ -197,6 +197,7 @@ def deduplicate_table(client, table_name: str, network: str):
 def main():
     parser = argparse.ArgumentParser(description='Fetch and update operator performance data.')
     parser.add_argument('-n', '--network', type=str, choices=['mainnet', 'holesky', 'hoodi'], default='mainnet')
+    parser.add_argument('-p', '--clickhouse_password_file', type=str, default=os.environ.get('CLICKHOUSE_PASSWORD_FILE'))
     parser.add_argument('--page_size', type=int, default=100)
     parser.add_argument('--utc', action='store_true')
     parser.add_argument('--ch-operators-table', default=os.environ.get('CH_OPERATORS_TABLE', 'operators'))
@@ -210,7 +211,15 @@ def main():
     logging.getLogger().setLevel(args.log_level.upper())
     logging.info(f"Logging level set to {args.log_level.upper()}")
 
-    client = get_clickhouse_client()
+    clickhouse_password_file = args.clickhouse_password
+
+    try:
+        clickhouse_password = read_clickhouse_password_from_file(clickhouse_password_file)
+    except Exception as e:
+        logging.info("Unable to retrieve ClickHouse password from file, trying environment variable instead.")
+        clickhouse_password = os.environ.get("CLICKHOUSE_PASSWORD")
+
+    client = get_clickhouse_client(clickhouse_password)
 
     base_url = f"https://api.ssv.network/api/v4/{args.network}/operators/?validatorsCount=true"
     operators = fetch_and_filter_data(base_url, args.page_size)
