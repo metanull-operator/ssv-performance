@@ -22,10 +22,8 @@ RUN set -eux; \
 
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
 COPY . .
+RUN pip install --no-cache-dir -r requirements.txt
 RUN chmod +x /app/entrypoint.sh
 
 #ENV CLICKHOUSE_PASSWORD=
@@ -46,4 +44,4 @@ ENV CLICKHOUSE_HOST=clickhouse
 ENV PYTHONUNBUFFERED=1
 
 ENTRYPOINT ["/app/entrypoint.sh"]
-CMD ["python", "ssv-performance-collector.py"]
+CMD []

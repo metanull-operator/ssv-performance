@@ -15,11 +15,7 @@ vi google-credentials.json
 ## Build Image
 
 ```
-docker build -t ssv-performance-sheets ./scripts/ssv-performance-sheets
-docker build -t ssv-performance-sheets:latest scripts/ssv-performance-sheets/
-
-
-docker build -t ssv-performance-sheets:latest scripts/ssv-performance-sheets/
+docker build -t ssv-performance-sheets:latest ./scripts/ssv-performance-sheets/
 ```
 
 ## Identify the ClickHouse Docker Network
@@ -35,20 +31,7 @@ docker network ls
 The script must be run once for each Ethereum network and performance period. A separate worksheet is required for each Ethereum network and performance period.
 
 ```bash
-docker run --rm -v ".\credentials\google-credentials.json:/google-credentials.json:ro" --network ssv-performance_ssv-performance-network ssv-performance-sheets -d 'ssv_performance_data' -w 'Mainnet 24h' --metric 24h --network mainnet
-
-docker run --rm -v ".\credentials\google-credentials.json:/google-credentials.json:ro" --network ssv-performance_ssv-performance-network ssv-performance-sheets -d 'ssv_performance_data' -w 'Mainnet 30d' --metric 30d --network mainnet
-
-docker run --rm -v ".\credentials\google-credentials.json:/google-credentials.json:ro" --network ssv-performance_ssv-performance-network ssv-performance-sheets -d 'ssv_performance_data' -w 'Holesky 24h' --metric 24h --network holesky
-
-docker run --rm -v ".\credentials\google-credentials.json:/google-credentials.json:ro" --network ssv-performance_ssv-performance-network ssv-performance-sheets -d 'ssv_performance_data' -w 'Holesky 30d' --metric 30d --network holesky
-
-docker run --rm -v ".\credentials\google-credentials.json:/google-credentials.json:ro" --network ssv-performance_ssv-performance-network ssv-performance-sheets -d 'ssv_performance_data' -w 'Hoodi 24h' --metric 24h --network hoodi
-
-docker run --rm -v ".\credentials\google-credentials.json:/google-credentials.json:ro" --network ssv-performance_ssv-performance-network ssv-performance-sheets -d 'ssv_performance_data' -w 'Hoodi 30d' --metric 30d --network hoodi
-
-
-
+docker run --rm -v "./credentials/clickhouse-password.txt:/clickhouse-password.txt" -v "./credentials/google-credentials.json:/google-credentials.json:ro" --network ssv-performance_ssv-performance-network ssv-performance-sheets -d 'ssv_performance_data' -w 'Mainnet 24h' --metric 24h --network mainnet
 
 sudo docker compose -f scripts/ssv-performance-sheets/docker-compose.yml -p ssv-performance run --rm ssv-performance-sheets -d 'ssv_performance_data' -w 'Mainnet 24h' --metric 24h
 ```

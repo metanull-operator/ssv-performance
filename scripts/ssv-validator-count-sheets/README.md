@@ -34,23 +34,7 @@ docker network ls
 The script must be run once for each Ethereum network and performance period. A separate worksheet is required for each Ethereum network and performance period.
 
 ```bash
-docker run --rm -v ".\credentials\google-credentials.json:/google-credentials.json:ro" --network ssv-performance_ssv-performance-network ssv-performance-sheets -d 'ssv_performance_data' -w 'Mainnet 24h' --metric 24h --network mainnet
-
-docker run --rm -v ".\credentials\google-credentials.json:/google-credentials.json:ro" --network ssv-performance_ssv-performance-network ssv-performance-sheets -d 'ssv_performance_data' -w 'Mainnet 30d' --metric 30d --network mainnet
-
-docker run --rm -v ".\credentials\google-credentials.json:/google-credentials.json:ro" --network ssv-performance_ssv-performance-network ssv-performance-sheets -d 'ssv_performance_data' -w 'Holesky 24h' --metric 24h --network holesky
-
-docker run --rm -v ".\credentials\google-credentials.json:/google-credentials.json:ro" --network ssv-performance_ssv-performance-network ssv-performance-sheets -d 'ssv_performance_data' -w 'Holesky 30d' --metric 30d --network holesky
-
-docker run --rm -v ".\credentials\google-credentials.json:/google-credentials.json:ro" --network ssv-performance_ssv-performance-network ssv-performance-sheets -d 'ssv_performance_data' -w 'Hoodi 24h' --metric 24h --network hoodi
-
-docker run --rm -v ".\credentials\google-credentials.json:/google-credentials.json:ro" --network ssv-performance_ssv-performance-network ssv-performance-sheets -d 'ssv_performance_data' -w 'Hoodi 30d' --metric 30d --network hoodi
-
-
-docker run --rm -v "./credentials/clickhouse-password.txt:/clickhouse-password.txt" -v "./credentials/google-credentials.json:/google-credentials.json:ro" --network ssv-performance_ssv-performance-network ssv-validator-count-sheets --log_level DEBUG  -d 'VOC Performance Data' -w 'Mainnet Validator Counts' --network mainnet
-
-sudo docker compose -p ssv-performance run --rm ssv-validator-count-sheets -d 'ssv_performance_data' -w 'Mainnet Validator Count'
-
+docker run --rm -v "./credentials/clickhouse-password.txt:/clickhouse-password.txt" -v "./credentials/google-credentials.json:/google-credentials.json:ro" --network ssv-performance_ssv-performance-network ssv-validator-count-sheets -d 'ssv_performance_data' -w 'Mainnet Validator Count' --network mainnet
 
 sudo docker compose -f scripts/ssv-validator-count-sheets/docker-compose.yml -p ssv-performance run --rm ssv-validator-count-sheets -d 'ssv_performance_data' -w 'Mainnet Validator Count'
 ```
