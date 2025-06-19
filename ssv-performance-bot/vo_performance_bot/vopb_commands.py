@@ -213,7 +213,8 @@ Thresholds displayed are subject to change.
     @bot.slash_command(name='fees', description='Show current fee information')
     async def fees(
         ctx,
-            availability: Option(str, "Which operators to include", choices=["public", "private"], default="public")
+            availability: Option(str, "Which operators to include", choices=["public", "private", "all"], default="public"),
+            verified: Option(str, "Which operators to include", choices=["verified", "unverified", "all"], default="verified")
     ):
 
         logging.info(f"/fees called with availability={availability}")
@@ -233,7 +234,7 @@ Thresholds displayed are subject to change.
                 await ctx.followup.send("Fee data not available.", ephemeral=True)
                 return
 
-            await respond_fee_messages(ctx, fee_data, extra_message=extra_message, availability=availability)
+            await respond_fee_messages(ctx, fee_data, extra_message=extra_message, availability=availability, verified=verified)
 
         except Exception as e:
             logging.error(f"Error fetching fee information: {e}", exc_info=True)

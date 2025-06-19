@@ -417,7 +417,7 @@ def render_bucket_lines(buckets_with_ranges, zero_count, outliers, fees, mean, m
     return bundle_messages(lines)
 
 
-def compile_fee_messages(fee_data, extra_message=None, availability="public"):
+def compile_fee_messages(fee_data, extra_message=None, availability="public", verified="all"):
     messages = []
 
     public_fees = []
@@ -514,20 +514,26 @@ def compile_fee_messages(fee_data, extra_message=None, availability="public"):
 
     # Public breakdown
     if availability in ("public", "both"):
-        messages.extend(summarize("All Public", public_fees, iqr_multiplier=1.5, num_buckets=10))
-        messages.append("")
-        messages.extend(summarize("Public Verified", public_vo_fees, iqr_multiplier=1.5, num_buckets=10))
-        messages.append("")
-        messages.extend(summarize("Public Unverified", public_non_vo_fees, iqr_multiplier=1.5, num_buckets=10))
-        messages.append("")
+        if verified == "all":
+            messages.extend(summarize("All Public", public_fees, iqr_multiplier=1.5, num_buckets=10))
+            messages.append("")
+        if verified in ("all", "verified"):
+            messages.extend(summarize("Public Verified", public_vo_fees, iqr_multiplier=1.5, num_buckets=10))
+            messages.append("")
+        if verified in ("all", "unverified"):
+            messages.extend(summarize("Public Unverified", public_non_vo_fees, iqr_multiplier=1.5, num_buckets=10))
+            messages.append("")
 
     # Private breakdown
     if availability in ("private", "both"):
-        messages.extend(summarize("All Private", private_fees, iqr_multiplier=2.5, num_buckets=5))
-        messages.append("")
-        messages.extend(summarize("Private Verified", private_vo_fees, iqr_multiplier=2.5, num_buckets=5))
-        messages.append("")
-        messages.extend(summarize("Private Unverified", private_non_vo_fees, iqr_multiplier=2.5, num_buckets=5))
+        if verified == "all":
+            messages.extend(summarize("All Private", private_fees, iqr_multiplier=2.5, num_buckets=5))
+            messages.append("")
+        if verified in ("all", "verified"):
+            messages.extend(summarize("Private Verified", private_vo_fees, iqr_multiplier=2.5, num_buckets=5))
+            messages.append("")
+        if verified in ("all", "unverified"):
+            messages.extend(summarize("Private Unverified", private_non_vo_fees, iqr_multiplier=2.5, num_buckets=5))
 
     if extra_message:
         messages.append("")
@@ -536,9 +542,9 @@ def compile_fee_messages(fee_data, extra_message=None, availability="public"):
     return bundle_messages(messages)
 
 
-async def respond_fee_messages(ctx, fee_data, extra_message=None, availability="public"):
+async def respond_fee_messages(ctx, fee_data, extra_message=None, availability="public", verified="all"):
     try:
-        messages = compile_fee_messages(fee_data, extra_message=extra_message, availability=availability)
+        messages = compile_fee_messages(fee_data, extra_message=extra_message, availability=availability, verified=verified)
 
         if messages:
             for message in messages:
