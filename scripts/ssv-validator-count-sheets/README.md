@@ -15,7 +15,7 @@ vi google-credentials.json
 ## Build Image
 
 ```
-docker build -t ssv-performance-sheets ./scripts/ssv-performance-sheets
+docker build -t ssv-validator-count-sheets ./scripts/ssv-validator-count-sheets/
 ```
 
 ## Identify the ClickHouse Docker Network

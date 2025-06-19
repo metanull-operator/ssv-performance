@@ -8,7 +8,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 RUN chmod +x /app/entrypoint.sh
 
-ENV CLICKHOUSE_PASSWORD=
+#ENV CLICKHOUSE_PASSWORD=
 
 # Number of days of performance data to upload to the Google Sheet
 #ENV NUMBER_OF_DAYS_TO_UPLOAD=180
@@ -23,4 +23,5 @@ ENV CLICKHOUSE_PASSWORD_FILE=/clickhouse-password.txt
 ENV CLICKHOUSE_HOST=clickhouse
 ENV PYTHONUNBUFFERED=1
 
-ENTRYPOINT ["python", "ssv-validator-count-sheets.py"]
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["python", "ssv-validator-count-sheets.py"]
