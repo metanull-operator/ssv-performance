@@ -213,6 +213,8 @@ def main():
 
     clickhouse_password_file = args.clickhouse_password_file
 
+    print(clickhouse_password_file)
+
     try:
         clickhouse_password = read_clickhouse_password_from_file(clickhouse_password_file)
     except Exception as e:
