@@ -374,7 +374,7 @@ def render_bucket_lines(buckets_with_ranges, zero_count, outliers, fees, mean, m
 
     lines = ["```"] + lines + ["```"]
 
-    return lines
+    return bundle_messages(lines)
 
 
 def dynamic_bucket_lines(values, fees, num_buckets=10):
