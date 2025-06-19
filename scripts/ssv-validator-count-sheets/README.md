@@ -16,6 +16,9 @@ vi google-credentials.json
 
 ```
 docker build -t ssv-validator-count-sheets ./scripts/ssv-validator-count-sheets/
+
+
+docker build -t ssv-validator-count-sheets scripts/ssv-validator-count-sheets/
 ```
 
 ## Identify the ClickHouse Docker Network
@@ -45,6 +48,11 @@ docker run --rm -v ".\credentials\google-credentials.json:/google-credentials.js
 
 
 docker run --rm -v "./credentials/clickhouse-password.txt:/clickhouse-password.txt" -v "./credentials/google-credentials.json:/google-credentials.json:ro" --network ssv-performance_ssv-performance-network ssv-validator-count-sheets --log_level DEBUG  -d 'VOC Performance Data' -w 'Mainnet Validator Counts' --network mainnet
+
+sudo docker compose -p ssv-performance run --rm ssv-validator-count-sheets -d 'ssv_performance_data' -w 'Mainnet Validator Count'
+
+
+sudo docker compose -f scripts/ssv-validator-count-sheets/docker-compose.yml -p ssv-performance run --rm ssv-validator-count-sheets -d 'ssv_performance_data' -w 'Mainnet Validator Count'
 ```
 
 Create cronjobs to run the command daily for each network and performance period. These cronjobs should run after the `ssv-performance-collector` cronjobs to ensure that the Google Sheets have the latest data.
