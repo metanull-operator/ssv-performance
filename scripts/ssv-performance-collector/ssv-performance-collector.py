@@ -211,7 +211,7 @@ def main():
     logging.getLogger().setLevel(args.log_level.upper())
     logging.info(f"Logging level set to {args.log_level.upper()}")
 
-    clickhouse_password_file = args.clickhouse_password
+    clickhouse_password_file = args.clickhouse_password_file
 
     try:
         clickhouse_password = read_clickhouse_password_from_file(clickhouse_password_file)
