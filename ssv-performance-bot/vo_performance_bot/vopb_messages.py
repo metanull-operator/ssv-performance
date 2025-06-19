@@ -473,7 +473,7 @@ def compile_fee_messages(fee_data, extra_message=None):
         else:
 #            lines.append(f"- Lowest Fee: {lowest_fee:.2f} — shared by {len(lowest_operators)} operators")
             example_op = random.choice(lowest_operators)
-            lines.append(f"- Lowest Fee: {lowest_fee:.2f} - {op[FIELD_OPERATOR_NAME]} (ID: {op[FIELD_OPERATOR_ID]}, Validators: {op[FIELD_VALIDATOR_COUNT]}) and {len(lowest_operators)} other operator(s)")
+            lines.append(f"- Lowest Fee: {lowest_fee:.2f} - {example_op[FIELD_OPERATOR_NAME]} (ID: {example_op[FIELD_OPERATOR_ID]}, Validators: {example_op[FIELD_VALIDATOR_COUNT]}) and {len(lowest_operators)-1} other operator(s)")
 
 
         # Highest Fee (as-is)
