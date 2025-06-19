@@ -211,9 +211,12 @@ Thresholds displayed are subject to change.
 
 
     @bot.slash_command(name='fees', description='Show current fee information')
-    async def fees(ctx):
+    async def fees(
+        ctx,
+            visibility: Option(str, "Which operators to include", choices=["public", "private"], default="public")
+    ):
 
-        logging.info("/fees called")
+        logging.info(f"/fees called with visibility={visibility}")
 
         if not allowed_channel(ctx):
             await ctx.respond("VO Performance Bot commands are not allowed in this channel.", ephemeral=True)
