@@ -310,11 +310,12 @@ def iqr_bucket_lines_with_zero_handling(values, fees, num_buckets=5, iqr_multipl
         upper = lower + bucket_size
         bucket_ranges.append((lower, upper))
 
-    for fee, _ in inlier_fees:
+    for fee, op in inlier_fees:
         i = int((fee - min_val) / bucket_size)
         if i == num_buckets:
             i -= 1
-        buckets[i].append((fee, op))
+        buckets[i].append((fee, op))  # ✅ Now 'op' is defined
+
 
     return buckets, bucket_ranges, len(zero_fees), outlier_fees
 
