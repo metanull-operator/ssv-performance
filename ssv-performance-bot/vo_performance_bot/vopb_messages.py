@@ -507,7 +507,7 @@ def compile_fee_messages(fee_data, extra_message=None, availability="public", ve
             f"(ID: {highest[1][FIELD_OPERATOR_ID]}, Validators: {highest[1][FIELD_VALIDATOR_COUNT]})"
         )
 
-        lines.append("### Fee Distribution (Operators)")
+        lines.append(f"### {label} Operator Fee Distribution (Operators)")
         lines += bucket_lines
 
         return bundle_messages(lines)
