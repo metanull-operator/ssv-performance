@@ -1,14 +1,17 @@
 services:
   ssv-validator-count-sheets:
     image: ssv-validator-count-sheets:${SSV_VALIDATOR_COUNT_SHEETS_VERSION:-latest}
+    build:
+      context: ../..
+      dockerfile: scripts/ssv-performance-sheets/Dockerfile
     environment:
       NETWORK: ${NETWORK:-mainnet}
       CLICKHOUSE_HOST: ${CLICKHOUSE_HOST:-clickhouse}
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-ssv_performance}
       CLICKHOUSE_PASSWORD_FILE: /clickhouse-password.txt
     volumes:
-      - ./credentials/google-credentials.json:/google-credentials.json
-      - ./credentials/clickhouse-password.txt:/clickhouse-password.txt
+      - ../../credentials/google-credentials.json:/google-credentials.json
+      - ../../credentials/clickhouse-password.txt:/clickhouse-password.txt
     networks:
       - ssv-performance-network
 
