@@ -403,7 +403,12 @@ def render_bucket_lines(buckets_with_ranges, zero_count, outliers, fees, mean, m
         label = f">= {outlier_min:.2f}"
 #        label_width = len(label) + 1
 
-        lines.append(f"{label:>{label_width}} {bar:<{max_segments}} {count_str:<{count_width}} ⟵ outliers: {outlier_min:.2f}-{outlier_max:.2f}")
+        if count == 1:
+            outlier_info = f"⟵ outlier: {outlier_min:.2f}"
+        else:
+            outlier_info = f"⟵ outliers: {outlier_min:.2f}-{outlier_max:.2f}"
+
+        lines.append(f"{label:>{label_width}} {bar:<{max_segments}} {count_str:<{count_width}} {outlier_info}")
 
     lines = ["```"] + lines + ["```"]
 
