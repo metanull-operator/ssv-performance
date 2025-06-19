@@ -372,8 +372,6 @@ def render_bucket_lines(buckets_with_ranges, zero_count, outliers, fees, mean, m
         validator_count = sum(op[FIELD_VALIDATOR_COUNT] for fee, op in b)
         count_str = f"({b_len}/{validator_count})"
 
-        validator_count = validator_sum(outliers)
-        count_str = f"({count}/{validator_count})"
         lines.append(f"{label:>{label_width}} {bar:<{max_segments}} {count_str:<{count_width}}{marker_str}")
 
     if outliers:
