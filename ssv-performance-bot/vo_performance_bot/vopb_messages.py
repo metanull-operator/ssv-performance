@@ -509,11 +509,11 @@ def compile_fee_messages(fee_data, extra_message=None):
     messages.append("")
 
     # Private breakdown
-    messages.extend(summarize("Private (All)", private_fees, iqr_multiplier=2.5, num_buckets=5))
-    messages.append("")
-    messages.extend(summarize("Private (Verified)", private_vo_fees, iqr_multiplier=2.5, num_buckets=5))
-    messages.append("")
-    messages.extend(summarize("Private (Unverified)", private_non_vo_fees, iqr_multiplier=2.5, num_buckets=5))
+#    messages.extend(summarize("Private (All)", private_fees, iqr_multiplier=2.5, num_buckets=5))
+#    messages.append("")
+#    messages.extend(summarize("Private (Verified)", private_vo_fees, iqr_multiplier=2.5, num_buckets=5))
+#    messages.append("")
+#    messages.extend(summarize("Private (Unverified)", private_non_vo_fees, iqr_multiplier=2.5, num_buckets=5))
 
     if extra_message:
         messages.append("")
