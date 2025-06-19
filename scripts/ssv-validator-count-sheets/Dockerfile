@@ -23,5 +23,5 @@ ENV CLICKHOUSE_PASSWORD_FILE=/clickhouse-password.txt
 ENV CLICKHOUSE_HOST=clickhouse
 ENV PYTHONUNBUFFERED=1
 
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["python", "ssv-validator-count-sheets.py"]
