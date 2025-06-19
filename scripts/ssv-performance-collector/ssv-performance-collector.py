@@ -194,6 +194,10 @@ def deduplicate_table(client, table_name: str, network: str):
         logging.info(f"❌ Failed to deduplicate {table_name}: {e}")
 
 
+def read_clickhouse_password_from_file(password_file_path):
+    with open(password_file_path, 'r') as file:
+        return file.read().strip()
+
 def main():
     parser = argparse.ArgumentParser(description='Fetch and update operator performance data.')
     parser.add_argument('-n', '--network', type=str, choices=['mainnet', 'holesky', 'hoodi'], default='mainnet')
@@ -212,8 +216,6 @@ def main():
     logging.info(f"Logging level set to {args.log_level.upper()}")
 
     clickhouse_password_file = args.clickhouse_password_file
-
-    print(clickhouse_password_file)
 
     try:
         clickhouse_password = read_clickhouse_password_from_file(clickhouse_password_file)
