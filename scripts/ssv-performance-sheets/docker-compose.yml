@@ -1,0 +1,25 @@
+services:
+  ssv-performance-sheets:
+    image: ssv-performance-sheets:${SSV_PERFORMANCE_SHEETS_VERSION:-latest}
+    environment:
+      NETWORK: ${NETWORK:-mainnet}
+      CLICKHOUSE_HOST: ${CLICKHOUSE_HOST:-clickhouse}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-ssv_performance}
+      CLICKHOUSE_PASSWORD_FILE: /clickhouse-password.txt
+    volumes:
+      - ./credentials/google-credentials.json:/google-credentials.json
+      - ./credentials/clickhouse-password.txt:/clickhouse-password.txt
+    networks:
+      - ssv-performance-network
+
+#command: |
+#  sh -c '
+#    echo "0 12 * * * root python /app/ssv-performance-collector.py >> /var/log/cron.log 2>&1" > /etc/cron.d/ssv-collector &&
+#    chmod 0644 /etc/cron.d/ssv-collector &&
+#    touch /var/log/cron.log &&
+#    cron -f
+#  '
+
+networks:
+  ssv-performance-network:
+    driver: bridge
