@@ -26,8 +26,8 @@ SPREADSHEET_COLUMNS = [
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Creates a two-dimensional representation of the data to be populated into the Google Sheet
-def create_spreadsheet_data(data, performance_data_attribute):
-    dates = sorted({d for details in data.values() for d in details[performance_data_attribute]}, reverse=True)
+def create_spreadsheet_data(data, count_data_attribute):
+    dates = sorted({d for details in data.values() for d in details[count_data_attribute]}, reverse=True)
     sorted_entries = sorted(data.items(), key=lambda item: item[1].get(FIELD_OPERATOR_ID, 'Unknown'))
 
     spreadsheet_data = [SPREADSHEET_COLUMNS + dates]
@@ -38,11 +38,10 @@ def create_spreadsheet_data(data, performance_data_attribute):
             details.get(FIELD_OPERATOR_NAME, None),
             1 if details.get(FIELD_IS_VO, 0) else 0,
             1 if details.get(FIELD_IS_PRIVATE, 0) else 0,
-            details.get(FIELD_VALIDATOR_COUNT, None),
             details.get(FIELD_ADDRESS, None)
         ]
         for d in dates:
-            row.append(details[performance_data_attribute].get(d, None))
+            row.append(details[count_data_attribute].get(d, None))
         spreadsheet_data.append(row)
 
     return spreadsheet_data
