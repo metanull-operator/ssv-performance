@@ -336,7 +336,10 @@ def render_bucket_lines(buckets_with_ranges, zero_count, outliers, fees, mean, m
     max_label = f"Outliers > {max_fee:.2f}"
     label_width = len(max_label) + 1
 
-    count_width = 8
+ #   count_width = 8
+
+    all_counts = [zero_count] + [len(b) for b, _, _ in buckets_with_ranges] + [len(outliers)]
+    count_width = max(len(str(c)) for c in all_counts) + 2
 
     if zero_count > 0:
         bar = build_bar(zero_count)
@@ -347,7 +350,7 @@ def render_bucket_lines(buckets_with_ranges, zero_count, outliers, fees, mean, m
         if median is not None and median == 0:
             markers.append("median")
 
-        marker_str = f"⟵ {', '.join(markers)}" if markers else ""
+        marker_str = f" ⟵ {', '.join(markers)}" if markers else ""
 
         validator_count = sum(op[FIELD_VALIDATOR_COUNT] for fee, op in fees if fee == 0)
 #        count_str = f"({zero_count}/{validator_count})"
