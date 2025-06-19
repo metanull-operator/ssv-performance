@@ -6,7 +6,6 @@ The ssv-performance-collector gathers SSV network performance data from api.ssv.
 
 ```
 docker build -t ssv-performance-collector ./scripts/ssv-performance-collector
-docker build -t ssv-performance-sheets:latest ./scripts/ssv-performance-sheets/
 ```
 
 ## Identify the ClickHouse Docker Network
@@ -22,11 +21,9 @@ docker network ls
 Run the collector once for each Ethereum network for which you want to collect performance data.
 
 ```bash
-docker run --rm --network=ssv-performance_ssv-performance-network ssv-performance-collector --network mainnet
-docker run --rm --network=ssv_performance_ssv-performance-network ssv-performance-collector --network holesky
-docker run --rm --network=ssv_performance_ssv-performance-network ssv-performance-collector --network hoodi
+docker run --rm -v "./credentials/clickhouse-password.txt:/clickhouse-password.txt" --network ssv-performance_ssv-performance-network ssv-performance-collector --network mainnet
 
-docker run --rm -it -v "./credentials/clickhouse-password.txt:/clickhouse-password.txt" --network ssv-performance_ssv-performance-network ssv-performance-collector:latest --network mainnet
+docker compose -f scripts/ssv-performance-collector/docker-compose.yml -p ssv-performance run --rm ssv-performance-collector
 ```
 
 Create cronjobs to run the command daily for each network.
