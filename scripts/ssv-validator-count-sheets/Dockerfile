@@ -44,4 +44,5 @@ ENV CLICKHOUSE_HOST=clickhouse
 ENV PYTHONUNBUFFERED=1
 
 ENTRYPOINT ["/app/entrypoint.sh"]
-CMD ["python", "ssv-validator-count-sheets.py"]
+CMD []
+#CMD ["python", "ssv-validator-count-sheets.py"]
