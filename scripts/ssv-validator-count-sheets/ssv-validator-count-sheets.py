@@ -112,7 +112,7 @@ def authorize_google_sheets(credentials_file):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Export SSV operator performance to Google Sheets")
+    parser = argparse.ArgumentParser(description="Export SSV validator count data to Google Sheets")
     parser.add_argument('-c', '--google_credentials', type=str, default=os.environ.get('GOOGLE_CREDENTIALS_FILE', '/etc/ssv-performance-sheets/credentials/google-credentials.json'))
     parser.add_argument('-p', '--clickhouse_password', type=str, default=os.environ.get('CLICKHOUSE_PASSWORD_FILE', '/etc/ssv-performance-sheets/credentials/clickhouse-password.txt'))
     parser.add_argument('-d', '--document', type=str, required=True)
@@ -151,7 +151,7 @@ def main():
         return
 
     try:
-        perf_data = get_operator_validator_count_data(network=args.network, days=args.days, clickhouse_password=clickhouse_password)
+        count_data = get_operator_validator_count_data(network=args.network, days=args.days, clickhouse_password=clickhouse_password)
         logging.info("Retrieved performance data from ClickHouse.")
 
     except Exception as e:
@@ -159,7 +159,7 @@ def main():
         return
 
     try:
-        spreadsheet = create_spreadsheet_data(perf_data, args.metric)
+        spreadsheet = create_spreadsheet_data(count_data, 'validator_counts')
         worksheet.clear()
         worksheet.update(values=spreadsheet, range_name='A1', value_input_option='USER_ENTERED')
         worksheet.resize(rows=len(spreadsheet), cols=len(spreadsheet[0]))
