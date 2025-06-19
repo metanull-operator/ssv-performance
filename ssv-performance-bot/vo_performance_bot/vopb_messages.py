@@ -314,12 +314,16 @@ def iqr_bucket_lines_with_zero_handling(values, fees, num_buckets=5, iqr_multipl
         i = int((fee - min_val) / bucket_size)
         if i == num_buckets:
             i -= 1
-        buckets[i].append(fee)
+        buckets[i].append((fee, op))
 
     return buckets, bucket_ranges, len(zero_fees), outlier_fees
 
 
 def render_bucket_lines(buckets_with_ranges, zero_count, outliers, fees, mean, median, max_segments=20):
+
+    def validator_sum(entries):
+        return sum(op.get(FIELD_VALIDATOR_COUNT, 0) for _, op in entries)
+
     max_count = max([len(b) for b, _, _ in buckets_with_ranges] + [zero_count, len(outliers)])
     lines = []
 
@@ -360,7 +364,9 @@ def render_bucket_lines(buckets_with_ranges, zero_count, outliers, fees, mean, m
             markers.append("median")
 
         marker_str = f"⟵ {', '.join(markers)}" if markers else ""
-        count_str = f"({b_len})"
+
+        validator_count = validator_sum(outliers)
+        count_str = f"({count}/{validator_count})"
         lines.append(f"{label:>{label_width}} {bar:<{max_segments}} {count_str:<{count_width}}{marker_str}")
 
     if outliers:
@@ -486,7 +492,7 @@ def compile_fee_messages(fee_data, extra_message=None):
             f"- Median Fee: {median:.2f}",
             f"- Lowest Fee: {lowest[0]:.2f} - {lowest[1][FIELD_OPERATOR_NAME]} (ID: {lowest[1][FIELD_OPERATOR_ID]}, Validators: {lowest[1][FIELD_VALIDATOR_COUNT]})",
             f"- Highest Fee: {highest[0]:.2f} - {highest[1][FIELD_OPERATOR_NAME]} (ID: {highest[1][FIELD_OPERATOR_ID]}, Validators: {highest[1][FIELD_VALIDATOR_COUNT]})",
-            "### Fee Distribution"
+            "### Fee Distribution (ID/Validators)"
         ] + bucket_lines)
 
 
