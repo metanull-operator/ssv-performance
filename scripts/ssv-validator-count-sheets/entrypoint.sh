@@ -5,8 +5,14 @@ if [ -n "${CLICKHOUSE_PASSWORD_FILE:-}" ] && [ -f "$CLICKHOUSE_PASSWORD_FILE" ];
   export CLICKHOUSE_PASSWORD=$(< "$CLICKHOUSE_PASSWORD_FILE")
 fi
 
-if [[ $# -eq 0 ]]; then
+# If no arguments passed, use default command from environment
+if [[ $# -eq 0 && -n "$DEFAULT_CMD" ]]; then
   set -- python ssv-validator-count-sheets.py
+fi
+
+# If first argument starts with "-", assume it's flags for the default command
+if [[ "$1" =~ ^- && -n "$DEFAULT_CMD" ]]; then
+  set -- python ssv-validator-count-sheets.py "$@"
 fi
 
 exec gosu sheets "$@"
