@@ -2,6 +2,9 @@ services:
   ssv-performance-bot:
     image: ssv-performance-bot:${SSV_PERFORMANCE_BOT_VERSION:-latest}
     hostname: ssv-performance-bot
+    build:
+      context: .
+      dockerfile: ssv-performance-bot/Dockerfile
     environment:
       NETWORK: ${NETWORK:-mainnet}
       BOT_DISCORD_CHANNEL_ID: ${BOT_DISCORD_CHANNEL_ID}
