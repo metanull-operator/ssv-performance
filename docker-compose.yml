@@ -27,6 +27,7 @@ services:
     environment:
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
       CLICKHOUSE_HOST: ${CLICKHOUSE_HOST:-clickhouse}
+      CLICKHOUSE_PORT: ${CLICKHOUSE_PORT:-8123}
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-ssv_performance}
       CLICKHOUSE_PASSWORD_FILE: /clickhouse-password.txt
     volumes:
@@ -35,7 +36,7 @@ services:
       - ./clickhouse-init/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
       - ./clickhouse-init/healthcheck.sh:/app/healthcheck.sh:ro
       - ./sql-import:/sql-import:ro
-      - ./scripts/clickhouse-import/clickhouse-import.sh:/app/clickhouse-import.sh:ro
+      - ./scripts/clickhouse-import/clickhouse-import.sh:/usr/local/bin/clickhouse-import.sh:ro
     healthcheck:
       test: ["CMD", "/app/healthcheck.sh"]
       interval: 2s
