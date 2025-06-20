@@ -26,8 +26,9 @@ def main():
     parser.add_argument("--output", default="performance_restore.sql", help="Output SQL file path")
     args = parser.parse_args()
 
-    df = pd.read_csv(args.csv_file, header=0)
+    df = pd.read_csv(args.csv_file, header=0, index_col=0, dtype=str)
     metric_dates = df.iloc[0, 1:]
+    print()
     df = df.iloc[1:]
     df.columns = ['operator_id'] + list(metric_dates)
 
