@@ -10,7 +10,8 @@ services:
       BOT_LOG_LEVEL: ${BOT_LOG_LEVEL:-INFO}
       CLICKHOUSE_HOST: ${CLICKHOUSE_HOST:-clickhouse}
       CLICKHOUSE_PORT: ${CLICKHOUSE_PORT:-8123}
-      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-ssv_performance}      
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-ssv_performance}  
+      CLICKHOUSE_PASSWORD_FILE: /clickhouse-password.txt    
     volumes:
       - ./certs:/certs:ro
       - ./credentials/discord-token.txt:/discord-token.txt:ro
