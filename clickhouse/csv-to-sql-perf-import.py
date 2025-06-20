@@ -7,6 +7,7 @@ def parse_metric_value(raw):
         return None
     try:
         str_val = str(raw).strip()
+        print(f"Parsing metric value: '{str_val}'")
         if str_val.endswith('%'):
             return float(str_val.rstrip('%')) / 100.0
         return float(str_val)
@@ -44,7 +45,7 @@ def main():
                 except Exception as e:
                     print(f"⚠️ Skipping column '{col}': {e}")
                     continue
-                
+
                 rows.append(
                     f"('{args.network}', {operator_id}, '{args.metric_type}', "
                     f"'{metric_date}', {metric_value}, 'api.ssv.network', '{now}')"
