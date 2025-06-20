@@ -9,6 +9,8 @@ def parse_metric_value(raw):
         str_val = str(raw).strip()
         print(f"Parsing metric value: '{str_val}'")
         if str_val.endswith('%'):
+            print(f"Detected percentage format: '{str_val}'")
+            print(f"Converted to float: {float(str_val.rstrip('%')) / 100.0}")
             return float(str_val.rstrip('%')) / 100.0
         return float(str_val)
     except Exception as e:
