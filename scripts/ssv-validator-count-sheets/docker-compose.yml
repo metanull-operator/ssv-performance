@@ -13,8 +13,8 @@ services:
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-ssv_performance}
       CLICKHOUSE_PASSWORD_FILE: /clickhouse-password.txt
     volumes:
-      - ../../credentials/google-credentials.json:/google-credentials.json
-      - ../../credentials/clickhouse-password.txt:/clickhouse-password.txt
+      - ../../credentials/google-credentials.json:/google-credentials.json:ro
+      - ../../credentials/clickhouse-password.txt:/clickhouse-password.txt:ro
     networks:
       - ssv-performance-network
 
