@@ -28,16 +28,16 @@ services:
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
       CLICKHOUSE_HOST: ${CLICKHOUSE_HOST:-clickhouse}
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-ssv_performance}
-      CLICKHOUSE_PASSWORD_FILE: /etc/ssv-performance-bot/clickhouse-password.txt
+      CLICKHOUSE_PASSWORD_FILE: /clickhouse-password.txt
     volumes:
       - clickhouse-data:/var/lib/clickhouse
-      - ./clickhouse-init/init.sql:/docker-entrypoint-initdb.d/init.sql
-      - ./credentials/clickhouse-password.txt:/etc/ssv-performance-bot/clickhouse-password.txt:ro
-      - ./clickhouse-init/healthcheck.sh:/usr/local/bin/healthcheck.sh:ro
+      - ./credentials/clickhouse-password.txt:/clickhouse-password.txt:ro
+      - ./clickhouse-init/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./clickhouse-init/healthcheck.sh:/app/healthcheck.sh:ro
       - ./sql-import:/sql-import:ro
-      - ./scripts/clickhouse-import/clickhouse-import.sh:/usr/local/bin/clickhouse-import.sh
+      - ./scripts/clickhouse-import/clickhouse-import.sh:/app/clickhouse-import.sh:ro
     healthcheck:
-      test: ["CMD", "/usr/local/bin/healthcheck.sh"]
+      test: ["CMD", "/app/healthcheck.sh"]
       interval: 2s
       timeout: 2s
       retries: 5

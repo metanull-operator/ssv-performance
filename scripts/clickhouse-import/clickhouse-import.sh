@@ -2,9 +2,10 @@
 set -euo pipefail
 
 CLICKHOUSE_USER="${CLICKHOUSE_USER:-ssv_performance}"
-CLICKHOUSE_HOST="${CLICKHOUSE_HOST:-localhost}"
+CLICKHOUSE_HOST="${CLICKHOUSE_HOST:-clickhouse}"
 CLICKHOUSE_DATABASE="${CLICKHOUSE_DATABASE:-default}"
-CLICKHOUSE_PASSWORD_FILE="${CLICKHOUSE_PASSWORD_FILE:-/etc/ssv-performance-bot/clickhouse-password.txt}"
+CLICKHOUSE_PASSWORD_FILE="${CLICKHOUSE_PASSWORD_FILE:-/clickhouse-password.txt}"
+
 SQL_DIR="${SQL_DIR:-/sql-import}"
 
 # Load password
