@@ -26,37 +26,40 @@ def main():
     parser.add_argument("--output", default="performance_restore.sql", help="Output SQL file path")
     args = parser.parse_args()
 
-    df = pd.read_csv(args.csv_file, header=0, index_col=0, dtype=str)
-    metric_dates = df.iloc[0, 1:]
-    print()
-    df = df.iloc[1:]
-    df.columns = ['operator_id'] + list(metric_dates)
+    df = pd.read_csv(args.csv_file, header=0)
+    df.columns = [col.strip() for col in df.columns]
+
+    metric_dates = df.columns[1:]
 
     now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
     rows = []
 
     for _, row in df.iterrows():
-        operator_id = int(row['operator_id'])
-        for col, val in row.items():
-            if col == 'operator_id':
-                continue
+        try:
+            operator_id = int(row['OperatorID'])
+        except Exception as e:
+            print(f"⚠️ Skipping row with invalid OperatorID: {e}")
+            continue
+
+        for col in metric_dates:  # metric_dates = df.columns[1:]
+            val = row[col]
+
             metric_value = parse_metric_value(val)
             print(f"Processing operator {operator_id}, column '{col}': value = {metric_value}")
+
             if metric_value is None:
                 continue
+
             try:
-                try:
-                    metric_date = pd.to_datetime(col, errors='raise').strftime("%Y-%m-%d")
-                except Exception as e:
-                    print(f"⚠️ Skipping column '{col}': {e}")
-                    continue
+                metric_date = pd.to_datetime(col, errors='raise').strftime("%Y-%m-%d")
 
                 rows.append(
                     f"('{args.network}', {operator_id}, '{args.metric_type}', "
                     f"'{metric_date}', {metric_value}, 'api.ssv.network', '{now}')"
                 )
+
             except Exception as e:
-                print(f"⚠️ Skipping row for operator {operator_id} on {col}: {e}")
+                print(f"⚠️ Skipping row for operator {operator_id} on column '{col}': {e}")
 
     if not rows:
         print("❌ No valid rows found.")
