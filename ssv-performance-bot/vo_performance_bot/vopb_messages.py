@@ -428,6 +428,8 @@ def compile_fee_messages(fee_data, extra_message=None, availability="public", ve
     private_vo_fees = []
     private_non_vo_fees = []
 
+    all_fees = []
+
     for operator in fee_data.values():
         fee = operator.get(FIELD_OPERATOR_FEE)
         is_private = operator.get(FIELD_IS_PRIVATE)
@@ -436,6 +438,8 @@ def compile_fee_messages(fee_data, extra_message=None, availability="public", ve
             continue
 
         item = (fee, operator)
+
+        all_fees.append(item)
 
         if is_private:
             private_fees.append(item)
@@ -511,6 +515,10 @@ def compile_fee_messages(fee_data, extra_message=None, availability="public", ve
         lines += bucket_lines
 
         return bundle_messages(lines)
+
+
+    if availability == "all" and visibility == "all":
+        messages.extend(summarize("All", all_fees, iqr_multiplier=1.5, num_buckets=10))
 
     # Public breakdown
     if availability in ("public", "all"):
