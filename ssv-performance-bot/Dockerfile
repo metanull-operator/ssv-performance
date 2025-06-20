@@ -14,5 +14,5 @@ COPY . .
 RUN pip install --no-cache-dir -r requirements.txt
 RUN chmod +x /app/entrypoint.sh
 
-ENTRYPOINT ["/entrypoint.sh"]
-CMD ["python", "ssv-performance-bot.py"]
+ENTRYPOINT ["/app/entrypoint.sh"]
+CMD []
