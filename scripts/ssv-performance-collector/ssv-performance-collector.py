@@ -6,7 +6,7 @@ import time
 import os
 import logging
 
-OPERATOR_PERFORMANCE_DAYS = int(os.environ.get('OPERATOR_PERFORMANCE_DAYS', 7)) # Number of 24h data points for /operator command
+MISSING_PERFORMANCE_DAYS = int(os.environ.get('MISSING_PERFORMANCE_DAYS', 7)) 
 REQUESTS_PER_MINUTE = int(os.environ.get('REQUESTS_PER_MINUTE', 20)) # Total requests to API per minute
 REQUEST_DELAY = 60 / REQUESTS_PER_MINUTE
 
@@ -46,17 +46,34 @@ def fetch_and_filter_data(base_url, page_size):
 
         data = response.json()
 
-        if not data["operators"]:
+        if not data.get("operators"):
             break
 
         for op in data["operators"]:
             try:
-                if int(op["validators_count"]) > 0:
-                    op["performance"]['24h'] = float(op["performance"]['24h']) / 100
-                    op["performance"]['30d'] = float(op["performance"]['30d']) / 100
-                operators[int(op["id"])] = op
+                perf = op.get("performance", {})
+                perf_24h_raw = perf.get("24h")
+                perf_30d_raw = perf.get("30d")
+
+                perf_clean = {}
+
+                # Normalize 24h performance
+                if perf_24h_raw is not None:
+                    val = float(perf_24h_raw)
+                    perf_clean["24h"] = val if val == 0 else val / 100
+
+                # Normalize 30d performance
+                if perf_30d_raw is not None:
+                    val = float(perf_30d_raw)
+                    perf_clean["30d"] = val if val == 0 else val / 100
+
+                # Only keep if we have at least one of the two
+                if perf_clean:
+                    op["performance"] = perf_clean
+                    operators[int(op["id"])] = op
+
             except Exception as e:
-                logging.error(f"Error processing operator {op['id']}: {e}")
+                logging.error(f"Error processing operator {op.get('id')}: {e}")
                 continue
 
         page += 1
@@ -158,7 +175,7 @@ def insert_clickhouse_performance_data(client, network, clickhouse_table_operato
 
 
 def cleanup_outdated_records(client):
-    cutoff_date = (datetime.now(timezone.utc) - timedelta(days=OPERATOR_PERFORMANCE_DAYS)).strftime('%Y-%m-%d')
+    cutoff_date = (datetime.now(timezone.utc) - timedelta(days=MISSING_PERFORMANCE_DAYS)).strftime('%Y-%m-%d')
 
     # Count how many rows will be updated
     count_query = f"""
@@ -171,7 +188,7 @@ def cleanup_outdated_records(client):
         )
     """
     affected_rows = client.query(count_query).result_rows[0][0]  
-    logging.info(f"Found {affected_rows} operators with no performance data for the last {OPERATOR_PERFORMANCE_DAYS} days. Updating validator count to zero.")
+    logging.info(f"Found {affected_rows} operators with no performance data for the last {MISSING_PERFORMANCE_DAYS} days. Updating validator count to zero.")
 
     # Now run the update
     update_query = f"""
