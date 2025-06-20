@@ -111,8 +111,10 @@ async def main():
             logging.error(f"Error in on_ready event: {e}", exc_info=True)
             sys.exit(1)
 
+    num_segments = os.environ.get("NUMBER_OF_SEGMENTS", DEFAULT_NUMBER_OF_SEGMENTS)
+
     try:
-        await vopb_commands.setup(network, bot, channel_id, extra_message)
+        await vopb_commands.setup(network, bot, channel_id, extra_message, num_segments=num_segments)
         logging.info("Commands setup successfully.")
     except Exception as e:
         logging.error(f"Error setting up commands: {e}", exc_info=True)

@@ -417,7 +417,7 @@ def render_bucket_lines(buckets_with_ranges, zero_count, outliers, fees, mean, m
     return bundle_messages(lines)
 
 
-def compile_fee_messages(fee_data, extra_message=None, availability="public", verified="all"):
+def compile_fee_messages(fee_data, extra_message=None, availability="public", verified="all", num_segments=20):
     messages = []
 
     public_fees = []
@@ -455,7 +455,7 @@ def compile_fee_messages(fee_data, extra_message=None, availability="public", ve
                 public_non_vo_fees.append(item)
 
 
-    def summarize(label, fees, num_buckets=5, iqr_multiplier=1.5):
+    def summarize(label, fees, num_buckets=5, iqr_multiplier=1.5, num_segments=20):
         if not fees:
             return [f"No {label} operators found."]
 
@@ -479,7 +479,7 @@ def compile_fee_messages(fee_data, extra_message=None, availability="public", ve
             zero_count=zero_count,
             outliers=outliers,
             fees=fees,
-            max_segments=40,
+            max_segments=num_segments,
             mean=mean,
             median=median
         )
@@ -491,7 +491,6 @@ def compile_fee_messages(fee_data, extra_message=None, availability="public", ve
             f"- Median Fee: {median:.2f}",
         ]
 
-        # Handle Lowest Fee
         lowest_fee = lowest[0]
         lowest_operators = [op for fee, op in fees if fee == lowest_fee]
 
@@ -501,11 +500,9 @@ def compile_fee_messages(fee_data, extra_message=None, availability="public", ve
                 f"- Lowest Fee: {lowest_fee:.2f} - {op[FIELD_OPERATOR_NAME]} (ID: {op[FIELD_OPERATOR_ID]}, Validators: {op[FIELD_VALIDATOR_COUNT]})"
             )
         else:
-#            lines.append(f"- Lowest Fee: {lowest_fee:.2f} — shared by {len(lowest_operators)} operators")
             example_op = random.choice(lowest_operators)
             lines.append(f"- Lowest Fee: {lowest_fee:.2f} - {example_op[FIELD_OPERATOR_NAME]} (ID: {example_op[FIELD_OPERATOR_ID]}, Validators: {example_op[FIELD_VALIDATOR_COUNT]}) and {len(lowest_operators)-1} other operator(s)")
 
-        # Highest Fee (as-is)
         lines.append(
             f"- Highest Fee: {highest[0]:.2f} - {highest[1][FIELD_OPERATOR_NAME]} "
             f"(ID: {highest[1][FIELD_OPERATOR_ID]}, Validators: {highest[1][FIELD_VALIDATOR_COUNT]})"
@@ -516,38 +513,36 @@ def compile_fee_messages(fee_data, extra_message=None, availability="public", ve
 
         return bundle_messages(lines)
 
-
     if availability == "all" and visibility == "all":
-        messages.extend(summarize("All", all_fees, iqr_multiplier=1.5, num_buckets=10))
+        messages.extend(summarize("All", all_fees, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
 
     # Public breakdown
     if availability in ("public", "all"):
         if verified == "all":
-            messages.extend(summarize("All Public", public_fees, iqr_multiplier=1.5, num_buckets=10))
+            messages.extend(summarize("All Public", public_fees, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
         if verified in ("all", "verified"):
-            messages.extend(summarize("Public Verified", public_vo_fees, iqr_multiplier=1.5, num_buckets=10))
+            messages.extend(summarize("Public Verified", public_vo_fees, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
         if verified in ("all", "unverified"):
-            messages.extend(summarize("Public Unverified", public_non_vo_fees, iqr_multiplier=1.5, num_buckets=10))
+            messages.extend(summarize("Public Unverified", public_non_vo_fees, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
  
     # Private breakdown
     if availability in ("private", "all"):
         if verified == "all":
-            messages.extend(summarize("All Private", private_fees, iqr_multiplier=2.5, num_buckets=5))
+            messages.extend(summarize("All Private", private_fees, iqr_multiplier=2.5, num_buckets=5, num_segments=num_segments))
         if verified in ("all", "verified"):
-            messages.extend(summarize("Private Verified", private_vo_fees, iqr_multiplier=2.5, num_buckets=5))
+            messages.extend(summarize("Private Verified", private_vo_fees, iqr_multiplier=2.5, num_buckets=5, num_segments=num_segments))
         if verified in ("all", "unverified"):
-            messages.extend(summarize("Private Unverified", private_non_vo_fees, iqr_multiplier=2.5, num_buckets=5))
+            messages.extend(summarize("Private Unverified", private_non_vo_fees, iqr_multiplier=2.5, num_buckets=5, num_segments=num_segments))
 
     if extra_message:
-#        messages.append("")
         messages.append(extra_message)
 
     return bundle_messages(messages)
 
 
-async def respond_fee_messages(ctx, fee_data, extra_message=None, availability="public", verified="all"):
+async def respond_fee_messages(ctx, fee_data, extra_message=None, availability="public", verified="all", num_segments=20):
     try:
-        messages = compile_fee_messages(fee_data, extra_message=extra_message, availability=availability, verified=verified)
+        messages = compile_fee_messages(fee_data, extra_message=extra_message, availability=availability, verified=verified, num_segments=num_segments)
 
         if messages:
             for message in messages:

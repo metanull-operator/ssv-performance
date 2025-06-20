@@ -18,7 +18,7 @@ def is_channel(ctx):
     return hasattr(ctx, 'guild') and ctx.guild
 
 
-async def setup(network, bot, allowed_channel_id, extra_message):
+async def setup(network, bot, allowed_channel_id, extra_message, num_segments):
 
     @bot.slash_command(name="help", description="Shows help information")
     async def help(ctx):
@@ -235,7 +235,7 @@ Thresholds displayed are subject to change.
                 await ctx.followup.send("Fee data not available.", ephemeral=True)
                 return
 
-            await respond_fee_messages(ctx, fee_data, extra_message=extra_message, availability=availability, verified=verified)
+            await respond_fee_messages(ctx, fee_data, extra_message=extra_message, availability=availability, verified=verified, num_segments=num_segments)
 
         except Exception as e:
             logging.error(f"Error fetching fee information: {e}", exc_info=True)
