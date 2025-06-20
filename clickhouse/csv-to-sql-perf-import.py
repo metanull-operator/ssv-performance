@@ -39,7 +39,12 @@ def main():
             if metric_value is None:
                 continue
             try:
-                metric_date = pd.to_datetime(col).strftime("%Y-%m-%d")
+                try:
+                    metric_date = pd.to_datetime(col, errors='raise').strftime("%Y-%m-%d")
+                except Exception as e:
+                    print(f"⚠️ Skipping column '{col}': {e}")
+                    continue
+                
                 rows.append(
                     f"('{args.network}', {operator_id}, '{args.metric_type}', "
                     f"'{metric_date}', {metric_value}, 'api.ssv.network', '{now}')"
