@@ -12,6 +12,7 @@ def parse_metric_value(raw):
             print(f"Detected percentage format: '{str_val}'")
             print(f"Converted to float: {float(str_val.rstrip('%')) / 100.0}")
             return float(str_val.rstrip('%')) / 100.0
+        print(f"Converted to float: {str_val}")
         return float(str_val)
     except Exception as e:
         print(f"⚠️ Skipping invalid value '{raw}': {e}")
@@ -39,6 +40,7 @@ def main():
             if col == 'operator_id':
                 continue
             metric_value = parse_metric_value(val)
+            print(f"Processing operator {operator_id}, column '{col}': value = {metric_value}")
             if metric_value is None:
                 continue
             try:
