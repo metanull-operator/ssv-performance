@@ -18,6 +18,7 @@ IMPORT_SOURCE = os.environ.get("IMPORT_SOURCE", 'api.ssv.network')
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+
 def get_clickhouse_client(clickhouse_password):
     return create_client(
         host=os.environ.get("CLICKHOUSE_HOST", "localhost"),
@@ -62,6 +63,7 @@ def fetch_and_filter_data(base_url, page_size):
         time.sleep(REQUEST_DELAY)
 
     return operators
+
 
 def insert_clickhouse_performance_data(client, network, clickhouse_table_operators, clickhouse_table_performance, operators, target_date, source):
     performance_rows = []
@@ -154,6 +156,7 @@ def insert_clickhouse_performance_data(client, network, clickhouse_table_operato
         'network', 'operator_id', 'metric_date', 'validator_count', 'source', 'updated_at'
     ])    
 
+
 def cleanup_outdated_records(client):
     cutoff_date = (datetime.now(timezone.utc) - timedelta(days=OPERATOR_PERFORMANCE_DAYS)).strftime('%Y-%m-%d')
 
@@ -198,6 +201,7 @@ def read_clickhouse_password_from_file(password_file_path):
     with open(password_file_path, 'r') as file:
         return file.read().strip()
 
+
 def main():
     parser = argparse.ArgumentParser(description='Fetch and update operator performance data.')
     parser.add_argument('-n', '--network', type=str, choices=['mainnet', 'holesky', 'hoodi'], default='mainnet')
@@ -237,6 +241,7 @@ def main():
     deduplicate_table(client, args.ch_performance_table, args.network)
     deduplicate_table(client, 'operator_fees', args.network)
     deduplicate_table(client, 'validator_counts', args.network)
+
 
 if __name__ == "__main__":
     main()

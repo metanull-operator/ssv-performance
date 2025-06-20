@@ -6,6 +6,9 @@ services:
       dockerfile: scripts/ssv-performance-collector/Dockerfile
     environment:
       NETWORK: ${NETWORK:-mainnet}
+      REQUESTS_PER_MINUTE: ${REQUESTS_PER_MINUTE:-20}
+      MISSING_PERFORMANCE_DAYS: ${MISSING_PERFORMANCE_DAYS:-7}
+      COLLECTOR_LOG_LEVEL: ${COLLECTOR_LOG_LEVEL:-INFO}
       CLICKHOUSE_HOST: ${CLICKHOUSE_HOST:-clickhouse}
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-ssv_performance}
       CLICKHOUSE_PASSWORD_FILE: /clickhouse-password.txt
@@ -13,14 +16,6 @@ services:
       - ../../credentials/clickhouse-password.txt:/clickhouse-password.txt
     networks:
       - ssv-performance-network
-
-#command: |
-#  sh -c '
-#    echo "0 12 * * * root python /app/ssv-performance-collector.py >> /var/log/cron.log 2>&1" > /etc/cron.d/ssv-collector &&
-#    chmod 0644 /etc/cron.d/ssv-collector &&
-#    touch /var/log/cron.log &&
-#    cron -f
-#  '
 
 networks:
   ssv-performance-network:

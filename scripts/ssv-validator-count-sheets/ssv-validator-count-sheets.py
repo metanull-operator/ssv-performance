@@ -111,11 +111,11 @@ def authorize_google_sheets(credentials_file):
 
 def main():
     parser = argparse.ArgumentParser(description="Export SSV validator count data to Google Sheets")
-    parser.add_argument('-c', '--google_credentials', type=str, default=os.environ.get('GOOGLE_CREDENTIALS_FILE', '/etc/ssv-performance-sheets/credentials/google-credentials.json'))
-    parser.add_argument('-p', '--clickhouse_password', type=str, default=os.environ.get('CLICKHOUSE_PASSWORD_FILE', '/etc/ssv-performance-sheets/credentials/clickhouse-password.txt'))
+    parser.add_argument('-c', '--google_credentials_file', type=str, default=os.environ.get('GOOGLE_CREDENTIALS_FILE'))
+    parser.add_argument('-p', '--clickhouse_password_file', type=str, default=os.environ.get('CLICKHOUSE_PASSWORD_FILE'))
     parser.add_argument('-d', '--document', type=str, required=True)
     parser.add_argument('-w', '--worksheet', type=str, required=True)
-    parser.add_argument('-n', '--network', type=str, default='mainnet')
+    parser.add_argument('-n', '--network', type=str, default=os.environ.get('NETWORK', 'mainnet'))
     parser.add_argument('--days', type=int, default=os.environ.get('NUMBER_OF_DAYS_TO_UPLOAD', 180), help='How many days of data to include')
     parser.add_argument("--log_level", default=os.environ.get("SHEETS_LOG_LEVEL", "INFO"),
                         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
@@ -126,8 +126,8 @@ def main():
     logging.getLogger().setLevel(args.log_level.upper())
     logging.info(f"Logging level set to {args.log_level.upper()}")
 
-    clickhouse_password_file = args.clickhouse_password
-    credentials_file = args.google_credentials
+    clickhouse_password_file = args.clickhouse_password_file
+    credentials_file = args.google_credentials_file
     document_name = args.document
     worksheet_name = args.worksheet
 

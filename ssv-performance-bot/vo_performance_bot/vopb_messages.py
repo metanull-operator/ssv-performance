@@ -289,7 +289,6 @@ def iqr_bucket_lines_with_zero_handling(values, fees, num_buckets=5, iqr_multipl
     iqr = q3 - q1
     upper_bound = q3 + iqr_multiplier * iqr
 
-#    inlier_fees = [(fee, op) for fee, op in non_zero_fees if fee <= upper_bound]
     inlier_fees = [(fee, op) for fee, op in non_zero_fees if 0 < fee <= upper_bound]
     outlier_fees = [(fee, op) for fee, op in non_zero_fees if fee > upper_bound]
 
@@ -312,7 +311,7 @@ def iqr_bucket_lines_with_zero_handling(values, fees, num_buckets=5, iqr_multipl
 
     for fee, op in inlier_fees:
         if fee == 0:
-            continue  # Skip zero-fee operators (already handled separately)
+            continue  
         i = int((fee - min_val) / bucket_size)
         if i == num_buckets:
             i -= 1
@@ -336,8 +335,6 @@ def render_bucket_lines(buckets_with_ranges, zero_count, outliers, fees, mean, m
         if count == 0:
             return ""
         return "■" * max(1, int((count / max_count) * max_segments))
-
- #   count_width = 8
 
     all_counts = [zero_count] + [len(b) for b, _, _ in buckets_with_ranges] + [len(outliers)]
     count_width = max(len(str(c)) for c in all_counts) + 2
@@ -367,7 +364,6 @@ def render_bucket_lines(buckets_with_ranges, zero_count, outliers, fees, mean, m
         marker_str = f"⟵ {', '.join(markers)}" if markers else ""
 
         validator_count = sum(op[FIELD_VALIDATOR_COUNT] for fee, op in fees if fee == 0)
-#        count_str = f"({zero_count}/{validator_count})"
         count_str = f"({zero_count})"
 
         lines.append(f"{'0.00':>{label_width}} {bar:<{max_segments}} {count_str:<{count_width}} {marker_str}")
@@ -387,7 +383,6 @@ def render_bucket_lines(buckets_with_ranges, zero_count, outliers, fees, mean, m
         marker_str = f"⟵ {', '.join(markers)}" if markers else ""
 
         validator_count = sum(op[FIELD_VALIDATOR_COUNT] for fee, op in b)
-#        count_str = f"({b_len}/{validator_count})"
         count_str = f"({b_len})"
 
         lines.append(f"{label:>{label_width}} {bar:<{max_segments}} {count_str:<{count_width}} {marker_str}")
@@ -398,10 +393,8 @@ def render_bucket_lines(buckets_with_ranges, zero_count, outliers, fees, mean, m
         outlier_max = max(fee for fee, _ in outliers)
         bar = build_bar(count)
         validator_count = sum(op[FIELD_VALIDATOR_COUNT] for fee, op in outliers)
-#        count_str = f"({count}/{validator_count})"
         count_str = f"({count})"
         label = f">= {outlier_min:.2f}"
-#        label_width = len(label) + 1
 
         single_plural = '' if count == 1 else 's'
 
@@ -517,7 +510,7 @@ def compile_fee_messages(fee_data, extra_message=None, availability="public", ve
         messages.extend(summarize("All", all_fees, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
 
     # Public breakdown
-    if availability in ("public", "all"):
+    if availability in ("public"):
         if verified == "all":
             messages.extend(summarize("All Public", public_fees, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
         if verified in ("all", "verified"):
@@ -526,7 +519,7 @@ def compile_fee_messages(fee_data, extra_message=None, availability="public", ve
             messages.extend(summarize("Public Unverified", public_non_vo_fees, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
  
     # Private breakdown
-    if availability in ("private", "all"):
+    if availability in ("private"):
         if verified == "all":
             messages.extend(summarize("All Private", private_fees, iqr_multiplier=2.5, num_buckets=5, num_segments=num_segments))
         if verified in ("all", "verified"):
