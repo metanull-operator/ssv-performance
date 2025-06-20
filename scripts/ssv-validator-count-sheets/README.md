@@ -18,7 +18,7 @@ vi google-credentials.json
 docker build -t ssv-validator-count-sheets ./scripts/ssv-validator-count-sheets/
 
 
-docker build -t ssv-validator-count-sheets scripts/ssv-validator-count-sheets/
+docker build -t ssv-validator-count-sheets:latest scripts/ssv-validator-count-sheets/
 ```
 
 ## Identify the ClickHouse Docker Network

@@ -37,8 +37,8 @@ services:
     volumes:
       - clickhouse-data:/var/lib/clickhouse
       - ./credentials/clickhouse-password.txt:/clickhouse-password.txt
-      - ./clickhouse-init/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-      - ./clickhouse-init/healthcheck.sh:/app/healthcheck.sh:ro
+      - ./clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./clickhouse/healthcheck.sh:/app/healthcheck.sh:ro
       - ./sql-import:/sql-import:ro
       - ./scripts/clickhouse-import/clickhouse-import.sh:/usr/local/bin/clickhouse-import.sh:ro
     healthcheck:

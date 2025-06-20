@@ -5,7 +5,7 @@ The ssv-performance-collector gathers SSV network performance data from api.ssv.
 ## Build Image
 
 ```
-docker build -t ssv-performance-collector ./scripts/ssv-performance-collector
+docker build -t ssv-performance-collector:latest ./scripts/ssv-performance-collector
 ```
 
 ## Identify the ClickHouse Docker Network
