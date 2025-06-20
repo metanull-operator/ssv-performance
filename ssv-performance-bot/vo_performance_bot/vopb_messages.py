@@ -513,7 +513,7 @@ def compile_fee_messages(fee_data, extra_message=None, availability="public", ve
 
         return bundle_messages(lines)
 
-    if availability == "all" and visibility == "all":
+    if availability == "all" and verified == "all":
         messages.extend(summarize("All", all_fees, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
 
     # Public breakdown
