@@ -2,6 +2,18 @@ import argparse
 import pandas as pd
 from datetime import datetime
 
+def parse_metric_value(raw):
+    if pd.isna(raw):
+        return None
+    try:
+        str_val = str(raw).strip()
+        if str_val.endswith('%'):
+            return float(str_val.rstrip('%')) / 100.0
+        return float(str_val)
+    except Exception as e:
+        print(f"⚠️ Skipping invalid value '{raw}': {e}")
+        return None
+
 def main():
     parser = argparse.ArgumentParser(description="Generate ClickHouse INSERT SQL from CSV")
     parser.add_argument("csv_file", help="Path to exported CSV")
@@ -11,7 +23,6 @@ def main():
     args = parser.parse_args()
 
     df = pd.read_csv(args.csv_file)
-
     metric_dates = df.iloc[0, 1:]
     df = df.iloc[1:]
     df.columns = ['operator_id'] + list(metric_dates)
@@ -22,20 +33,22 @@ def main():
     for _, row in df.iterrows():
         operator_id = int(row['operator_id'])
         for col, val in row.items():
-            if col == 'operator_id' or pd.isna(val):
+            if col == 'operator_id':
+                continue
+            metric_value = parse_metric_value(val)
+            if metric_value is None:
                 continue
             try:
                 metric_date = pd.to_datetime(col).strftime("%Y-%m-%d")
-                metric_value = float(val)
                 rows.append(
                     f"('{args.network}', {operator_id}, '{args.metric_type}', "
                     f"'{metric_date}', {metric_value}, 'api.ssv.network', '{now}')"
                 )
             except Exception as e:
-                print(f"Skipping row for operator {operator_id} on {col}: {e}")
+                print(f"⚠️ Skipping row for operator {operator_id} on {col}: {e}")
 
     if not rows:
-        print("No valid rows found.")
+        print("❌ No valid rows found.")
         return
 
     insert_sql = (
