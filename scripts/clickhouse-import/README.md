@@ -27,10 +27,11 @@ Replace `ssv-performance-clickhouse-1` in the commands below with the name of yo
 Tthe following commands will export performance data from the source ClickHouse container, one table at a time.
 
 ```bash
-docker exec -i ssv-performance-clickhouse-1 clickhouse-client --database=default --query="SELECT * FROM operators FORMAT SQLInsert" >  operators.sql
-docker exec -i ssv-performance-clickhouse-1 clickhouse-client --database=default --query="SELECT * FROM performance FORMAT SQLInsert" > performance.sql
-docker exec -i ssv-performance-clickhouse-1 clickhouse-client --database=default --query="SELECT * FROM performance FORMAT SQLInsert" > subscriptions.sql
-docker exec -i ssv-performance-clickhouse-1 clickhouse-client --database=default --query="SELECT * FROM performance FORMAT SQLInsert" > import_state.sql
+docker exec -it ssv-performance-clickhouse-1 clickhouse-client --database=default --query="SELECT * FROM operators FORMAT SQLInsert" >  operators.sql
+docker exec -it ssv-performance-clickhouse-1 clickhouse-client --database=default --query="SELECT * FROM performance FORMAT SQLInsert" > performance.sql
+docker exec -it ssv-performance-clickhouse-1 clickhouse-client --database=default --query="SELECT * FROM performance FORMAT SQLInsert" > subscriptions.sql
+docker exec -it ssv-performance-clickhouse-1 clickhouse-client --database=default --query="SELECT * FROM validator_counts FORMAT SQLInsert" > validator_counts.sql
+docker exec -it ssv-performance-clickhouse-1 clickhouse-client --database=default --query="SELECT * FROM operator_fees FORMAT SQLInsert" > operator_fees.sql
 ```
 
 ## Copy SQL Files to `sql-import/`

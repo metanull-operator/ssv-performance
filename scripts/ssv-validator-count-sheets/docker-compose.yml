@@ -11,6 +11,7 @@ services:
       CLICKHOUSE_HOST: ${CLICKHOUSE_HOST:-clickhouse}
       CLICKHOUSE_PORT: ${CLICKHOUSE_PORT:-8123}
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-ssv_performance}
+      CLICKHOUSE_PASSWORD_FILE: /clickhouse-password.txt
     volumes:
       - ../../credentials/google-credentials.json:/google-credentials.json
       - ../../credentials/clickhouse-password.txt:/clickhouse-password.txt
