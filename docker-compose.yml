@@ -1,7 +1,6 @@
 services:
   ssv-performance-bot:
     image: ssv-performance-bot:${SSV_PERFORMANCE_BOT_VERSION:-latest}
-    entrypoint: ["/usr/local/bin/entrypoint.sh"]
     hostname: ssv-performance-bot
     environment:
       NETWORK: ${NETWORK:-mainnet}
