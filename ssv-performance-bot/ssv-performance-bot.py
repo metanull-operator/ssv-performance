@@ -8,6 +8,7 @@ import vo_performance_bot.vopb_commands as vopb_commands
 from discord.ext import commands
 from storage.storage_factory import StorageFactory
 from vo_performance_bot.vopb_loops import LoopTasks
+from common.config import DEFAULT_NUMBER_OF_SEGMENTS
 
 loop_tasks = None
 
