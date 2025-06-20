@@ -13,8 +13,8 @@ services:
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-ssv_performance}      
     volumes:
       - ./certs:/certs:ro
-      - ./credentials/discord-token.txt:/etc/ssv-performance-bot/discord-token.txt:ro
-      - ./credentials/clickhouse-password.txt:/etc/ssv-performance-bot/clickhouse-password.txt:ro
+      - ./credentials/discord-token.txt:/discord-token.txt:ro
+      - ./credentials/clickhouse-password.txt:/clickhouse-password.txt:ro
     depends_on:
       clickhouse:
         condition: service_healthy
