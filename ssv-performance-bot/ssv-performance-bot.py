@@ -44,7 +44,7 @@ def parse_arguments():
     except ValueError:
         raise ValueError(f"Invalid ID(s) in --dm_recipients: {args.dm_recipients}")
 
-    return args.network, args.discord_token_file, args.channel_id, args.alert_time, args.extra_message, args.ch_operators_table, args.ch_performance_table, args.ch_subscriptions_table, dm_recipients, args.log_level, args.mentions_30d
+    return args.network, args.discord_token_file, args.channel_id, args.alert_time, args.extra_message, args.ch_operators_table, args.ch_performance_table, args.ch_subscriptions_table, dm_recipients, args.log_level, args.mentions_30d, args.clickhouse_password_file
 
 def read_discord_token_from_file(token_file_path):
     with open(token_file_path, 'r') as file:
@@ -56,7 +56,7 @@ def read_clickhouse_password_from_file(password_file_path):
 
 async def main():
     try:
-        network, discord_token_file, channel_id, alert_time, extra_message, operators_data_table, performance_data_table, subscription_data_table, dm_recipients, log_level, mentions_30d = parse_arguments()
+        network, discord_token_file, channel_id, alert_time, extra_message, operators_data_table, performance_data_table, subscription_data_table, dm_recipients, log_level, mentions_30d, clickhouse_password_file = parse_arguments()
     except SystemExit as e:
         if e.code != 0:
             logging.error("Argument parsing failed", exc_info=True)
