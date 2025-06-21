@@ -18,7 +18,7 @@ services:
     volumes:
       - ./certs:/certs:ro
       - ./credentials/discord-token.txt:/discord-token.txt:ro
-      - ./credentials/clickhouse-password.txt:/clickhouse-password.txt
+      - ./credentials/clickhouse-password.txt:/clickhouse-password.txt:ro
     depends_on:
       clickhouse:
         condition: service_healthy
@@ -38,9 +38,9 @@ services:
       - clickhouse-data:/var/lib/clickhouse
       - ./credentials/clickhouse-password.txt:/clickhouse-password.txt:ro
       - ./clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-      - ./clickhouse/healthcheck.sh:/usr/local/bin/healthcheck.sh:ro
+      - ./clickhouse/healthcheck.sh:/usr/local/bin/healthcheck.sh
       - ./sql-import:/sql-import:ro
-      - ./scripts/clickhouse-import/clickhouse-import.sh:/usr/local/bin/clickhouse-import.sh:ro
+      - ./scripts/clickhouse-import/clickhouse-import.sh:/usr/local/bin/clickhouse-import.sh
     healthcheck:
       test: ["CMD", "/usr/local/bin/healthcheck.sh"]
       interval: 2s
