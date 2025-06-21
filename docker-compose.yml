@@ -38,11 +38,11 @@ services:
       - clickhouse-data:/var/lib/clickhouse
       - ./credentials/clickhouse-password.txt:/clickhouse-password.txt:ro
       - ./clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-      - ./clickhouse/healthcheck.sh:/app/healthcheck.sh:ro
+      - ./clickhouse/healthcheck.sh:/usr/local/bin/healthcheck.sh:ro
       - ./sql-import:/sql-import:ro
       - ./scripts/clickhouse-import/clickhouse-import.sh:/usr/local/bin/clickhouse-import.sh:ro
     healthcheck:
-      test: ["CMD", "/app/healthcheck.sh"]
+      test: ["CMD", "/usr/local/bin/healthcheck.sh"]
       interval: 2s
       timeout: 2s
       retries: 5
