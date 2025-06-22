@@ -122,7 +122,7 @@ def insert_clickhouse_performance_data(client, network, clickhouse_table_operato
             target_date,
             performance_24h,
             source,
-            datetime.now(timezone.utc)
+            now
         ))
 
         if operator_fee is not None:
@@ -152,7 +152,7 @@ def insert_clickhouse_performance_data(client, network, clickhouse_table_operato
             target_date,
             performance_30d,
             source,
-            datetime.now(timezone.utc)
+            now
         ))
 
     logging.info(f"Inserting/updating {len(operator_rows)} operator records, {len(performance_rows)} performance records, {len(validator_counts_rows)} validator count records, and {len(operator_fees_rows)} operator fee records into database.")
@@ -174,8 +174,8 @@ def insert_clickhouse_performance_data(client, network, clickhouse_table_operato
     ])    
 
 
-def cleanup_outdated_records(client):
-    cutoff_date = (datetime.now(timezone.utc) - timedelta(days=MISSING_PERFORMANCE_DAYS)).strftime('%Y-%m-%d')
+def cleanup_outdated_records(client, local_time=False):
+    cutoff_date = (datetime.now(timezone.utc if not local_time else None) - timedelta(days=MISSING_PERFORMANCE_DAYS)).strftime('%Y-%m-%d')
 
     # Count how many rows will be updated
     count_query = f"""
@@ -224,7 +224,7 @@ def main():
     parser.add_argument('-n', '--network', type=str, choices=['mainnet', 'holesky', 'hoodi'], default='mainnet')
     parser.add_argument('-p', '--clickhouse_password_file', type=str, default=os.environ.get('CLICKHOUSE_PASSWORD_FILE'))
     parser.add_argument('--page_size', type=int, default=100)
-    parser.add_argument('--utc', action='store_true')
+    parser.add_argument('--local_time', action='store_true')
     parser.add_argument('--ch-operators-table', default=os.environ.get('CH_OPERATORS_TABLE', 'operators'))
     parser.add_argument('--ch-performance-table', default=os.environ.get('CH_PERFORMANCE_TABLE', 'performance'))
     parser.add_argument("--log_level", default=os.environ.get("COLLECTOR_LOG_LEVEL", "INFO"),
@@ -249,10 +249,10 @@ def main():
     base_url = f"https://api.ssv.network/api/v4/{args.network}/operators/?validatorsCount=true"
     operators = fetch_and_filter_data(base_url, args.page_size)
 
-    target_date = datetime.now(timezone.utc if args.utc else None).date()
+    target_date = datetime.now(timezone.utc if not args.local_time else None).date()
 
     insert_clickhouse_performance_data(client, args.network, args.ch_operators_table, args.ch_performance_table, operators, target_date, IMPORT_SOURCE)
-    cleanup_outdated_records(client)
+    cleanup_outdated_records(client, args.local_time)
 
     deduplicate_table(client, args.ch_operators_table, args.network)
     deduplicate_table(client, args.ch_performance_table, args.network)
