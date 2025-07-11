@@ -1,6 +1,6 @@
 # ssv-performance-sheets
 
-ssv-performance-sheets copies SSV performance data from the ClickHouse database to a Google Sheet. Performance data for a single Ethereum network and performance period (24h/30d) is copied to a single Google Sheet.
+ssv-performance-sheets copies SSV performance data from the ClickHouse database to a Google Sheet. Performance data for a single Ethereum network and a single performance period (24h/30d) is copied to a single Google Sheet.
 
 ## Store Google Credentials
 
@@ -14,7 +14,7 @@ vi google-credentials.json
 
 ## Build Image
 
-```
+```bash
 docker build -t ssv-performance-sheets:latest ./scripts/ssv-performance-sheets/
 ```
 
@@ -31,9 +31,7 @@ docker network ls
 The script must be run once for each Ethereum network and performance period. A separate worksheet is required for each Ethereum network and performance period.
 
 ```bash
-docker run --rm -v "./credentials/clickhouse-password.txt:/clickhouse-password.txt" -v "./credentials/google-credentials.json:/google-credentials.json:ro" --network ssv-performance_ssv-performance-network ssv-performance-sheets -d 'ssv_performance_data' -w 'Mainnet 24h' --metric 24h --network mainnet
-
-sudo docker compose -f scripts/ssv-performance-sheets/docker-compose.yml -p ssv-performance run --rm ssv-performance-sheets -d 'ssv_performance_data' -w 'Mainnet 24h' --metric 24h
+docker run --rm -v "./credentials/clickhouse-password.txt:/clickhouse-password.txt" -v "./credentials/google-credentials.json:/google-credentials.json:ro" --network ssv-performance_ssv-performance-network ssv-performance-sheets:latest -d 'VOC Performance Data' -w 'Mainnet 30d' --metric 30d --network mainnet
 ```
 
 Create cronjobs to run the command daily for each network and performance period. These cronjobs should run after the `ssv-performance-collector` cronjobs to ensure that the Google Sheets have the latest data.

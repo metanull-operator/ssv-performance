@@ -5,4 +5,5 @@ Filenames must be the table name with the `.sql` extension. Presently allowed fi
 - operators.sql
 - performance.sql
 - subscriptions.sql
-- import_state.sql
+- validator_counts.sql
+- operator_fees.sql

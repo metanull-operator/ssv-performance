@@ -24,7 +24,7 @@ Replace `ssv-performance-clickhouse-1` in the commands below with the name of yo
 
 ### Run Exports Commands
 
-Tthe following commands will export performance data from the source ClickHouse container, one table at a time.
+The following commands will export performance data from the source ClickHouse container, one table at a time.
 
 ```bash
 docker exec -it ssv-performance-clickhouse-1 clickhouse-client --database=default --query="SELECT * FROM operators FORMAT SQLInsert" >  operators.sql
@@ -42,7 +42,8 @@ You should have files for the following tables:
 - operators
 - performance
 - subscriptions
-- import_state
+- validator_counts
+- operator_fees
 
 ## Import Source Data
 
@@ -61,8 +62,5 @@ Replace `ssv-performance-clickhouse-1` in the commands below with the name of yo
 Run the `clickhouse-import.sh` script in the destination ClickHouse container. This script will import all `.sql` files in the `sql-import/` directory into the ClickHouse database.
 
 ```bash
-docker build  -t ssv-performance-collector:latest scripts/ssv-performance-collector/
-docker exec -it ssv-performance-clickhouse-1 clickhouse-import.sh
-
 docker exec -i ssv-performance-clickhouse-1 clickhouse-import.sh
 ```

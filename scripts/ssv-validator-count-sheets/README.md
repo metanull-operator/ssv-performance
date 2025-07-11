@@ -34,9 +34,7 @@ docker network ls
 The script must be run once for each Ethereum network and performance period. A separate worksheet is required for each Ethereum network and performance period.
 
 ```bash
-docker run --rm -v "./credentials/clickhouse-password.txt:/clickhouse-password.txt" -v "./credentials/google-credentials.json:/google-credentials.json:ro" --network ssv-performance_ssv-performance-network ssv-validator-count-sheets -d 'ssv_performance_data' -w 'Mainnet Validator Count' --network mainnet
-
-sudo docker compose -f scripts/ssv-validator-count-sheets/docker-compose.yml -p ssv-performance run --rm ssv-validator-count-sheets -d 'ssv_performance_data' -w 'Mainnet Validator Count'
+docker run --rm -v "./credentials/clickhouse-password.txt:/clickhouse-password.txt:ro" -v "./credentials/google-credentials.json:/google-credentials.json:ro" --network ssv-performance_ssv-performance-network ssv-validator-count-sheets:latest -d 'VOC Performance Data' -w 'Mainnet Validator Counts' --network mainnet
 ```
 
 Create cronjobs to run the command daily for each network and performance period. These cronjobs should run after the `ssv-performance-collector` cronjobs to ensure that the Google Sheets have the latest data.

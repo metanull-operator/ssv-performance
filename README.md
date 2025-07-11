@@ -6,8 +6,8 @@ Components of this repository include:
 - ssv-performance-bot - Discord bot that posts performance data and responds to commands
 - ssv-performance-collector - Script to collect performance data from a third-party API and store in the ClickHouse database
 - ssv-performance-sheets - Script to upload performance data to Google Sheets
+- ssv-validator-count-sheets - Script to upload performance data to Google Sheets
 - clickhouse-import - Script to import performance data SQL into the database
-- migration-dyndb-clickhouse - Deprecated script to migrate data from the legacy AWS DynamoDB database to the ClickHouse database
 
 # ssv-performance Installation and Configuration
 
@@ -83,7 +83,7 @@ docker build -t ssv-performance-bot:latest ./ssv-performance-bot
 To start the ssv-performance-bot and ClickHouse database:
 
 ```bash
-docker compose -p ssv-performance up --build -d
+docker compose -p ssv-performance up -d
 ```
 
 To stop the ssv-performance-bot and ClickHouse database:
@@ -104,6 +104,12 @@ See the [ssv-performance-collector README](scripts/ssv-performance-collector/REA
 
 ## ssv-performance-sheets
 
-ssv-performance-sheets copies SSV performance data from the ClickHouse database to a Google Sheet. Each Google Sheets will contain the performance data for a single Ethereum network and performance period (24h/30d). It is recommended to run this script daily as a cronjob. A separate instance must be run for each Ethereum network and performance period copied to Google Sheets.
+ssv-performance-sheets copies SSV performance data from the ClickHouse database to a Google Sheet. Each Google Sheet will contain the performance data for a single Ethereum network and performance period (24h/30d). It is recommended to run this script daily as a cronjob. A separate instance must be run for each Ethereum network and performance period copied to Google Sheets.
 
 See the [ssv-performance-sheets README](scripts/ssv-performance-sheets/README.md) for more details.
+
+## ssv-validator-count-sheets
+
+ssv-validator-count-sheets copies SSV validator count data from the ClickHouse database to a Google Sheet. Each Google Sheet will contain the validator count data for a single Ethereum network. It is recommended to run this script daily as a cronjob. A separate instance must be run for each Ethereum network copied to Google Sheets.
+
+See the [ssv-validator-count-sheets README](scripts/ssv-validator-count-sheets/README.md) for more details.
