@@ -16,10 +16,7 @@ vi google-credentials.json
 
 ## Build Image
 
-```
-docker build -t ssv-validator-count-sheets ./scripts/ssv-validator-count-sheets/
-
-
+```bash
 docker build -t ssv-validator-count-sheets:latest scripts/ssv-validator-count-sheets/
 ```
 

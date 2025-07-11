@@ -39,17 +39,6 @@ Other environment variables in `.env` may be modified as necessary to suit your 
 
 Save and exit the text editor.
 
-### Secure the credentials/ directory
-
-The `credentials/` directory will store sensitive password and credential information. Ensure that this directory is readable only to the user account that will run the ssv-performance-bot and associated scripts.
-
-```bash
-chmod 640 credentials
-chown <USERNAME>:<GROUP> credentials
-```
-
-Replace <USERNAME> and <GROUP> with the username and group that the Docker containers will run as.
-
 ### Store Discord Token
 
 The ssv-performance-bot requires permission for Discord channel access and a token for API access. Generate the Discord token and put the contents in `credentials/discord-token.txt`. See our [Discord token documentation](docs/discord-token.md) for details on configuring Discord API access and generating a Discord token.
