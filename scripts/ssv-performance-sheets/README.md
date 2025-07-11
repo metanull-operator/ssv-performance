@@ -6,6 +6,8 @@ ssv-performance-sheets copies SSV performance data from the ClickHouse database 
 
 Create Google credentials allowing this script to access and edit the target Google Sheet. Store the credentials in `credentials/google-credentials.json`.
 
+See the [Google Credentials instructions](../../docs/google-credentials.md) for details of configuring Google Credentials.
+
 ```bash
 cd credentials
 cp google-credentials.json.sample google-credentials.json
