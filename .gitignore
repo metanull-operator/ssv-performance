@@ -175,3 +175,7 @@ cython_debug/
 
 # AWS Credentials
 .aws/
+
+# Visual Studio Code
+.vscode/
+*.code-workspace

@@ -4,6 +4,9 @@ from vo_performance_bot.vopb_operator_threshold_alerts import *
 from datetime import datetime, timedelta
 from common.config import OPERATOR_24H_HISTORY_COUNT, ALERTS_THRESHOLDS_30D, ALERTS_THRESHOLDS_24H
 import discord
+import statistics
+import random
+
 
 # Break messages into < MAX_DISCORD_MESSAGE_LENGTH characters chunks, called bundles
 # Returns list of separate bundles, each < MAX_DISCORD_MESSAGE_LENGTH
@@ -261,6 +264,286 @@ async def send_vo_threshold_messages(channel, perf_data, extra_message=None, sub
             await channel.send(f'No performance alerts for {current_date}.')
     except Exception as e:
         logging.error(f"Failed to send VO threshold messages: {e}", exc_info=True)
+
+
+def iqr_bucket_lines_with_zero_handling(values, fees, num_buckets=5, iqr_multiplier=1.5):
+    zero_fees = [(fee, op) for fee, op in fees if fee == 0]
+    non_zero_fees = [(fee, op) for fee, op in fees if fee > 0]
+
+    if not non_zero_fees:
+        return [], [], len(zero_fees), []
+
+    non_zero_values = [fee for fee, _ in non_zero_fees]
+
+    if len(non_zero_values) < 2:
+        # fallback only includes non-zero fees in the bucket
+        fees_only = [fee for fee, _ in non_zero_fees]
+        min_fee = min(fees_only)
+        max_fee = max(fees_only)
+        
+        return [non_zero_fees], [(min_fee, max_fee)], len(zero_fees), []
+
+    # IQR-based outlier detection
+    q1 = statistics.quantiles(non_zero_values, n=4)[0]
+    q3 = statistics.quantiles(non_zero_values, n=4)[2]
+    iqr = q3 - q1
+    upper_bound = q3 + iqr_multiplier * iqr
+
+    inlier_fees = [(fee, op) for fee, op in non_zero_fees if 0 < fee <= upper_bound]
+    outlier_fees = [(fee, op) for fee, op in non_zero_fees if fee > upper_bound]
+
+    if zero_fees:
+        min_val = min(fee for fee, _ in inlier_fees)
+    else:
+        min_val = min(fee for fee, _ in inlier_fees + outlier_fees)
+
+    max_val = max(fee for fee, _ in inlier_fees)
+    bucket_size = (max_val - min_val) / (num_buckets or 1)
+
+    # Build buckets and ranges
+    buckets = [[] for _ in range(num_buckets)]
+    bucket_ranges = []
+
+    for i in range(num_buckets):
+        lower = min_val + i * bucket_size
+        upper = lower + bucket_size
+        bucket_ranges.append((lower, upper))
+
+    for fee, op in inlier_fees:
+        if fee == 0:
+            continue  
+        i = int((fee - min_val) / bucket_size)
+        if i == num_buckets:
+            i -= 1
+        buckets[i].append((fee, op))
+
+    assert len(zero_fees) + sum(len(b) for b in buckets) + len(outlier_fees) == len(fees), \
+        "Mismatch in total operator counts"
+
+    return buckets, bucket_ranges, len(zero_fees), outlier_fees
+
+
+def render_bucket_lines(buckets_with_ranges, zero_count, outliers, fees, mean, median, max_segments=20):
+
+    def validator_sum(entries):
+        return sum(op.get(FIELD_VALIDATOR_COUNT, 0) for _, op in entries)
+
+    max_count = max([len(b) for b, _, _ in buckets_with_ranges] + [zero_count, len(outliers)])
+    lines = []
+
+    def build_bar(count):
+        if count == 0:
+            return ""
+        return "■" * max(1, int((count / max_count) * max_segments))
+
+    all_counts = [zero_count] + [len(b) for b, _, _ in buckets_with_ranges] + [len(outliers)]
+    count_width = max(len(str(c)) for c in all_counts) + 2
+
+    labels = ["0.00"]  # zero bucket label
+
+    # Add range labels
+    for _, lower, upper in buckets_with_ranges:
+        labels.append(f"{lower:.2f}–{upper:.2f}")
+
+    # Add outlier label if any
+    if outliers:
+        outlier_min = min(fee for fee, _ in outliers)
+        labels.append(f">= {outlier_min:.2f}")
+
+    label_width = max(len(label) for label in labels) + 1
+
+    if zero_count > 0:
+        bar = build_bar(zero_count)
+
+        markers = []
+        if mean is not None and mean == 0:
+            markers.append("mean")
+        if median is not None and median == 0:
+            markers.append("median")
+
+        marker_str = f"⟵ {', '.join(markers)}" if markers else ""
+
+        validator_count = sum(op[FIELD_VALIDATOR_COUNT] for fee, op in fees if fee == 0)
+        count_str = f"({zero_count})"
+
+        lines.append(f"{'0.00':>{label_width}} {bar:<{max_segments}} {count_str:<{count_width}} {marker_str}")
+
+
+    for b, lower, upper in buckets_with_ranges:
+        label = f"{lower:.2f}–{upper:.2f}"
+        b_len = len(b)
+        bar = build_bar(b_len)
+
+        markers = []
+        if mean is not None and mean != 0 and lower <= mean <= upper:
+            markers.append("mean")
+        if median is not None and median != 0 and lower <= median <= upper:
+            markers.append("median")
+
+        marker_str = f"⟵ {', '.join(markers)}" if markers else ""
+
+        validator_count = sum(op[FIELD_VALIDATOR_COUNT] for fee, op in b)
+        count_str = f"({b_len})"
+
+        lines.append(f"{label:>{label_width}} {bar:<{max_segments}} {count_str:<{count_width}} {marker_str}")
+
+    if outliers:
+        count = len(outliers)
+        outlier_min = min(fee for fee, _ in outliers)
+        outlier_max = max(fee for fee, _ in outliers)
+        bar = build_bar(count)
+        validator_count = sum(op[FIELD_VALIDATOR_COUNT] for fee, op in outliers)
+        count_str = f"({count})"
+        label = f">= {outlier_min:.2f}"
+
+        single_plural = '' if count == 1 else 's'
+
+        if outlier_min == outlier_max:
+            outlier_info = f"⟵ outlier{single_plural}: {outlier_min:.2f}"
+        else:
+            outlier_info = f"⟵ outliers: {outlier_min:.2f}-{outlier_max:.2f}"
+
+        lines.append(f"{label:>{label_width}} {bar:<{max_segments}} {count_str:<{count_width}} {outlier_info}")
+
+    lines = ["```"] + lines + ["```"]
+
+    return bundle_messages(lines)
+
+
+def compile_fee_messages(fee_data, extra_message=None, availability="public", verified="all", num_segments=20):
+    messages = []
+
+    public_fees = []
+    private_fees = []
+
+    public_vo_fees = []
+    public_non_vo_fees = []
+    private_vo_fees = []
+    private_non_vo_fees = []
+
+    all_fees = []
+
+    for operator in fee_data.values():
+        fee = operator.get(FIELD_OPERATOR_FEE)
+        is_private = operator.get(FIELD_IS_PRIVATE)
+        is_vo = operator.get(FIELD_IS_VO)
+        if fee is None:
+            continue
+
+        item = (fee, operator)
+
+        all_fees.append(item)
+
+        if is_private:
+            private_fees.append(item)
+            if is_vo:
+                private_vo_fees.append(item)
+            else:
+                private_non_vo_fees.append(item)
+        else:
+            public_fees.append(item)
+            if is_vo:
+                public_vo_fees.append(item)
+            else:
+                public_non_vo_fees.append(item)
+
+
+    def summarize(label, fees, num_buckets=5, iqr_multiplier=1.5, num_segments=20):
+        if not fees:
+            return [f"No {label} operators found."]
+
+        values = [f[0] for f in fees]
+        sorted_fees = sorted(fees, key=lambda x: x[0])
+        highest = sorted_fees[-1]
+        lowest = sorted_fees[0]
+        count = len(values)
+
+        # Get structured buckets
+        buckets, bucket_ranges, zero_count, outliers = iqr_bucket_lines_with_zero_handling(
+            values, fees, num_buckets=num_buckets, iqr_multiplier=iqr_multiplier
+        )
+
+        mean = statistics.mean(values)
+        median = statistics.median(values)        
+
+        # Render aligned bar lines
+        bucket_lines = render_bucket_lines(
+            buckets_with_ranges=[(bucket, lower, upper) for bucket, (lower, upper) in zip(buckets, bucket_ranges)],
+            zero_count=zero_count,
+            outliers=outliers,
+            fees=fees,
+            max_segments=num_segments,
+            mean=mean,
+            median=median
+        )
+
+        lines = [
+            f"**{label} Operators (SSV/year)**",
+            f"*{count} operators*",
+            f"- Mean Fee: {mean:.2f}",
+            f"- Median Fee: {median:.2f}",
+        ]
+
+        lowest_fee = lowest[0]
+        lowest_operators = [op for fee, op in fees if fee == lowest_fee]
+
+        if len(lowest_operators) == 1:
+            op = lowest_operators[0]
+            lines.append(
+                f"- Lowest Fee: {lowest_fee:.2f} - {op[FIELD_OPERATOR_NAME]} (ID: {op[FIELD_OPERATOR_ID]}, Validators: {op[FIELD_VALIDATOR_COUNT]})"
+            )
+        else:
+            example_op = random.choice(lowest_operators)
+            lines.append(f"- Lowest Fee: {lowest_fee:.2f} - {example_op[FIELD_OPERATOR_NAME]} (ID: {example_op[FIELD_OPERATOR_ID]}, Validators: {example_op[FIELD_VALIDATOR_COUNT]}) and {len(lowest_operators)-1} other operator(s)")
+
+        lines.append(
+            f"- Highest Fee: {highest[0]:.2f} - {highest[1][FIELD_OPERATOR_NAME]} "
+            f"(ID: {highest[1][FIELD_OPERATOR_ID]}, Validators: {highest[1][FIELD_VALIDATOR_COUNT]})"
+        )
+
+        lines.append(f"### {label} Operator Fee Distribution (Operators)")
+        lines += bucket_lines
+
+        return bundle_messages(lines)
+
+    if availability == "all" and verified == "all":
+        messages.extend(summarize("All", all_fees, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
+
+    # Public breakdown
+    if availability in ("public"):
+        if verified == "all":
+            messages.extend(summarize("All Public", public_fees, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
+        if verified in ("all", "verified"):
+            messages.extend(summarize("Public Verified", public_vo_fees, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
+        if verified in ("all", "unverified"):
+            messages.extend(summarize("Public Unverified", public_non_vo_fees, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
+ 
+    # Private breakdown
+    if availability in ("private"):
+        if verified == "all":
+            messages.extend(summarize("All Private", private_fees, iqr_multiplier=2.5, num_buckets=5, num_segments=num_segments))
+        if verified in ("all", "verified"):
+            messages.extend(summarize("Private Verified", private_vo_fees, iqr_multiplier=2.5, num_buckets=5, num_segments=num_segments))
+        if verified in ("all", "unverified"):
+            messages.extend(summarize("Private Unverified", private_non_vo_fees, iqr_multiplier=2.5, num_buckets=5, num_segments=num_segments))
+
+    if extra_message:
+        messages.append(extra_message)
+
+    return bundle_messages(messages)
+
+
+async def respond_fee_messages(ctx, fee_data, extra_message=None, availability="public", verified="all", num_segments=20):
+    try:
+        messages = compile_fee_messages(fee_data, extra_message=extra_message, availability=availability, verified=verified, num_segments=num_segments)
+
+        if messages:
+            for message in messages:
+                await ctx.followup.send(message.strip(), ephemeral=False)
+        else:
+            await ctx.followup.send("Fee data not found.", ephemeral=True)
+    except Exception as e:
+        logging.error(f"Failed to respond with fee data message: {e}", exc_info=True)
 
 
 async def respond_vo_threshold_messages(ctx, perf_data, extra_message=None):

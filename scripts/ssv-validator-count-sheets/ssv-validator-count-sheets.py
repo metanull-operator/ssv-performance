@@ -18,7 +18,6 @@ SPREADSHEET_COLUMNS = [
     FIELD_OPERATOR_NAME,
     FIELD_IS_VO,
     FIELD_IS_PRIVATE,
-    FIELD_VALIDATOR_COUNT,
     FIELD_ADDRESS
 ]
 
@@ -26,8 +25,8 @@ SPREADSHEET_COLUMNS = [
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Creates a two-dimensional representation of the data to be populated into the Google Sheet
-def create_spreadsheet_data(data, performance_data_attribute):
-    dates = sorted({d for details in data.values() for d in details[performance_data_attribute]}, reverse=True)
+def create_spreadsheet_data(data, count_data_attribute):
+    dates = sorted({d for details in data.values() for d in details[count_data_attribute]}, reverse=True)
     sorted_entries = sorted(data.items(), key=lambda item: item[1].get(FIELD_OPERATOR_ID, 'Unknown'))
 
     spreadsheet_data = [SPREADSHEET_COLUMNS + dates]
@@ -38,20 +37,17 @@ def create_spreadsheet_data(data, performance_data_attribute):
             details.get(FIELD_OPERATOR_NAME, None),
             1 if details.get(FIELD_IS_VO, 0) else 0,
             1 if details.get(FIELD_IS_PRIVATE, 0) else 0,
-            details.get(FIELD_VALIDATOR_COUNT, None),
             details.get(FIELD_ADDRESS, None)
         ]
         for d in dates:
-            row.append(details[performance_data_attribute].get(d, None))
+            row.append(details[count_data_attribute].get(d, None))
         spreadsheet_data.append(row)
 
     return spreadsheet_data
 
-
 def read_clickhouse_password_from_file(password_file_path):
     with open(password_file_path, 'r') as file:
         return file.read().strip()
-    
 
 def get_clickhouse_client(clickhouse_password):
     return create_client(
@@ -63,7 +59,7 @@ def get_clickhouse_client(clickhouse_password):
     )
 
 
-def get_operator_performance_data(network: str, days: int, metric_type: str, clickhouse_password: str):
+def get_operator_validator_count_data(network: str, days: int, clickhouse_password: str):
     client = get_clickhouse_client(clickhouse_password=clickhouse_password)
 
     since_date = (date.today() - timedelta(days=days)).isoformat()
@@ -74,38 +70,35 @@ def get_operator_performance_data(network: str, days: int, metric_type: str, cli
             o.operator_name,
             o.is_vo,
             o.is_private,
-            o.validator_count,
             o.address,
-            p.metric_date,
-            p.metric_value
+            v.metric_date,
+            v.validator_count
         FROM operators o
-        LEFT JOIN performance p
-            ON o.operator_id = p.operator_id AND o.network = p.network
+        LEFT JOIN validator_counts v
+            ON o.operator_id = v.operator_id AND o.network = v.network
         WHERE 
             o.network = %(network)s AND 
-            p.metric_type = %(metric_type)s AND 
-            p.metric_date >= %(since_date)s
-        ORDER BY o.operator_id, p.metric_date
+            v.metric_date >= %(since_date)s
+        ORDER BY o.operator_id, v.metric_date
     """
 
-    params = {'network': network, 'metric_type': metric_type, 'since_date': since_date}
+    params = {'network': network, 'since_date': since_date}
     rows = client.query(query, parameters=params).result_rows
 
     result = {}
     for row in rows:
         op_id = row[0]
-        metric_date = row[6].strftime('%Y-%m-%d')
+        metric_date = row[5].strftime('%Y-%m-%d')
         if op_id not in result:
             result[op_id] = {
                 FIELD_OPERATOR_ID: op_id,
                 FIELD_OPERATOR_NAME: row[1],
                 FIELD_IS_VO: row[2],
                 FIELD_IS_PRIVATE: row[3],
-                FIELD_VALIDATOR_COUNT: row[4],
-                FIELD_ADDRESS: row[5],
-                metric_type: {}
+                FIELD_ADDRESS: row[4],
+                'validator_counts': {}
             }
-        result[op_id][metric_type][metric_date] = float(row[7])
+        result[op_id]['validator_counts'][metric_date] = float(row[6])
 
     return result
 
@@ -117,14 +110,13 @@ def authorize_google_sheets(credentials_file):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Export SSV operator performance to Google Sheets")
-    parser.add_argument('-c', '--google_credentials', type=str, default=os.environ.get('GOOGLE_CREDENTIALS_FILE', '/etc/ssv-performance-sheets/credentials/google-credentials.json'))
-    parser.add_argument('-p', '--clickhouse_password', type=str, default=os.environ.get('CLICKHOUSE_PASSWORD_FILE', '/etc/ssv-performance-sheets/credentials/clickhouse-password.txt'))
+    parser = argparse.ArgumentParser(description="Export SSV validator count data to Google Sheets")
+    parser.add_argument('-c', '--google_credentials_file', type=str, default=os.environ.get('GOOGLE_CREDENTIALS_FILE'))
+    parser.add_argument('-p', '--clickhouse_password_file', type=str, default=os.environ.get('CLICKHOUSE_PASSWORD_FILE'))
     parser.add_argument('-d', '--document', type=str, required=True)
     parser.add_argument('-w', '--worksheet', type=str, required=True)
-    parser.add_argument('-n', '--network', type=str, default='mainnet')
+    parser.add_argument('-n', '--network', type=str, default=os.environ.get('NETWORK', 'mainnet'))
     parser.add_argument('--days', type=int, default=os.environ.get('NUMBER_OF_DAYS_TO_UPLOAD', 180), help='How many days of data to include')
-    parser.add_argument('--metric', type=str, choices=['24h', '30d'], default='24h', help='Performance metric type')
     parser.add_argument("--log_level", default=os.environ.get("SHEETS_LOG_LEVEL", "INFO"),
                         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
                         help="Set the logging level")
@@ -134,8 +126,8 @@ def main():
     logging.getLogger().setLevel(args.log_level.upper())
     logging.info(f"Logging level set to {args.log_level.upper()}")
 
-    clickhouse_password_file = args.clickhouse_password
-    credentials_file = args.google_credentials
+    clickhouse_password_file = args.clickhouse_password_file
+    credentials_file = args.google_credentials_file
     document_name = args.document
     worksheet_name = args.worksheet
 
@@ -157,7 +149,7 @@ def main():
         return
 
     try:
-        perf_data = get_operator_performance_data(network=args.network, days=args.days, metric_type=args.metric, clickhouse_password=clickhouse_password)
+        count_data = get_operator_validator_count_data(network=args.network, days=args.days, clickhouse_password=clickhouse_password)
         logging.info("Retrieved performance data from ClickHouse.")
 
     except Exception as e:
@@ -165,7 +157,7 @@ def main():
         return
 
     try:
-        spreadsheet = create_spreadsheet_data(perf_data, args.metric)
+        spreadsheet = create_spreadsheet_data(count_data, 'validator_counts')
         worksheet.clear()
         worksheet.update(values=spreadsheet, range_name='A1', value_input_option='USER_ENTERED')
         worksheet.resize(rows=len(spreadsheet), cols=len(spreadsheet[0]))

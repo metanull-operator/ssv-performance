@@ -4,7 +4,8 @@ CREATE TABLE IF NOT EXISTS default.operators (
     operator_name String,
     is_vo UInt8,
     is_private UInt8,
-    validator_count UInt32,
+    validator_count Nullable(UInt32),
+    operator_fee Nullable(Float64),
     address String,
     updated_at DateTime DEFAULT now()
 )
@@ -13,7 +14,7 @@ PARTITION BY network
 ORDER BY (network, operator_id);
 
 
-CREATE TABLE performance (
+CREATE TABLE IF NOT EXISTS default.performance (
     network String,
     operator_id UInt32,
     metric_type String,
@@ -24,6 +25,28 @@ CREATE TABLE performance (
 ) ENGINE = ReplacingMergeTree(updated_at)
 PARTITION BY network
 ORDER BY (network, operator_id, metric_type, metric_date, source);
+
+CREATE TABLE IF NOT EXISTS default.operator_fees (
+    network String,
+    operator_id UInt32,
+    metric_date Date,
+    operator_fee Float64,
+    source String,
+    updated_at DateTime DEFAULT now()
+) ENGINE = ReplacingMergeTree(updated_at)
+PARTITION BY network
+ORDER BY (network, operator_id, metric_date, source);
+
+CREATE TABLE IF NOT EXISTS default.validator_counts (
+    network String,
+    operator_id UInt32,
+    metric_date Date,
+    validator_count UInt32,
+    source String,
+    updated_at DateTime DEFAULT now()
+) ENGINE = ReplacingMergeTree(updated_at)
+PARTITION BY network
+ORDER BY (network, operator_id, metric_date, source);
 
 CREATE TABLE IF NOT EXISTS default.subscriptions (
     network String,

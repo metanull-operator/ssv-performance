@@ -1,0 +1,22 @@
+services:
+  ssv-performance-collector:
+    image: ssv-performance-collector:${SSV_PERFORMANCE_COLLECTOR_VERSION:-latest}
+    build:
+      context: ../..
+      dockerfile: scripts/ssv-performance-collector/Dockerfile
+    environment:
+      NETWORK: ${NETWORK:-mainnet}
+      REQUESTS_PER_MINUTE: ${REQUESTS_PER_MINUTE:-20}
+      MISSING_PERFORMANCE_DAYS: ${MISSING_PERFORMANCE_DAYS:-7}
+      COLLECTOR_LOG_LEVEL: ${COLLECTOR_LOG_LEVEL:-INFO}
+      CLICKHOUSE_HOST: ${CLICKHOUSE_HOST:-clickhouse}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-ssv_performance}
+      CLICKHOUSE_PASSWORD_FILE: /clickhouse-password.txt
+    volumes:
+      - ../../credentials/clickhouse-password.txt:/clickhouse-password.txt
+    networks:
+      - ssv-performance-network
+
+networks:
+  ssv-performance-network:
+    driver: bridge

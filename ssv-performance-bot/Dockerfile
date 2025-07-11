@@ -1,20 +1,18 @@
 FROM python:3.11-slim
 
-WORKDIR /app
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY . .
+ENV DISCORD_TOKEN_FILE=/discord-token.txt
 
 ENV CLICKHOUSE_HOST=clickhouse
 ENV CLICKHOUSE_USER=ssv_performance
-ENV CLICKHOUSE_PASSWORD=dsFtsxfSfNKd42uDrkp47gt22cfgG8sh
+ENV CLICKHOUSE_PASSWORD_FILE=/clickhouse-password.txt
 
 ENV PYTHONUNBUFFERED=1
 
-ENV BOT_LOG_LEVEL=INFO
-ENV BOT_DAILY_MESSAGE_TIME="1:00"
-ENV BOT_EXTRA_MESSAGE="/subscribe for @mentions on daily alerts or for performance report DMs. /operator for latest performance data. /help for more info."
+WORKDIR /app
 
-ENTRYPOINT ["python", "ssv-performance-bot.py"]
+COPY . .
+RUN pip install --no-cache-dir -r requirements.txt
+RUN chmod +x /app/entrypoint.sh
+
+ENTRYPOINT ["/app/entrypoint.sh"]
+CMD []

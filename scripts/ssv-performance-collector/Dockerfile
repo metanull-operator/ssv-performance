@@ -1,24 +1,25 @@
 FROM python:3.11-slim
 
-WORKDIR /app
+# Ethereum network to use
+# Possible values: mainnet, holesky, hoodi
+ENV NETWORK=mainnet
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY . .
-
-# Number of days of 24h performance data to show with /operator command
-ENV OPERATOR_PERFORMANCE_DAYS=7
-
-# Number of outbound API calls per minute
-ENV REQUESTS_PER_MINUTE=20
-
+# ClickHouse connection details
 ENV CLICKHOUSE_HOST=clickhouse
 ENV CLICKHOUSE_USER=ssv_performance
-ENV CLICKHOUSE_PASSWORD=dsFtsxfSfNKd42uDrkp47gt22cfgG8sh
+ENV CLICKHOUSE_PASSWORD_FILE=/clickhouse-password.txt
 
+# Log level for the collector script
+# Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
 ENV COLLECTOR_LOG_LEVEL=INFO
 
 ENV PYTHONUNBUFFERED=1
 
-ENTRYPOINT ["python", "ssv-performance-collector.py"]
+WORKDIR /app
+
+COPY . .
+RUN pip install --no-cache-dir -r requirements.txt
+RUN chmod +x /app/entrypoint.sh
+
+ENTRYPOINT ["/app/entrypoint.sh"]
+CMD []

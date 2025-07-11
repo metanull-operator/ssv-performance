@@ -15,8 +15,8 @@ class ClickHouseStorage(DataStorageInterface):
                 self.client = create_client(
                     host=os.environ.get("CLICKHOUSE_HOST", "localhost"),
                     port=int(os.environ.get("CLICKHOUSE_PORT", 8123)),
-                    username=os.environ.get("CLICKHOUSE_USER"),
-                    password=os.environ.get("CLICKHOUSE_PASSWORD"),
+                    username=os.environ.get("CLICKHOUSE_USER", "ssv_performance"),
+                    password=kwargs.get("password"),
                     database=os.environ.get("CLICKHOUSE_DB", "default")
                 )
                 break  # Success!
@@ -43,6 +43,45 @@ class ClickHouseStorage(DataStorageInterface):
             perf_data[row[FIELD_OPERATOR_ID]] = row
 
         return perf_data
+
+
+    def get_latest_fee_data(self, network):
+        query = """
+            SELECT 
+                o.operator_id,
+                o.operator_name,
+                o.is_vo,
+                o.is_private,
+                o.validator_count,
+                o.address,
+                o.operator_fee,
+                o.updated_at
+            FROM operators o
+            WHERE o.network = %(network)s
+        """
+
+        params = {
+            'network': network        # e.g., 'mainnet'
+        }
+
+        rows = self.client.query(query, parameters=params).result_rows
+
+        fee_data = {}
+        for row in rows:
+            operator_id = row[0]
+            if operator_id not in fee_data:
+                fee_data[operator_id] = {
+                    FIELD_OPERATOR_ID: row[0],
+                    FIELD_OPERATOR_NAME: row[1],
+                    FIELD_IS_VO: row[2],
+                    FIELD_IS_PRIVATE: row[3],
+                    FIELD_VALIDATOR_COUNT: row[4],
+                    FIELD_ADDRESS: row[5],
+                    FIELD_OPERATOR_FEE: row[6],
+                    FIELD_OPERATOR_FEE_DATE: row[7]
+                }
+
+        return fee_data
 
 
     def get_latest_performance_data(self, network, period):
@@ -115,7 +154,8 @@ class ClickHouseStorage(DataStorageInterface):
                 o.address,
                 pd.metric_date,
                 pd.metric_value,
-                pd.metric_type
+                pd.metric_type,
+                o.operator_fee
             FROM (
                 SELECT 
                     *,
@@ -157,14 +197,17 @@ class ClickHouseStorage(DataStorageInterface):
                     FIELD_ADDRESS: row[5],
                     FIELD_PERFORMANCE_DATE: row[6],
                     FIELD_PERF_DATA_24H: {},
-                    FIELD_PERF_DATA_30D: {}
+                    FIELD_PERF_DATA_30D: {},
+                    FIELD_OPERATOR_FEE: row[9]
                 }
             metric_type = row[8]
             date_str = row[6].strftime('%Y-%m-%d')
             if metric_type == '24h':
-                perf_data[operator_id][FIELD_PERF_DATA_24H][date_str] = float(row[7])
+                if row[7] is not None:
+                    perf_data[operator_id][FIELD_PERF_DATA_24H][date_str] = float(row[7])
             elif metric_type == '30d':
-                perf_data[operator_id][FIELD_PERF_DATA_30D][date_str] = float(row[7])
+                if row[7] is not None:
+                    perf_data[operator_id][FIELD_PERF_DATA_30D][date_str] = float(row[7])
 
         return perf_data
 

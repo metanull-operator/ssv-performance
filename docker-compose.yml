@@ -1,0 +1,58 @@
+services:
+  ssv-performance-bot:
+    image: ssv-performance-bot:${SSV_PERFORMANCE_BOT_VERSION:-latest}
+    hostname: ssv-performance-bot
+    build:
+      context: .
+      dockerfile: ssv-performance-bot/Dockerfile
+    environment:
+      NETWORK: ${NETWORK:-mainnet}
+      BOT_DISCORD_CHANNEL_ID: ${BOT_DISCORD_CHANNEL_ID}
+      BOT_DM_RECIPIENTS: ${BOT_DM_RECIPIENTS:-}
+      BOT_DAILY_MESSAGE_TIME: ${BOT_DAILY_MESSAGE_TIME:-08:00}
+      BOT_LOG_LEVEL: ${BOT_LOG_LEVEL:-INFO}
+      CLICKHOUSE_HOST: ${CLICKHOUSE_HOST:-clickhouse}
+      CLICKHOUSE_PORT: ${CLICKHOUSE_PORT:-8123}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-ssv_performance}  
+      CLICKHOUSE_PASSWORD_FILE: /clickhouse-password.txt    
+    volumes:
+      - ./certs:/certs:ro
+      - ./credentials/discord-token.txt:/discord-token.txt:ro
+      - ./credentials/clickhouse-password.txt:/clickhouse-password.txt:ro
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    networks:
+      - ssv-performance-network
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-latest}
+    hostname: clickhouse
+    environment:
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+      CLICKHOUSE_HOST: ${CLICKHOUSE_HOST:-clickhouse}
+      CLICKHOUSE_PORT: ${CLICKHOUSE_PORT:-8123}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-ssv_performance}
+      CLICKHOUSE_PASSWORD_FILE: /clickhouse-password.txt
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - ./credentials/clickhouse-password.txt:/clickhouse-password.txt:ro
+      - ./clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./clickhouse/healthcheck.sh:/usr/local/bin/healthcheck.sh
+      - ./sql-import:/sql-import:ro
+      - ./scripts/clickhouse-import/clickhouse-import.sh:/usr/local/bin/clickhouse-import.sh
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/healthcheck.sh"]
+      interval: 2s
+      timeout: 2s
+      retries: 5
+      start_period: 10s
+    networks:
+      - ssv-performance-network
+
+volumes:
+  clickhouse-data:
+
+networks:
+  ssv-performance-network:
+    driver: bridge

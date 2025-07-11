@@ -1,0 +1,3 @@
+gspread
+oauth2client
+clickhouse_connect

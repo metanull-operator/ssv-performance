@@ -1,0 +1,22 @@
+services:
+  ssv-performance-sheets:
+    image: ssv-performance-sheets:${SSV_PERFORMANCE_SHEETS_VERSION:-latest}
+    build:
+      context: ../..
+      dockerfile: scripts/ssv-performance-sheets/Dockerfile
+    environment:
+      NETWORK: ${NETWORK:-mainnet}
+      NUMBER_OF_DAYS_TO_UPLOAD: ${NUMBER_OF_DAYS_TO_UPLOAD:-180}
+      SHEETS_LOG_LEVEL: ${SHEETS_LOG_LEVEL:-INFO}
+      CLICKHOUSE_HOST: ${CLICKHOUSE_HOST:-clickhouse}
+      CLICKHOUSE_PORT: ${CLICKHOUSE_PORT:-8123}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-ssv_performance}
+    volumes:
+      - ../../credentials/google-credentials.json:/google-credentials.json
+      - ../../credentials/clickhouse-password.txt:/clickhouse-password.txt
+    networks:
+      - ssv-performance-network
+
+networks:
+  ssv-performance-network:
+    driver: bridge

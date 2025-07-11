@@ -8,7 +8,8 @@ from vo_performance_bot.vopb_messages import (
     create_subscriptions_message,
     send_operator_performance_messages,
     respond_vo_threshold_messages,
-    send_direct_message_test
+    send_direct_message_test,
+    respond_fee_messages
 )
 
 
@@ -17,7 +18,7 @@ def is_channel(ctx):
     return hasattr(ctx, 'guild') and ctx.guild
 
 
-async def setup(network, bot, allowed_channel_id, extra_message):
+async def setup(network, bot, allowed_channel_id, extra_message, num_segments):
 
     @bot.slash_command(name="help", description="Shows help information")
     async def help(ctx):
@@ -44,12 +45,13 @@ Thresholds displayed are subject to change.
 
 **Commands:**
 - /alerts: List all operator IDs whose recent performance is below various alert thresholds
+- /fees: Show current fee information
+- /help: Shows this help message
+- /info: Display bot information
 - /operator [operator_ids...]: Show recent performance for specified operator IDs
 - /subscribe daily|alerts [operator_ids...]: Subscribe to daily operator performance direct messages or threshold alert @mentions
-- /unsubscribe daily|alerts [operator_ids...]: Unsubscribe from daily operator performance direct messages or threshold alert @mentions
 - /subscriptions: List all operator IDs to which you are subscribed for daily operator performance messages or threshold alert @mentions
-- /info: Display bot information
-- /help: Shows this help message
+- /unsubscribe daily|alerts [operator_ids...]: Unsubscribe from daily operator performance direct messages or threshold alert @mentions
         """
         await ctx.respond(help_text)
 
@@ -207,6 +209,38 @@ Thresholds displayed are subject to change.
         except Exception as e:
             logging.error(f"Error fetching operator performance: {e}", exc_info=True)
             await ctx.respond("An error occurred while fetching operator performance data.", ephemeral=True)
+
+
+    @bot.slash_command(name='fees', description='Show current fee information')
+    async def fees(
+        ctx,
+            availability: Option(str, "Which operators to include", choices=["public", "private", "all"], default="public"),
+            verified: Option(str, "Which operators to include", choices=["verified", "unverified", "all"], default="verified")
+    ):
+
+        logging.info(f"/fees called with availability={availability}")
+
+        if not allowed_channel(ctx):
+            await ctx.respond("VO Performance Bot commands are not allowed in this channel.", ephemeral=True)
+            return
+
+        await ctx.defer()
+
+        try:
+            storage = StorageFactory.get_storage('ssv_performance')
+            fee_data = storage.get_latest_fee_data(network)
+
+            if not fee_data:
+                logging.error(f"alerts() fee_data empty [077188]")
+                await ctx.followup.send("Fee data not available.", ephemeral=True)
+                return
+
+            await respond_fee_messages(ctx, fee_data, extra_message=extra_message, availability=availability, verified=verified, num_segments=num_segments)
+
+        except Exception as e:
+            logging.error(f"Error fetching fee information: {e}", exc_info=True)
+            await ctx.followup.send("An error occurred while fetching fee data.", ephemeral=True)
+
 
     def merge_operator_performance(dict1, dict2):
         merged = {}
