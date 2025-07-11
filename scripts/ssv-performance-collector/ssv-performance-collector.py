@@ -246,7 +246,7 @@ def main():
 
     client = get_clickhouse_client(clickhouse_password)
 
-    base_url = f"https://api.ssv.network/api/v4/{args.network}/operators/?validatorsCount=true"
+    base_url = f"https://api.ssv.network/api/v4/{args.network}/operators/?"
     operators = fetch_and_filter_data(base_url, args.page_size)
 
     target_date = datetime.now(timezone.utc if not args.local_time else None).date()
