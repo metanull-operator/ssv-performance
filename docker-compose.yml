@@ -34,13 +34,16 @@ services:
       CLICKHOUSE_PORT: ${CLICKHOUSE_PORT:-8123}
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-ssv_performance}
       CLICKHOUSE_PASSWORD_FILE: /clickhouse-password.txt
+      EXPORT_DIR: ${EXPORT_DIR:-./sql-export}
     volumes:
       - clickhouse-data:/var/lib/clickhouse
       - ./credentials/clickhouse-password.txt:/clickhouse-password.txt:ro
       - ./clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
       - ./clickhouse/healthcheck.sh:/usr/local/bin/healthcheck.sh
       - ./sql-import:/sql-import:ro
+      - "${EXPORT_DIR:-./sql-export}:/sql-export"
       - ./scripts/clickhouse-import/clickhouse-import.sh:/usr/local/bin/clickhouse-import.sh
+      - ./scripts/clickhouse-export/clickhouse-export.sh:/usr/local/bin/clickhouse-export.sh
     healthcheck:
       test: ["CMD", "/usr/local/bin/healthcheck.sh"]
       interval: 2s
