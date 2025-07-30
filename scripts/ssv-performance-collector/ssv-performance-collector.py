@@ -265,7 +265,7 @@ def main():
     target_date = datetime.now(timezone.utc if not args.local_time else None).date()
 
     insert_clickhouse_performance_data(client, args.network, args.ch_operators_table, args.ch_performance_table, operators, target_date, IMPORT_SOURCE)
-    cleanup_outdated_records(client, args.local_time)
+    cleanup_outdated_records(client)
 
     deduplicate_table(client, args.ch_operators_table, args.network)
     deduplicate_table(client, args.ch_performance_table, args.network)
