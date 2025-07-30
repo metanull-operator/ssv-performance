@@ -174,29 +174,42 @@ def insert_clickhouse_performance_data(client, network, clickhouse_table_operato
     ])    
 
 
-def cleanup_outdated_records(client, local_time=False):
-    cutoff_date = (datetime.now(timezone.utc if not local_time else None) - timedelta(days=MISSING_PERFORMANCE_DAYS)).strftime('%Y-%m-%d')
+def cleanup_outdated_records(client):
+    logging.info(f"Looking for operators with no performance data in the last {MISSING_PERFORMANCE_DAYS} days...")
 
-    # Count how many rows will be updated
+    # Count operators with stale or missing performance
     count_query = f"""
         SELECT count()
-        FROM operators
-        WHERE (network, operator_id) NOT IN (
-            SELECT DISTINCT network, operator_id
+        FROM operators o
+        LEFT JOIN (
+            SELECT
+                network,
+                operator_id,
+                max(metric_date) AS max_date
             FROM performance
-            WHERE metric_date >= toDate('{cutoff_date}')
-        )
+            GROUP BY network, operator_id
+        ) p ON o.network = p.network AND o.operator_id = p.operator_id
+        WHERE max_date < today() - INTERVAL {MISSING_PERFORMANCE_DAYS} DAY OR max_date IS NULL
     """
-    affected_rows = client.query(count_query).result_rows[0][0]  
-    logging.info(f"Found {affected_rows} operators with no performance data for the last {MISSING_PERFORMANCE_DAYS} days. Updating validator count to zero.")
+    affected_rows = client.query(count_query).result_rows[0][0]
+    logging.info(f"Found {affected_rows} operators to update across all networks.")
 
-    # Now run the update
+    # Update validator_count = 0 for operators with stale or missing performance
     update_query = f"""
-        ALTER TABLE operators UPDATE validator_count = 0
-        WHERE (network, operator_id) NOT IN (
-            SELECT DISTINCT network, operator_id
-            FROM performance
-            WHERE metric_date >= toDate('{cutoff_date}')
+        ALTER TABLE operators
+        UPDATE validator_count = 0
+        WHERE (network, operator_id) IN (
+            SELECT o.network, o.operator_id
+            FROM operators o
+            LEFT JOIN (
+                SELECT
+                    network,
+                    operator_id,
+                    max(metric_date) AS max_date
+                FROM performance
+                GROUP BY network, operator_id
+            ) p ON o.network = p.network AND o.operator_id = p.operator_id
+            WHERE max_date < today() - INTERVAL {MISSING_PERFORMANCE_DAYS} DAY OR max_date IS NULL
         )
     """
     client.command(update_query)
