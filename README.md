@@ -64,7 +64,7 @@ Enter your new ClickHouse password, then save and exit.
 Build the ssv-performance-bot Docker image.
 
 ```bash
-docker build -t ssv-performance-bot:latest ./ssv-performance-bot
+docker build -t ssv-performance-bot ./ssv-performance-bot
 ```
 
 ### Start the Applications
@@ -81,9 +81,9 @@ To stop the ssv-performance-bot and ClickHouse database:
 docker compose -p ssv-performance down
 ```
 
-## Data Migration
+## clickhouse-import.sh
 
-See the [clickhouse-import README](scripts/clickhouse-import/README.md) for the steps to import performance data SQL files from one ClickHouse database to another.
+See the [clickhouse-import README](scripts/clickhouse-import/README.md) for the steps to import performance data SQL files. This may be used to restore backups or to transfer a database from one ClickHouse instance to another.
 
 ## ssv-performance-collector
 
@@ -102,3 +102,7 @@ See the [ssv-performance-sheets README](scripts/ssv-performance-sheets/README.md
 ssv-validator-count-sheets copies SSV validator count data from the ClickHouse database to a Google Sheet. Each Google Sheet will contain the validator count data for a single Ethereum network. It is recommended to run this script daily as a cronjob. A separate instance must be run for each Ethereum network copied to Google Sheets.
 
 See the [ssv-validator-count-sheets README](scripts/ssv-validator-count-sheets/README.md) for more details.
+
+## clickhouse-export.sh
+
+See the [clickhouse-export README](scripts/clickhouse-export/README.md) for the steps to export performance data SQL files from the ClickHouse database for backups or to import into another ClickHouse database instance.
