@@ -305,7 +305,10 @@ def main():
 
     base_url = f"https://api.ssv.network/api/v4/{args.network}/operators/?"
     operators = fetch_and_filter_data(base_url, args.page_size)
-    update_validator_counts_from_subgraph(operators, GRAPH_API_KEY)
+
+    if (GRAPH_API_KEY):
+        logging.info(f"GRAPH_API_KEY = {GRAPH_API_KEY}")
+        update_validator_counts_from_subgraph(operators, GRAPH_API_KEY)
 
     target_date = datetime.now(timezone.utc if not args.local_time else None).date()
 
