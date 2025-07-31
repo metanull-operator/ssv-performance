@@ -63,6 +63,8 @@ def update_validator_counts_from_subgraph(operators: dict, api_key: str) -> None
                 op_id = int(op["id"])
                 count = len(op.get("validators", []))
                 if op_id in operators:
+                    if count != operators[op_id].get("validatorCount", None):
+                        logging.debug(f"Updating operator {op_id} validator count from {operators[op_id].get('validatorCount', None)} to {count}")
                     operators[op_id]["validatorCount"] = count
             except Exception as e:
                 logging.warning(f"Failed to update operator {op.get('id')}: {e}")
