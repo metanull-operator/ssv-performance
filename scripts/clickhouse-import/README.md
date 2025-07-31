@@ -8,7 +8,7 @@ High-level overview of migration process:
 - Copy data files to the `sql-import/` directory
 - Import source SQL data to destination ClickHouse instance
 
-### Export SQL Data
+## Export SQL Data
 
 See the [../clickhouse-export/README.md](clickhouse-export.sh documentation) for instructions on export SQL files from an existing ssv-performance ClickHouse database.
 
@@ -23,7 +23,7 @@ You should have files for the following tables:
 - validator_counts
 - operator_fees
 
-### Source ClickHouse Container Name
+## Source ClickHouse Container Name
 
 Confirm your source ClickHouse container name.
 
@@ -33,9 +33,7 @@ docker ps
 
 Replace `ssv-performance-clickhouse-1` in the commands below with the name of your source ClickHouse container.
 
-## Import Source Data
-
-### Destination ClickHouse Container Name
+## Destination ClickHouse Container Name
 
 Confirm your destination ClickHouse container name.
 
@@ -45,7 +43,7 @@ docker ps
 
 Replace `ssv-performance-clickhouse-1` in the commands below with the name of your destination ClickHouse container.
 
-### Run Import Command
+## Run Import Command
 
 Run the `clickhouse-import.sh` script in the destination ClickHouse container. This script will import all `.sql` files in the `sql-import/` directory into the ClickHouse database.
 
