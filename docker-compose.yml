@@ -35,6 +35,7 @@ services:
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-ssv_performance}
       CLICKHOUSE_PASSWORD_FILE: /clickhouse-password.txt
       EXPORT_DIR: ${EXPORT_DIR:-./sql-export}
+      DAYS_TO_KEEP: ${DAYS_TO_KEEP:-7}
     volumes:
       - clickhouse-data:/var/lib/clickhouse
       - ./credentials/clickhouse-password.txt:/clickhouse-password.txt:ro
