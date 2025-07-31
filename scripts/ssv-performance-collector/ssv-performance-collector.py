@@ -16,6 +16,8 @@ BLOCKS_PER_YEAR = BLOCKS_PER_DAY * DAYS_PER_YEAR
 
 IMPORT_SOURCE = os.environ.get("IMPORT_SOURCE", 'api.ssv.network')
 
+GRAPH_API_KEY = os.environ.get("GRAPH_API_KEY", None)
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
@@ -27,6 +29,46 @@ def get_clickhouse_client(clickhouse_password):
         password=clickhouse_password,
         database=os.environ.get("CLICKHOUSE_DB", "default")
     )
+
+
+def update_validator_counts_from_subgraph(operators: dict, api_key: str) -> None:
+    url = "https://gateway.thegraph.com/api/subgraphs/id/7V45fKPugp9psQjgrGsfif98gWzCyC6ChN7CW98VyQnr"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}"
+    }
+    query = """
+    {
+      operators {
+        id
+        validators(where: {removed: false}) {
+          id
+        }
+      }
+    }
+    """
+
+    try:
+        response = requests.post(url, headers=headers, json={"query": query, "operationName": "Subgraphs", "variables": {}})
+        response.raise_for_status()
+        result = response.json()
+
+        if "errors" in result:
+            logging.error(f"GraphQL query error: {result['errors']}")
+            return
+
+        subgraph_operators = result.get("data", {}).get("operators", [])
+        for op in subgraph_operators:
+            try:
+                op_id = int(op["id"])
+                count = len(op.get("validators", []))
+                if op_id in operators:
+                    operators[op_id]["validatorCount"] = count
+            except Exception as e:
+                logging.warning(f"Failed to update operator {op.get('id')}: {e}")
+
+    except requests.RequestException as e:
+        logging.error(f"Subgraph query failed: {e}")
 
 
 def fetch_and_filter_data(base_url, page_size):
@@ -261,6 +303,7 @@ def main():
 
     base_url = f"https://api.ssv.network/api/v4/{args.network}/operators/?"
     operators = fetch_and_filter_data(base_url, args.page_size)
+    update_validator_counts_from_subgraph(operators, GRAPH_API_KEY)
 
     target_date = datetime.now(timezone.utc if not args.local_time else None).date()
 
