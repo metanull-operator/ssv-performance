@@ -5,6 +5,7 @@ CLICKHOUSE_USER="${CLICKHOUSE_USER:-ssv_performance}"
 CLICKHOUSE_HOST="${CLICKHOUSE_HOST:-clickhouse}"
 CLICKHOUSE_DATABASE="${CLICKHOUSE_DATABASE:-default}"
 CLICKHOUSE_PASSWORD_FILE="${CLICKHOUSE_PASSWORD_FILE:-/clickhouse-password.txt}"
+DAYS_TO_KEEP="${DAYS_TO_KEEP:-7}"
 
 EXPORT_BASE_DIR="${EXPORT_BASE_DIR:-/sql-export}"
 DATE_DIR=$(date '+%Y-%m-%d_%H-%M-%S')
@@ -42,3 +43,31 @@ for TABLE in $TABLES; do
 done
 
 echo "✅ All tables exported to $EXPORT_DIR"
+
+# Cleanup old backups using folder names instead of mtime
+if [[ "$DAYS_TO_KEEP" -gt 0 ]]; then
+  echo "🧹 Deleting backups older than $DAYS_TO_KEEP day(s) based on folder name..."
+
+  CUTOFF_DATE=$(date -d "$DAYS_TO_KEEP days ago" +%s)
+
+  for dir in "$EXPORT_BASE_DIR"/*/; do
+    dir=${dir%/}  # remove trailing slash
+    basename=$(basename "$dir")
+
+    # Extract date part (assumes format YYYY-MM-DD_HH-MM-SS)
+    dir_date_part="${basename%%_*}"
+
+    # Skip if not a valid date format
+    if ! date_ts=$(date -d "$dir_date_part" +%s 2>/dev/null); then
+      echo "⚠️  Skipping unrecognized folder: $basename"
+      continue
+    fi
+
+    if [[ "$date_ts" -lt "$CUTOFF_DATE" ]]; then
+      echo "🗑️  Deleting old backup: $basename"
+      rm -rf "$dir"
+    fi
+  done
+
+  echo "✅ Old backups cleaned."
+fi
