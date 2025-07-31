@@ -41,7 +41,7 @@ def update_validator_counts_from_subgraph(operators: dict, api_key: str) -> None
     {
       operators {
         id
-        validators(where: {removed: false}) {
+        validators(first: 1000, where: {removed: false}) {
           id
         }
       }
