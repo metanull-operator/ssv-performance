@@ -12,6 +12,7 @@ services:
       CLICKHOUSE_HOST: ${CLICKHOUSE_HOST:-clickhouse}
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-ssv_performance}
       CLICKHOUSE_PASSWORD_FILE: /clickhouse-password.txt
+      GRAPH_API_KEY: ${GRAPH_API_KEY:-}
     volumes:
       - ../../credentials/clickhouse-password.txt:/clickhouse-password.txt
     networks:
