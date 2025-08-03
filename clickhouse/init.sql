@@ -68,3 +68,11 @@ CREATE TABLE IF NOT EXISTS default.import_state (
 ENGINE = ReplacingMergeTree(updated_at)
 ORDER BY network;
 
+CREATE TABLE IF NOT EXISTS default.validators (
+    network String,
+    pubkey String,
+    status String,
+    update_at DateTime DEFAULT now(),
+) ENGINE = ReplacingMergeTree(update_at)
+PARTITION BY network
+ORDER BY pubkey;

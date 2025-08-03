@@ -14,10 +14,29 @@ BLOCKS_PER_DAY = 7200
 DAYS_PER_YEAR = 365
 BLOCKS_PER_YEAR = BLOCKS_PER_DAY * DAYS_PER_YEAR
 
+# SSV API configuration
 IMPORT_SOURCE = os.environ.get("IMPORT_SOURCE", 'api.ssv.network')
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# SUBGRAPH API configuration
+GRAPH_SUBGRAPH_URL = "https://gateway.thegraph.com/api/subgraphs/id/7V45fKPugp9psQjgrGsfif98gWzCyC6ChN7CW98VyQnr"
+GRAPH_API_KEY = os.environ.get("GRAPH_API_KEY", "")
 
+# BEACON API configuration``
+BEACON_API_URL = os.environ.get("BEACON_API_URL", None)
+STATUS_RPM = int(os.environ.get("VALIDATOR_STATUS_RPM", 30))
+STATUS_BATCH_SIZE = int(os.environ.get("VALIDATOR_STATUS_BATCH", 50))
+CACHE_TTL_MINUTES = int(os.environ.get("VALIDATOR_CACHE_TTL_MINUTES", 60))
+
+STATUS_DELAY = 60 / STATUS_RPM
+ACTIVE_STATUSES = {
+    "active_ongoing",
+    "active_exiting",
+    "active_slashed",
+    "pending_queued",
+    "pending_initialized",
+}
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def get_clickhouse_client(clickhouse_password):
     return create_client(
@@ -27,6 +46,115 @@ def get_clickhouse_client(clickhouse_password):
         password=clickhouse_password,
         database=os.environ.get("CLICKHOUSE_DB", "default")
     )
+
+
+def fetch_all_operator_validators():
+    op_skip = 0
+    page_size = 1000
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {GRAPH_API_KEY}"
+    }
+    operator_validators = {}
+    seen_pubkeys = set()
+
+    while True:
+        query = f"""
+        {{
+          operators(first: {page_size}, skip: {op_skip}) {{
+            id
+            validators(first: 1000, where: {{removed: false}}) {{
+              id
+            }}
+          }}
+        }}
+        """
+        resp = requests.post(GRAPH_SUBGRAPH_URL, headers=headers, json={"query": query})
+        resp.raise_for_status()
+        ops = resp.json().get("data", {}).get("operators", [])
+        if not ops:
+            break
+
+        for op in ops:
+            op_id = int(op["id"])
+            keys = {v["id"] for v in op.get("validators", [])}
+            operator_validators[op_id] = keys
+            seen_pubkeys.update(keys)
+
+        op_skip += page_size
+        time.sleep(1)
+
+    return operator_validators, seen_pubkeys
+
+# --- Query cache ---
+def get_cached_statuses(client, pubkeys: set[str]) -> dict[str, str]:
+    if not pubkeys:
+        return {}
+    chunk = "', '".join(pubkeys)
+    query = f"""
+        SELECT pubkey, status
+        FROM validator_status
+        WHERE pubkey IN ('{chunk}')
+        AND last_updated > now() - INTERVAL {CACHE_TTL_MINUTES} MINUTE
+    """
+    result = client.query(query)
+    return {row["pubkey"]: row["status"] for row in result.result_rows}
+
+
+def insert_statuses(client, statuses: dict[str, str]) -> None:
+    now = datetime.utcnow().replace(microsecond=0)
+    rows = [(k, v, now) for k, v in statuses.items()]
+    client.insert("validator_status", rows, column_names=["pubkey", "status", "last_updated"])
+
+
+def fetch_validator_statuses(pubkeys: set[str]) -> dict[str, str]:
+    result = {}
+    pubkeys = list(pubkeys)
+    for i in range(0, len(pubkeys), STATUS_BATCH_SIZE):
+        batch = pubkeys[i:i+STATUS_BATCH_SIZE]
+        ids = ",".join(batch)
+        try:
+            url = f"{BEACON_API_URL}/eth/v1/beacon/states/head/validators?id={ids}"
+            resp = requests.get(url, timeout=15)
+            resp.raise_for_status()
+            data = resp.json().get("data", [])
+            for v in data:
+                key = v.get("validator", {}).get("pubkey") or v.get("index") or ""
+                result[key] = v.get("status", "")
+        except Exception as e:
+            logging.warning(f"Failed to fetch validator status batch {i}: {e}")
+        time.sleep(STATUS_DELAY)
+    return result
+
+
+def calculate_active_counts(operator_validators: dict[int, set[str]], status_map: dict[str, str]) -> dict[int, int]:
+    return {
+        op_id: sum(1 for k in pubkeys if status_map.get(k, "") in ACTIVE_STATUSES)
+        for op_id, pubkeys in operator_validators.items()
+    }
+
+
+def enrich_operator_counts(client, operators: dict[int, dict]) -> None:
+    if not GRAPH_API_KEY:
+        logging.info("GRAPH_API_KEY not set. Skipping validator counts enrichment.")
+        return
+
+    operator_validators, all_pubkeys = fetch_all_operator_validators()
+    logging.info(f"Found {len(operator_validators)} operators and {len(all_pubkeys)} unique validators.")
+
+    cached = get_cached_statuses(client, all_pubkeys)
+    missing = all_pubkeys - set(cached)
+
+    if BEACON_API_URL and missing:
+        logging.info(f"Fetching {len(missing)} validator statuses from beacon API")
+        new_statuses = fetch_validator_statuses(missing)
+        insert_statuses(client, new_statuses)
+        cached.update(new_statuses)
+
+    counts = calculate_active_counts(operator_validators, cached)
+    for op_id, count in counts.items():
+        if op_id in operators:
+            operators[op_id]["activeValidatorCount"] = count
 
 
 def fetch_and_filter_data(base_url, page_size):
@@ -261,6 +389,7 @@ def main():
 
     base_url = f"https://api.ssv.network/api/v4/{args.network}/operators/?"
     operators = fetch_and_filter_data(base_url, args.page_size)
+    enrich_operator_counts(client, operators)
 
     target_date = datetime.now(timezone.utc if not args.local_time else None).date()
 
