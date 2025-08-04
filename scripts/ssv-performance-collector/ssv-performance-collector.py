@@ -27,6 +27,16 @@ STATUS_RPM = int(os.environ.get("VALIDATOR_STATUS_RPM", 30))
 STATUS_BATCH_SIZE = int(os.environ.get("VALIDATOR_STATUS_BATCH", 50))
 CACHE_TTL_MINUTES = int(os.environ.get("VALIDATOR_CACHE_TTL_MINUTES", 60))
 
+HEADERS = {
+    "Content-Type": "application/json",
+    "Authorization": f"Bearer {GRAPH_API_KEY}"
+}
+
+PAGE_SIZE = 100
+VALIDATOR_PAGE_SIZE = 1000
+SLEEP_BETWEEN_OP_PAGES = 1
+SLEEP_BETWEEN_VAL_PAGES = 0.25
+
 STATUS_DELAY = 60 / STATUS_RPM
 ACTIVE_STATUSES = {
     "active_ongoing",
@@ -54,45 +64,77 @@ def get_clickhouse_client():
 
 
 def fetch_all_operator_validators():
-    logging.debug("Fetching all operator validators.")
-    op_skip = 0
-    page_size = 100
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {GRAPH_API_KEY}"
-    }
     operator_validators = {}
     seen_pubkeys = set()
+    likely_truncated = set()
 
-#          operators(first: {page_size}, skip: {op_skip}) {{
+    logging.info("Starting paginated fetch of operators and initial validator sets...")
+    op_skip = 0
 
     while True:
-        logging.debug(f"Retrieving {page_size} operators")
         query = f"""
-        query MyQuery {{
-          operators(first: {page_size}, skip: {op_skip}) {{
+        {{
+          operators(first: {PAGE_SIZE}, skip: {op_skip}) {{
             id
-            validators(where: {{removed: false}}) {{
+            validators(first: {VALIDATOR_PAGE_SIZE}, where: {{removed: false}}) {{
               id
             }}
           }}
         }}
         """
-        resp = requests.post(GRAPH_SUBGRAPH_URL, headers=headers, json={"query": query}, timeout=60)
+        resp = requests.post(GRAPH_SUBGRAPH_URL, headers=HEADERS, json={"query": query}, timeout=60)
         resp.raise_for_status()
-        ops = resp.json().get("data", {}).get("operators", [])
-        if not ops:
+        data = resp.json().get("data", {}).get("operators", [])
+        if not data:
             break
 
-        for op in ops:
+        for op in data:
             op_id = int(op["id"])
-            keys = {v["id"] for v in op.get("validators", [])}
+            validators = op.get("validators", [])
+            keys = {v["id"] for v in validators}
             operator_validators[op_id] = keys
             seen_pubkeys.update(keys)
 
-        op_skip += page_size
-        time.sleep(1)
+            if len(validators) == VALIDATOR_PAGE_SIZE:
+                likely_truncated.add(op_id)
 
+        op_skip += PAGE_SIZE
+        time.sleep(SLEEP_BETWEEN_OP_PAGES)
+
+    logging.info(f"Identified {len(likely_truncated)} operators with possibly truncated validator lists.")
+
+    for op_id in likely_truncated:
+        logging.info(f"Paginating validators for operator {op_id}")
+        val_skip = VALIDATOR_PAGE_SIZE
+
+        while True:
+            query = f"""
+            {{
+              operator(id: \"{op_id}\") {{
+                validators(first: {VALIDATOR_PAGE_SIZE}, skip: {val_skip}, where: {{removed: false}}) {{
+                  id
+                }}
+              }}
+            }}
+            """
+            resp = requests.post(GRAPH_SUBGRAPH_URL, headers=HEADERS, json={"query": query}, timeout=60)
+            resp.raise_for_status()
+            validators = resp.json().get("data", {}).get("operator", {}).get("validators", [])
+
+            if not validators:
+                break
+
+            new_keys = {v["id"] for v in validators}
+            operator_validators[op_id].update(new_keys)
+            seen_pubkeys.update(new_keys)
+
+            if len(validators) < VALIDATOR_PAGE_SIZE:
+                break
+
+            val_skip += VALIDATOR_PAGE_SIZE
+            time.sleep(SLEEP_BETWEEN_VAL_PAGES)
+
+    logging.info(f"Finished fetching validators for all operators.")
     return operator_validators, seen_pubkeys
 
 
