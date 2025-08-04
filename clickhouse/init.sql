@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS default.import_state (
 ENGINE = ReplacingMergeTree(updated_at)
 ORDER BY network;
 
-CREATE TABLE IF NOT EXISTS default.validators (
+CREATE TABLE IF NOT EXISTS default.validator_statuses (
     network String,
     pubkey String,
     status String,

@@ -93,7 +93,7 @@ def get_cached_statuses(client, pubkeys: set[str]) -> dict[str, str]:
     chunk = "', '".join(pubkeys)
     query = f"""
         SELECT pubkey, status
-        FROM validator_status
+        FROM validator_statuses
         WHERE pubkey IN ('{chunk}')
         AND last_updated > now() - INTERVAL {CACHE_TTL_MINUTES} MINUTE
     """
@@ -104,7 +104,7 @@ def get_cached_statuses(client, pubkeys: set[str]) -> dict[str, str]:
 def insert_statuses(client, statuses: dict[str, str]) -> None:
     now = datetime.utcnow().replace(microsecond=0)
     rows = [(k, v, now) for k, v in statuses.items()]
-    client.insert("validator_status", rows, column_names=["pubkey", "status", "last_updated"])
+    client.insert("validator_statuses", rows, column_names=["pubkey", "status", "last_updated"])
 
 
 def fetch_validator_statuses(pubkeys: set[str]) -> dict[str, str]:
