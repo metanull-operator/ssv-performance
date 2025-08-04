@@ -36,21 +36,27 @@ ACTIVE_STATUSES = {
     "pending_initialized",
 }
 
+CLICKHOUSE_PASSWORD = None
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-def get_clickhouse_client(clickhouse_password):
+
+def get_clickhouse_client():
+
+    logging.debug(f"CLICKHOUSE_PASSWORD={CLICKHOUSE_PASSWORD}")
     return create_client(
         host=os.environ.get("CLICKHOUSE_HOST", "localhost"),
         port=int(os.environ.get("CLICKHOUSE_PORT", 8123)),
         username=os.environ.get("CLICKHOUSE_USER", "ssv_performance"),
-        password=clickhouse_password,
+        password=CLICKHOUSE_PASSWORD,
         database=os.environ.get("CLICKHOUSE_DB", "default")
     )
 
 
 def fetch_all_operator_validators():
+    logging.debug("Fetching all operator validators.")
     op_skip = 0
-    page_size = 1000
+    page_size = 100
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {GRAPH_API_KEY}"
@@ -58,18 +64,21 @@ def fetch_all_operator_validators():
     operator_validators = {}
     seen_pubkeys = set()
 
+#          operators(first: {page_size}, skip: {op_skip}) {{
+
     while True:
+        logging.debug(f"Retrieving {page_size} operators")
         query = f"""
-        {{
+        query MyQuery {{
           operators(first: {page_size}, skip: {op_skip}) {{
             id
-            validators(first: 1000, where: {{removed: false}}) {{
+            validators(where: {{removed: false}}) {{
               id
             }}
           }}
         }}
         """
-        resp = requests.post(GRAPH_SUBGRAPH_URL, headers=headers, json={"query": query})
+        resp = requests.post(GRAPH_SUBGRAPH_URL, headers=headers, json={"query": query}, timeout=60)
         resp.raise_for_status()
         ops = resp.json().get("data", {}).get("operators", [])
         if not ops:
@@ -86,44 +95,76 @@ def fetch_all_operator_validators():
 
     return operator_validators, seen_pubkeys
 
-# --- Query cache ---
-def get_cached_statuses(client, pubkeys: set[str]) -> dict[str, str]:
-    if not pubkeys:
-        return {}
-    chunk = "', '".join(pubkeys)
-    query = f"""
-        SELECT pubkey, status
-        FROM validator_statuses
-        WHERE pubkey IN ('{chunk}')
-        AND last_updated > now() - INTERVAL {CACHE_TTL_MINUTES} MINUTE
-    """
-    result = client.query(query)
-    return {row["pubkey"]: row["status"] for row in result.result_rows}
+
+def get_cached_statuses(pubkeys: set[str], batch_size=1000) -> dict[str, str]:
+    cached = {}
+    pubkey_list = list(pubkeys)
+
+    client = get_clickhouse_client()
+
+    for i in range(0, len(pubkey_list), batch_size):
+        batch = pubkey_list[i:i + batch_size]
+        chunk = "', '".join(batch)
+        query = f"""
+            SELECT pubkey, status
+            FROM validator_statuses
+            WHERE pubkey IN ('{chunk}')
+              AND update_at > now() - INTERVAL {CACHE_TTL_MINUTES} MINUTE
+        """
+        try:
+            result = client.query(query)
+            for row in result.result_rows:
+                cached[row[0]] = row[1]
+        except Exception as e:
+            logging.warning(f"Failed to query validator_statuses batch {i}-{i+batch_size}: {e}")
+        time.sleep(0.1)
+
+    client = None
+
+    return cached
 
 
-def insert_statuses(client, statuses: dict[str, str]) -> None:
+def insert_statuses(statuses: dict[str, str]) -> None:
+    client = get_clickhouse_client()
     now = datetime.utcnow().replace(microsecond=0)
     rows = [(k, v, now) for k, v in statuses.items()]
-    client.insert("validator_statuses", rows, column_names=["pubkey", "status", "last_updated"])
+    client.insert("validator_statuses", rows, column_names=["pubkey", "status", "update_at"])
+    client = None
 
 
 def fetch_validator_statuses(pubkeys: set[str]) -> dict[str, str]:
+    if not BEACON_API_URL:
+      logging.debug("BEACON_API_URL is not set. Skipping beacon chain queries.")
+      return
+
     result = {}
     pubkeys = list(pubkeys)
+
+    headers = {
+        "Accept": "application/json",
+    }
+    
     for i in range(0, len(pubkeys), STATUS_BATCH_SIZE):
-        batch = pubkeys[i:i+STATUS_BATCH_SIZE]
+        batch = pubkeys[i:i + STATUS_BATCH_SIZE]
         ids = ",".join(batch)
         try:
+            logging.debug(f"Requesting {len(ids)}")
             url = f"{BEACON_API_URL}/eth/v1/beacon/states/head/validators?id={ids}"
-            resp = requests.get(url, timeout=15)
+            resp = requests.get(url, headers=headers, timeout=15)
             resp.raise_for_status()
-            data = resp.json().get("data", [])
-            for v in data:
-                key = v.get("validator", {}).get("pubkey") or v.get("index") or ""
-                result[key] = v.get("status", "")
+            validators = resp.json().get("data", [])
+            
+            for item in validators:
+                pubkey = item.get("validator", {}).get("pubkey", "")
+                status = item.get("status", "").lower()
+                if pubkey:
+                    result[pubkey] = status
+
         except Exception as e:
-            logging.warning(f"Failed to fetch validator status batch {i}: {e}")
+            logging.warning(f"Failed to fetch validator status batch {i}-{i + STATUS_BATCH_SIZE}: {e}")
+        
         time.sleep(STATUS_DELAY)
+
     return result
 
 
@@ -134,7 +175,7 @@ def calculate_active_counts(operator_validators: dict[int, set[str]], status_map
     }
 
 
-def enrich_operator_counts(client, operators: dict[int, dict]) -> None:
+def enrich_operator_counts(operators: dict[int, dict]) -> None:
     if not GRAPH_API_KEY:
         logging.info("GRAPH_API_KEY not set. Skipping validator counts enrichment.")
         return
@@ -142,13 +183,14 @@ def enrich_operator_counts(client, operators: dict[int, dict]) -> None:
     operator_validators, all_pubkeys = fetch_all_operator_validators()
     logging.info(f"Found {len(operator_validators)} operators and {len(all_pubkeys)} unique validators.")
 
-    cached = get_cached_statuses(client, all_pubkeys)
+    cached = get_cached_statuses(all_pubkeys)
+
     missing = all_pubkeys - set(cached)
 
     if BEACON_API_URL and missing:
         logging.info(f"Fetching {len(missing)} validator statuses from beacon API")
         new_statuses = fetch_validator_statuses(missing)
-        insert_statuses(client, new_statuses)
+        insert_statuses(new_statuses)
         cached.update(new_statuses)
 
     counts = calculate_active_counts(operator_validators, cached)
@@ -210,7 +252,7 @@ def fetch_and_filter_data(base_url, page_size):
     return operators
 
 
-def insert_clickhouse_performance_data(client, network, clickhouse_table_operators, clickhouse_table_performance, operators, target_date, source):
+def insert_clickhouse_performance_data(network, clickhouse_table_operators, clickhouse_table_performance, operators, target_date, source):
     performance_rows = []
     operator_rows = []
     validator_counts_rows = []
@@ -221,7 +263,9 @@ def insert_clickhouse_performance_data(client, network, clickhouse_table_operato
     for operator_id, operator in operators.items():
         performance_24h = operator["performance"]['24h']
         performance_30d = operator["performance"]['30d']
-        validator_count = operator.get("validators_count", None)
+        if operator.get("validators_count", None) != operator.get("activeValidatorCount", None):
+            logging.debug(f"Validator counts for {operator_id} do not match. { operator.get('validators_count', 0) } != { operator.get('activeValidatorCount', 0) }")
+        validator_count = operator.get("activeValidatorCount", operator.get("validators_count", None))
 
         is_vo = 1 if operator.get("type", "") == "verified_operator" else 0
         is_private = 1 if operator.get("is_private", False) else 0
@@ -285,6 +329,9 @@ def insert_clickhouse_performance_data(client, network, clickhouse_table_operato
 
     logging.info(f"Inserting/updating {len(operator_rows)} operator records, {len(performance_rows)} performance records, {len(validator_counts_rows)} validator count records, and {len(operator_fees_rows)} operator fee records into database.")
 
+   
+    client = get_clickhouse_client()
+
     client.insert(clickhouse_table_operators, operator_rows, column_names=[
         'network', 'operator_id', 'operator_name', 'is_vo', 'is_private', 'validator_count', 'operator_fee', 'address', 'updated_at'
     ])
@@ -301,9 +348,13 @@ def insert_clickhouse_performance_data(client, network, clickhouse_table_operato
         'network', 'operator_id', 'metric_date', 'validator_count', 'source', 'updated_at'
     ])    
 
+    client = None
 
-def cleanup_outdated_records(client):
+
+def cleanup_outdated_records():
     logging.info(f"Looking for operators with no performance data in the last {MISSING_PERFORMANCE_DAYS} days...")
+
+    client = get_clickhouse_client()
 
     # Count operators with stale or missing performance
     count_query = f"""
@@ -342,15 +393,19 @@ def cleanup_outdated_records(client):
     """
     client.command(update_query)
 
+    client = None
+
     return affected_rows
 
 
 # Run OPTIMIZE TABLE to deduplicate data in ClickHouse database
-def deduplicate_table(client, table_name: str, network: str):
+def deduplicate_table(table_name: str, network: str):
     try:
+        client = get_clickhouse_client()
         query = f"OPTIMIZE TABLE {table_name} PARTITION %(network)s FINAL"
         client.command(query, {'network': network})
         logging.info(f"✅ Deduplicated partition '{network}' in table '{table_name}'")
+        client = None
     except Exception as e:
         logging.info(f"❌ Failed to deduplicate {table_name}: {e}")
 
@@ -379,27 +434,26 @@ def main():
 
     clickhouse_password_file = args.clickhouse_password_file
 
+    global CLICKHOUSE_PASSWORD
     try:
-        clickhouse_password = read_clickhouse_password_from_file(clickhouse_password_file)
+        CLICKHOUSE_PASSWORD = read_clickhouse_password_from_file(clickhouse_password_file)
     except Exception as e:
         logging.info("Unable to retrieve ClickHouse password from file, trying environment variable instead.")
-        clickhouse_password = os.environ.get("CLICKHOUSE_PASSWORD")
-
-    client = get_clickhouse_client(clickhouse_password)
+        CLICKHOUSE_PASSWORD = os.environ.get("CLICKHOUSE_PASSWORD")
 
     base_url = f"https://api.ssv.network/api/v4/{args.network}/operators/?"
     operators = fetch_and_filter_data(base_url, args.page_size)
-    enrich_operator_counts(client, operators)
+    enrich_operator_counts(operators)
 
     target_date = datetime.now(timezone.utc if not args.local_time else None).date()
 
-    insert_clickhouse_performance_data(client, args.network, args.ch_operators_table, args.ch_performance_table, operators, target_date, IMPORT_SOURCE)
-    cleanup_outdated_records(client)
+    insert_clickhouse_performance_data(args.network, args.ch_operators_table, args.ch_performance_table, operators, target_date, IMPORT_SOURCE)
+    cleanup_outdated_records()
 
-    deduplicate_table(client, args.ch_operators_table, args.network)
-    deduplicate_table(client, args.ch_performance_table, args.network)
-    deduplicate_table(client, 'operator_fees', args.network)
-    deduplicate_table(client, 'validator_counts', args.network)
+    deduplicate_table(args.ch_operators_table, args.network)
+    deduplicate_table(args.ch_performance_table, args.network)
+    deduplicate_table('operator_fees', args.network)
+    deduplicate_table('validator_counts', args.network)
 
 
 if __name__ == "__main__":
