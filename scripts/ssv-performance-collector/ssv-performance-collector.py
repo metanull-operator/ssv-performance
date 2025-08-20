@@ -376,6 +376,19 @@ def main():
     # Step 2: validators → build counts
     operator_validators, all_pubkeys, ssv_active_map = fetch_validators_maps(args.network, args.val_page_size)
 
+    # Debug: operators that appear in /validators but not in /operators
+    missing_ops = sorted(set(operator_validators.keys()) - set(operators.keys()))
+    if missing_ops:
+        for op_id in missing_ops:
+            vals = sorted(operator_validators.get(op_id, set()))
+            logging.debug(
+                "SSV_API: Operator %d found in /validators but missing from /operators. "
+                "Associated validators (%d): %s",
+                op_id, len(vals), ", ".join(vals)
+            )
+    else:
+        logging.debug("SSV_API: No operators present in /validators that are missing from /operators.")
+
     # Attach SSV counts (total and active) to operators (keep unknown ops too)
     ssv_active_counts = {
         op_id: sum(1 for pk in pubkeys if ssv_active_map.get(pk, False))
