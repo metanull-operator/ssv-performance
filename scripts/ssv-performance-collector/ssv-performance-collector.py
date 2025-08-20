@@ -15,6 +15,16 @@ DAYS_PER_YEAR = 365
 BLOCKS_PER_YEAR = BLOCKS_PER_DAY * DAYS_PER_YEAR
 
 IMPORT_SOURCE = os.environ.get("IMPORT_SOURCE", 'api.ssv.network')
+SSV_API_BASE = "https://api.ssv.network/api/v4"
+
+ACTIVE_STATUSES = {
+    "active",
+    "active_ongoing",
+    "active_exiting",
+    "active_slashed",
+    "pending_queued",
+    "pending_initialized",
+}
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -29,56 +39,165 @@ def get_clickhouse_client(clickhouse_password):
     )
 
 
-def fetch_and_filter_data(base_url, page_size):
-    page = 1
-    operators = {}
+def http_get_json(url: str, timeout: int = 30) -> dict | None:
+    try:
+        resp = requests.get(url, headers={"Accept": "application/json"}, timeout=timeout)
+        resp.raise_for_status()
+        return resp.json()
+    except requests.RequestException as e:
+        logging.error(f"API request failed for {url}: {e}")
+        return None
+
+
+def collect_operators_from_validators(network: str, per_page: int = 1000) -> dict[int, dict]:
+    """
+    Fetch validators via cursor (lastId) and aggregate operator info & active counts.
+
+    For each operator we produce a dict like:
+      {
+        "id": <int>,
+        "name": <str>,
+        "type": <str>,             # e.g., "verified_operator"
+        "is_private": <bool>,
+        "fee": <str|float|None>,   # raw from API; converted later in insert fn
+        "owner_address": <str>,
+        "performance": {"24h": <float>, "30d": <float>},  # normalized to 0..1 (or 0)
+        "validators_count": <int>, # ACTIVE validator count (unique pubkeys)
+      }
+
+    Notes:
+      - We de-dup validators per operator using a set of pubkeys.
+      - 'is_active' is preferred; if missing, we derive from 'status' fields.
+      - Performance is taken from the operator object embedded in each validator; we keep the first non-null seen.
+    """
+    operators: dict[int, dict] = {}
+    op_total_pubkeys: dict[int, set[str]] = {}
+    op_active_pubkeys: dict[int, set[str]] = {}
+
+    last_id: int | None = None
+    batch = 0
+
+    logging.info(f"SSV_API: Fetching validators for {network} via lastId cursor, perPage={per_page}")
 
     while True:
-        url = f"{base_url}&page={page}&perPage={page_size}"
-        logging.info(f"Getting page {page} of performance data from API")
+        qs = f"perPage={per_page}"
+        if last_id is not None:
+            qs += f"&lastId={last_id}"
+        url = f"{SSV_API_BASE}/{network}/validators?{qs}"
 
-        try:
-            response = requests.get(url, timeout=10)
-            response.raise_for_status()
-        except requests.RequestException as e:
-            logging.error(f"API request failed: {e}")
+        data = http_get_json(url, timeout=30)
+        if data is None:
+            # Keep it simple like your last good version: stop on failure.
+            logging.error(f"Stopping fetch due to request error (lastId={last_id}).")
             break
 
-        data = response.json()
-
-        if not data.get("operators"):
+        validators = data.get("validators", []) or []
+        if not validators:
+            logging.info(f"SSV_API: No validators returned for lastId={last_id}; stopping.")
             break
 
-        for op in data["operators"]:
+        batch += 1
+
+        max_id_in_batch: int | None = None
+
+        for v in validators:
+            # Validator ID and pubkey
+            vid_raw = v.get("id")
             try:
-                perf = op.get("performance", {})
-                perf_24h_raw = perf.get("24h")
-                perf_30d_raw = perf.get("30d")
+                vid = int(vid_raw) if vid_raw is not None else None
+            except Exception:
+                vid = None
+            if vid is not None:
+                if max_id_in_batch is None or vid > max_id_in_batch:
+                    max_id_in_batch = vid
 
-                perf_clean = {}
-
-                # Normalize 24h performance
-                if perf_24h_raw is not None:
-                    val = float(perf_24h_raw)
-                    perf_clean["24h"] = val if val == 0 else val / 100
-
-                # Normalize 30d performance
-                if perf_30d_raw is not None:
-                    val = float(perf_30d_raw)
-                    perf_clean["30d"] = val if val == 0 else val / 100
-
-                # Only keep if we have at least one of the two
-                if perf_clean:
-                    op["performance"] = perf_clean
-                    operators[int(op["id"])] = op
-
-            except Exception as e:
-                logging.error(f"Error processing operator {op.get('id')}: {e}")
+            pubkey = v.get("public_key")
+            if not pubkey:
                 continue
 
-        page += 1
+            st = (v.get("status") or "").lower()
+            is_active = st in ACTIVE_STATUSES
+
+            for op in (v.get("operators") or []):
+                raw_id = op.get("id", op.get("id_str"))
+                try:
+                    op_id = int(raw_id)
+                except Exception:
+                    continue
+
+                op_total_pubkeys.setdefault(op_id, set()).add(pubkey)
+                if is_active:
+                    op_active_pubkeys.setdefault(op_id, set()).add(pubkey)
+
+                if op_id not in operators:
+                    operators[op_id] = {
+                        "id": op_id,
+                        "name": op.get("name", ""),
+                        "type": op.get("type", ""),
+                        "is_private": bool(op.get("is_private", False)),
+                        "fee": op.get("fee"),
+                        "owner_address": op.get("owner_address", ""),
+                        "performance": {},  # filled below
+                        # validators_count filled after loop
+                    }
+
+                # Attach/normalize performance if present and not yet set
+                if "performance" in op and isinstance(op["performance"], dict):
+                    perf = operators[op_id].get("performance") or {}
+                    if "24h" not in perf and op["performance"].get("24h") is not None:
+                        try:
+                            val = float(op["performance"]["24h"])
+                            perf["24h"] = val if val == 0 else val / 100.0
+                        except Exception:
+                            pass
+                    if "30d" not in perf and op["performance"].get("30d") is not None:
+                        try:
+                            val = float(op["performance"]["30d"])
+                            perf["30d"] = val if val == 0 else val / 100.0
+                        except Exception:
+                            pass
+                    operators[op_id]["performance"] = perf
+
+        pag = data.get("pagination") or {}
+        next_last = pag.get("current_last")
+        try:
+            next_last = int(next_last) if next_last is not None else None
+        except Exception:
+            next_last = None
+        if next_last is None:
+            next_last = max_id_in_batch
+
+        if next_last is None:
+            logging.info("SSV_API: Could not determine next lastId; stopping.")
+            break
+
+        if last_id is not None and next_last <= last_id:
+            logging.warning(f"SSV_API: Non-advancing lastId detected (prev={last_id}, next={next_last}); stopping.")
+            break
+
+        last_id = next_last
+
+        logging.info(
+            f"SSV_API: Batch {batch} → +{len(validators)} validators; "
+            f"next lastId={last_id} (operators so far: {len(operators)})"
+        )
+
         time.sleep(REQUEST_DELAY)
 
+    to_delete = []
+    for op_id, op in operators.items():
+        active_count = len(op_active_pubkeys.get(op_id, set()))
+        op["validators_count"] = active_count
+
+        # Ensure performance dict has keys to avoid KeyError in insert
+        perf = op.get("performance") or {}
+        if "24h" not in perf:
+            perf["24h"] = 0.0
+        if "30d" not in perf:
+            perf["30d"] = 0.0
+        op["performance"] = perf
+
+    logging.info(f"SSV_API: Aggregation complete. Operators={len(operators)}")
     return operators
 
 
@@ -100,8 +219,11 @@ def insert_clickhouse_performance_data(client, network, clickhouse_table_operato
 
         operator_fee = operator.get("fee", None)
         if operator_fee is not None:
-            operator_fee = float(operator_fee)
-            operator_fee = (operator_fee * BLOCKS_PER_YEAR) / 1e18
+            try:
+                operator_fee = float(operator_fee)
+                operator_fee = (operator_fee * BLOCKS_PER_YEAR) / 1e18
+            except Exception:
+                operator_fee = None
 
         operator_rows.append((
             network,
@@ -174,49 +296,6 @@ def insert_clickhouse_performance_data(client, network, clickhouse_table_operato
     ])    
 
 
-def cleanup_outdated_records(client):
-    logging.info(f"Looking for operators with no performance data in the last {MISSING_PERFORMANCE_DAYS} days...")
-
-    # Count operators with stale or missing performance
-    count_query = f"""
-        SELECT count()
-        FROM operators o
-        LEFT JOIN (
-            SELECT
-                network,
-                operator_id,
-                max(metric_date) AS max_date
-            FROM performance
-            GROUP BY network, operator_id
-        ) p ON o.network = p.network AND o.operator_id = p.operator_id
-        WHERE max_date < today() - INTERVAL {MISSING_PERFORMANCE_DAYS} DAY OR max_date IS NULL
-    """
-    affected_rows = client.query(count_query).result_rows[0][0]
-    logging.info(f"Found {affected_rows} operators to update across all networks.")
-
-    # Update validator_count = 0 for operators with stale or missing performance
-    update_query = f"""
-        ALTER TABLE operators
-        UPDATE validator_count = 0
-        WHERE (network, operator_id) IN (
-            SELECT o.network, o.operator_id
-            FROM operators o
-            LEFT JOIN (
-                SELECT
-                    network,
-                    operator_id,
-                    max(metric_date) AS max_date
-                FROM performance
-                GROUP BY network, operator_id
-            ) p ON o.network = p.network AND o.operator_id = p.operator_id
-            WHERE max_date < today() - INTERVAL {MISSING_PERFORMANCE_DAYS} DAY OR max_date IS NULL
-        )
-    """
-    client.command(update_query)
-
-    return affected_rows
-
-
 # Run OPTIMIZE TABLE to deduplicate data in ClickHouse database
 def deduplicate_table(client, table_name: str, network: str):
     try:
@@ -236,7 +315,7 @@ def main():
     parser = argparse.ArgumentParser(description='Fetch and update operator performance data.')
     parser.add_argument('-n', '--network', type=str, choices=['mainnet', 'holesky', 'hoodi'], default='mainnet')
     parser.add_argument('-p', '--clickhouse_password_file', type=str, default=os.environ.get('CLICKHOUSE_PASSWORD_FILE'))
-    parser.add_argument('--page_size', type=int, default=100)
+    parser.add_argument('--page_size', type=int, default=1000)
     parser.add_argument('--local_time', action='store_true')
     parser.add_argument('--ch-operators-table', default=os.environ.get('CH_OPERATORS_TABLE', 'operators'))
     parser.add_argument('--ch-performance-table', default=os.environ.get('CH_PERFORMANCE_TABLE', 'performance'))
@@ -259,14 +338,12 @@ def main():
 
     client = get_clickhouse_client(clickhouse_password)
 
-    base_url = f"https://api.ssv.network/api/v4/{args.network}/operators/?"
-    operators = fetch_and_filter_data(base_url, args.page_size)
+    operators = collect_operators_from_validators(args.network, args.page_size)
 
     target_date = datetime.now(timezone.utc if not args.local_time else None).date()
 
     insert_clickhouse_performance_data(client, args.network, args.ch_operators_table, args.ch_performance_table, operators, target_date, IMPORT_SOURCE)
-    cleanup_outdated_records(client)
-
+    
     deduplicate_table(client, args.ch_operators_table, args.network)
     deduplicate_table(client, args.ch_performance_table, args.network)
     deduplicate_table(client, 'operator_fees', args.network)
