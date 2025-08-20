@@ -204,7 +204,7 @@ def fetch_validators_maps(network: str, per_page: int = 1000):
             break
 
         last_id = next_last
-        logging.info("SSV_API: Batch %d → +%d validators; next lastId=%s (ops with validators so far: %d)",
+        logging.info("SSV_API: Batch %d → +%d validators; next lastId=%s (operators with validators so far: %d)",
                      batch, len(validators), last_id, len(operator_validators))
 
         time.sleep(REQUEST_DELAY)
@@ -244,13 +244,13 @@ def fetch_beacon_statuses(pubkeys: set[str]) -> dict[str, str]:
 
             # If fewer returned than requested, the missing ones likely aren't on-chain/deposited.
             if len(validators) < len(batch):
-                logging.debug("BEACON_API: batch %d-%d returned %d/%d records.",
+                logging.info("BEACON_API: batch %d-%d returned %d/%d records.",
                               i, i + STATUS_BATCH_SIZE, len(validators), len(batch))
         except Exception as e:
             logging.warning("BEACON_API: Failed batch %d-%d: %s", i, i + STATUS_BATCH_SIZE, e)
 
         if i % (STATUS_BATCH_SIZE * 10) == 0:
-            logging.debug("BEACON_API: processed %d / %d", i + len(batch), len(pubkey_list))
+            logging.info("BEACON_API: processed %d / %d", i + len(batch), len(pubkey_list))
 
         time.sleep(STATUS_DELAY)
 
@@ -335,9 +335,9 @@ def deduplicate_table(client, table_name: str, network: str):
     try:
         query = f"OPTIMIZE TABLE {table_name} PARTITION %(network)s FINAL"
         client.command(query, {'network': network})
-        logging.info("✅ Deduplicated partition '%s' in table '%s'", network, table_name)
+        logging.info("Deduplicated partition '%s' in table '%s'", network, table_name)
     except Exception as e:
-        logging.info("❌ Failed to deduplicate %s: %s", table_name, e)
+        logging.warning("Failed to deduplicate %s: %s", table_name, e)
 
 
 def read_clickhouse_password_from_file(password_file_path):
@@ -388,20 +388,20 @@ def main():
         op["ssv_total_validators"]  = total
         op["ssv_active_validators"] = active_ssv
 
-    logging.info("SSV_API: Operators with any validators: %d (out of %d total).",
+    logging.info("SSV_API: Operators with > 0 validators: %d/%d total).",
                  len([k for k,v in operator_validators.items() if v]), len(operators))
 
     # Step 3 (optional): Beacon cross-check — only query each pubkey once
     beacon_statuses = {}
     final_active_counts: dict[int, int] = {}
     if BEACON_API_URL:
+        logging.info("Getting BEACON_API validator statuses")
         beacon_statuses = fetch_beacon_statuses(all_pubkeys)
         beacon_active_counts = count_active_from_status_map(operator_validators, beacon_statuses)
         final_active_counts = beacon_active_counts
-        logging.info("Using BEACON-based active counts.")
     else:
-        final_active_counts = ssv_active_counts
         logging.info("No BEACON_API_URL set; using SSV-based active counts.")
+        final_active_counts = ssv_active_counts
 
     missing_ops = sorted(set(operator_validators.keys()) - set(operators.keys()))
     if missing_ops:
@@ -414,7 +414,7 @@ def main():
 
             active_vals = sorted(pk for pk in operator_validators.get(op_id, set()) if is_active(pk))
             if active_vals:
-                logging.debug(
+                logging.warning(
                     "SSV_API: Operator %d found in /validators but missing from /operators. "
                     "Active validators (%d): %s",
                     op_id, len(active_vals), ", ".join(active_vals)
