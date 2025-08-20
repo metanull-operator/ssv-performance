@@ -376,19 +376,6 @@ def main():
     # Step 2: validators → build counts
     operator_validators, all_pubkeys, ssv_active_map = fetch_validators_maps(args.network, args.val_page_size)
 
-    # Debug: operators that appear in /validators but not in /operators
-    missing_ops = sorted(set(operator_validators.keys()) - set(operators.keys()))
-    if missing_ops:
-        for op_id in missing_ops:
-            vals = sorted(operator_validators.get(op_id, set()))
-            logging.debug(
-                "SSV_API: Operator %d found in /validators but missing from /operators. "
-                "Associated validators (%d): %s",
-                op_id, len(vals), ", ".join(vals)
-            )
-    else:
-        logging.debug("SSV_API: No operators present in /validators that are missing from /operators.")
-
     # Attach SSV counts (total and active) to operators (keep unknown ops too)
     ssv_active_counts = {
         op_id: sum(1 for pk in pubkeys if ssv_active_map.get(pk, False))
@@ -405,6 +392,7 @@ def main():
                  len([k for k,v in operator_validators.items() if v]), len(operators))
 
     # Step 3 (optional): Beacon cross-check — only query each pubkey once
+    beacon_statuses = {}
     final_active_counts: dict[int, int] = {}
     if BEACON_API_URL:
         beacon_statuses = fetch_beacon_statuses(all_pubkeys)
@@ -414,6 +402,26 @@ def main():
     else:
         final_active_counts = ssv_active_counts
         logging.info("No BEACON_API_URL set; using SSV-based active counts.")
+
+    missing_ops = sorted(set(operator_validators.keys()) - set(operators.keys()))
+    if missing_ops:
+        for op_id in missing_ops:
+            # Use Beacon-active when available; fallback to SSV-active
+            def is_active(pk: str) -> bool:
+                if BEACON_API_URL:
+                    return beacon_statuses.get(pk, "").lower() in ACTIVE_STATUSES
+                return ssv_active_map.get(pk, False)
+
+            active_vals = sorted(pk for pk in operator_validators.get(op_id, set()) if is_active(pk))
+            if active_vals:
+                logging.debug(
+                    "SSV_API: Operator %d found in /validators but missing from /operators. "
+                    "Active validators (%d): %s",
+                    op_id, len(active_vals), ", ".join(active_vals)
+                )
+    else:
+        logging.debug("SSV_API: No operators present in /validators that are missing from /operators.")
+
 
     # Set the final active count into operators[op]['validators_count'] (used by DB writer)
     for op_id, op in operators.items():
