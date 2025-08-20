@@ -34,3 +34,16 @@ Here are some example crontab entries to run the collector daily for Mainnet and
 0 0 * * * /usr/bin/docker run --rm -v "/opt/ssv-performance/credentials/clickhouse-password.txt:/clickhouse-password.txt" --network ssv-performance_ssv-performance-network ssv-performance-collector --network mainnet
 5 0 * * * /usr/bin/docker run --rm -v "/opt/ssv-performance/credentials/clickhouse-password.txt:/clickhouse-password.txt" --network ssv-performance_ssv-performance-network ssv-performance-collector --network hoodi
 ```
+
+## Optional Consensus API Validator Status
+
+Validator statuses are required in order to get an accurate count of the number of active validators. The SSV API from which operator data is drawn should provide both validator public key and status information for every validator associated with an operator. You may optionally provide a consensus client URL to the script to have validator statuses pulled directly from the consensus layer.
+
+Include the environment variable `BEACON_API_URL` to specify the URL to a consensus client API. If present, the script will contact the API for the latest validator status information.
+
+On the command line:
+```
+-e "BEACON_API_URL=http://<CONSENSUS_ADDR>:<CONSENSUS_PORT>/"
+```
+
+If `BEACON_API_URL` is not specified, the status from the SSV API will be used instead.
