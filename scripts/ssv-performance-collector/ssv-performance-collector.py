@@ -162,6 +162,8 @@ def fetch_validators_maps(network: str, per_page: int = 1000):
             pubkey = v.get("public_key")
             if not pubkey:
                 continue
+            else:
+                pubkey = "0x" + pubkey.strip()
 
             # Prefer explicit is_active; fallback to status
             if "is_active" in v:
