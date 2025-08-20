@@ -6,7 +6,6 @@ import time
 import os
 import logging
 
-MISSING_PERFORMANCE_DAYS = int(os.environ.get('MISSING_PERFORMANCE_DAYS', 7)) 
 REQUESTS_PER_MINUTE = int(os.environ.get('REQUESTS_PER_MINUTE', 20)) # Total requests to API per minute
 REQUEST_DELAY = 60 / REQUESTS_PER_MINUTE
 
@@ -18,8 +17,8 @@ IMPORT_SOURCE = os.environ.get("IMPORT_SOURCE", 'api.ssv.network')
 SSV_API_BASE = "https://api.ssv.network/api/v4"
 
 ACTIVE_STATUSES = {
-    "active",
-    "active_ongoing",
+    "active",             # This is the main active status returned by the API
+    "active_ongoing",     # This and the following are official statuses not presently returned by the API
     "active_exiting",
     "active_slashed",
     "pending_queued",
@@ -51,7 +50,7 @@ def http_get_json(url: str, timeout: int = 30) -> dict | None:
 
 def collect_operators_from_validators(network: str, per_page: int = 1000) -> dict[int, dict]:
     """
-    Fetch validators via cursor (lastId) and aggregate operator info & active counts.
+    Fetch validators via lastId cursor and aggregate operator info & active counts.
 
     For each operator we produce a dict like:
       {
@@ -61,14 +60,9 @@ def collect_operators_from_validators(network: str, per_page: int = 1000) -> dic
         "is_private": <bool>,
         "fee": <str|float|None>,   # raw from API; converted later in insert fn
         "owner_address": <str>,
-        "performance": {"24h": <float>, "30d": <float>},  # normalized to 0..1 (or 0)
-        "validators_count": <int>, # ACTIVE validator count (unique pubkeys)
+        "performance": {"24h": <float>, "30d": <float>},
+        "validators_count": <int>, # active validator count
       }
-
-    Notes:
-      - We de-dup validators per operator using a set of pubkeys.
-      - 'is_active' is preferred; if missing, we derive from 'status' fields.
-      - Performance is taken from the operator object embedded in each validator; we keep the first non-null seen.
     """
     operators: dict[int, dict] = {}
     op_total_pubkeys: dict[int, set[str]] = {}
@@ -80,17 +74,19 @@ def collect_operators_from_validators(network: str, per_page: int = 1000) -> dic
     logging.info(f"SSV_API: Fetching validators for {network} via lastId cursor, perPage={per_page}")
 
     while True:
+        # Create API call query
         qs = f"perPage={per_page}"
         if last_id is not None:
             qs += f"&lastId={last_id}"
         url = f"{SSV_API_BASE}/{network}/validators?{qs}"
 
+        # Fetch data from API
         data = http_get_json(url, timeout=30)
         if data is None:
-            # Keep it simple like your last good version: stop on failure.
-            logging.error(f"Stopping fetch due to request error (lastId={last_id}).")
+            logging.error(f"SSV_API: Stopping fetch due to request error (lastId={last_id}).")
             break
 
+        # Stop if we no longer receive validators
         validators = data.get("validators", []) or []
         if not validators:
             logging.info(f"SSV_API: No validators returned for lastId={last_id}; stopping.")
@@ -101,7 +97,7 @@ def collect_operators_from_validators(network: str, per_page: int = 1000) -> dic
         max_id_in_batch: int | None = None
 
         for v in validators:
-            # Validator ID and pubkey
+            # Track highest validator ID in this batch
             vid_raw = v.get("id")
             try:
                 vid = int(vid_raw) if vid_raw is not None else None
@@ -111,24 +107,31 @@ def collect_operators_from_validators(network: str, per_page: int = 1000) -> dic
                 if max_id_in_batch is None or vid > max_id_in_batch:
                     max_id_in_batch = vid
 
+            # Get validator public key
             pubkey = v.get("public_key")
             if not pubkey:
                 continue
 
+            # Get validator status and determine if it's active
             st = (v.get("status") or "").lower()
             is_active = st in ACTIVE_STATUSES
 
+            # Cycle through operators in the validator
             for op in (v.get("operators") or []):
+
+                # Get operator ID
                 raw_id = op.get("id", op.get("id_str"))
                 try:
                     op_id = int(raw_id)
                 except Exception:
                     continue
 
+                # Add to lists of total pubkeys and active pubkeys
                 op_total_pubkeys.setdefault(op_id, set()).add(pubkey)
                 if is_active:
                     op_active_pubkeys.setdefault(op_id, set()).add(pubkey)
 
+                # Initialize operator if not seen before
                 if op_id not in operators:
                     operators[op_id] = {
                         "id": op_id,
@@ -137,8 +140,7 @@ def collect_operators_from_validators(network: str, per_page: int = 1000) -> dic
                         "is_private": bool(op.get("is_private", False)),
                         "fee": op.get("fee"),
                         "owner_address": op.get("owner_address", ""),
-                        "performance": {},  # filled below
-                        # validators_count filled after loop
+                        "performance": {},  
                     }
 
                 # Attach/normalize performance if present and not yet set
@@ -158,19 +160,24 @@ def collect_operators_from_validators(network: str, per_page: int = 1000) -> dic
                             pass
                     operators[op_id]["performance"] = perf
 
+        # Use pagination to determine next lastId
         pag = data.get("pagination") or {}
         next_last = pag.get("current_last")
         try:
             next_last = int(next_last) if next_last is not None else None
         except Exception:
             next_last = None
+
+        # Fallback to max_id_in_batch if next_last is None
         if next_last is None:
             next_last = max_id_in_batch
 
+        # Done if there is no next last ID
         if next_last is None:
             logging.info("SSV_API: Could not determine next lastId; stopping.")
             break
 
+        # Done if the next lastId is not advancing
         if last_id is not None and next_last <= last_id:
             logging.warning(f"SSV_API: Non-advancing lastId detected (prev={last_id}, next={next_last}); stopping.")
             break
@@ -184,12 +191,13 @@ def collect_operators_from_validators(network: str, per_page: int = 1000) -> dic
 
         time.sleep(REQUEST_DELAY)
 
-    to_delete = []
+    # Finalize operator data with counts
     for op_id, op in operators.items():
+        # Get active validator count
         active_count = len(op_active_pubkeys.get(op_id, set()))
         op["validators_count"] = active_count
 
-        # Ensure performance dict has keys to avoid KeyError in insert
+        # Default zero performance if not set
         perf = op.get("performance") or {}
         if "24h" not in perf:
             perf["24h"] = 0.0
