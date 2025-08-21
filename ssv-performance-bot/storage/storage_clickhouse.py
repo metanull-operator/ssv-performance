@@ -117,7 +117,7 @@ class ClickHouseStorage(DataStorageInterface):
             ) pm
                 ON o.operator_id = pm.operator_id
             AND o.network     = pm.network
-            WHERE o.network = %(network)s;
+            WHERE o.network = %(network)s
         """
 
         params = {
