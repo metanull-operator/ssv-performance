@@ -368,8 +368,6 @@ def main():
         logging.info("Unable to read ClickHouse password file; trying CLICKHOUSE_PASSWORD env.")
         clickhouse_password = os.environ.get("CLICKHOUSE_PASSWORD")
 
-    client = get_clickhouse_client(clickhouse_password)
-
     # Step 1: full operators list (metadata)
     operators = fetch_operators_from_ssv(args.network, args.ops_page_size)
 
@@ -428,6 +426,8 @@ def main():
         op["validators_count"] = final_active_counts.get(op_id, 0)
 
     target_date = datetime.now(timezone.utc if not args.local_time else None).date()
+
+    client = get_clickhouse_client(clickhouse_password)
 
     insert_clickhouse_performance_data(client, args.network, args.ch_operators_table, args.ch_performance_table, operators, target_date, IMPORT_SOURCE)
     
