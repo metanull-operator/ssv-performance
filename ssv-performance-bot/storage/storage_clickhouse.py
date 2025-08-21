@@ -105,10 +105,10 @@ class ClickHouseStorage(DataStorageInterface):
                 SELECT
                     operator_id,
                     network,
-                    -- we filtered to the global max date:
+                    -- restrict to the global latest day
                     max_dt AS metric_date,
-                    -- pick the value from the row with the max date
-                    argMax(metric_value, metric_date) AS metric_value
+                    -- break ties at that day by latest updated_at
+                    argMax(metric_value, updated_at) AS metric_value
                 FROM performance
                 WHERE metric_type = %(metric_type)s
                 AND network     = %(network)s
