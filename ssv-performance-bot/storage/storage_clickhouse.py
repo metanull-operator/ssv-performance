@@ -86,13 +86,11 @@ class ClickHouseStorage(DataStorageInterface):
 
     def get_latest_performance_data(self, network, period):
         query = """
-            WITH latest AS (
-            SELECT MAX(metric_date) AS max_date
+            WITH
+            (SELECT max(metric_date)
             FROM performance
-            WHERE metric_type = %(metric_type)s
-                AND network     = %(network)s
-            )
-            SELECT 
+            WHERE metric_type = %(metric_type)s AND network = %(network)s) AS max_dt
+            SELECT
                 o.operator_id,
                 o.operator_name,
                 o.is_vo,
@@ -102,26 +100,22 @@ class ClickHouseStorage(DataStorageInterface):
                 pm.metric_date,
                 pm.metric_value
             FROM operators o
-            LEFT JOIN (
-            SELECT *
-            FROM (
+            LEFT JOIN
+            (
                 SELECT
-                p.operator_id,
-                p.network,
-                p.metric_date,
-                p.metric_value,
-                ROW_NUMBER() OVER (
-                    PARTITION BY p.network, p.operator_id
-                    ORDER BY p.metric_date DESC
-                ) AS rn
-                FROM performance p
-                JOIN latest l ON p.metric_date = l.max_date
-                WHERE p.metric_type = %(metric_type)s
-                AND p.network     = %(network)s
-            ) x
-            WHERE x.rn = 1
+                    operator_id,
+                    network,
+                    -- we filtered to the global max date:
+                    max_dt AS metric_date,
+                    -- pick the value from the row with the max date
+                    argMax(metric_value, metric_date) AS metric_value
+                FROM performance
+                WHERE metric_type = %(metric_type)s
+                AND network     = %(network)s
+                AND metric_date = max_dt
+                GROUP BY operator_id, network
             ) pm
-            ON o.operator_id = pm.operator_id
+                ON o.operator_id = pm.operator_id
             AND o.network     = pm.network
             WHERE o.network = %(network)s;
         """
