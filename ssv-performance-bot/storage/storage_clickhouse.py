@@ -60,7 +60,7 @@ class ClickHouseStorage():
         """
 
         params = {
-            'network': network        # e.g., 'mainnet'
+            'network': network # e.g., 'mainnet'
         }
 
         rows = self.client.query(query, parameters=params).result_rows
@@ -142,15 +142,13 @@ class ClickHouseStorage():
                     FIELD_PERFORMANCE_DATE: row[6],
                     FIELD_PERFORMANCE: { period: row[7] }
                 }
-#            date_str = row[6].strftime('%Y-%m-%d')
-#            perf_data[operator_id][date_str] = { period: row[7] }
 
         return perf_data
 
 
     # Get performance data for specific operator IDs
     def get_performance_by_opids(self, network, op_ids):
-#        op_ids_str = ','.join(map(str, op_ids))
+
         query = """
             SELECT 
                 pd.operator_id,
@@ -183,11 +181,9 @@ class ClickHouseStorage():
         """
 
         params = {
-            "network": network,                      # e.g., 'mainnet'
-            "operator_ids": tuple(op_ids),     # tuple of ints from user input
+            "network": network,             # e.g., 'mainnet'
+            "operator_ids": tuple(op_ids),  # tuple of ints from user input
         }
-
-#        client.execute(query, params)
 
         rows = self.client.query(query, parameters=params).result_rows
 
@@ -218,70 +214,24 @@ class ClickHouseStorage():
 
         return perf_data
 
-    # Add performance metrics to ClickHouse
-    def add_performance_metric(self, network, operator_id, metric_type, metric_date, metric_value, source=None):
-
-        query = """
-            INSERT INTO performance_metrics (network, operator_id, metric_type, metric_date, metric_value)
-            VALUES (%(network)s, %(operator_id)s, %(metric_type)s, %(metric_date)s, %(metric_value)s)
-        """
-        params = {
-            'network': network,
-            'operator_id': operator_id,
-            'metric_type': metric_type,
-            'metric_date': metric_date,
-            'metric_value': metric_value,
-            'source': source
-        }
-        
-        try:
-            self.client.query(query, parameters=params)
-            return True
-        except Exception as e:
-            logging.error(f"Failed to add performance metric: {e}", exc_info=True)
-            return None
-
 
     # Get the latest performance data update date from the application state
     def get_latest_perf_data_date(self, network):
 
-        return None
-    
         query = """
-            SELECT state_value 
-            FROM application_state 
-            WHERE state_key = 'last_performance_update'
-            ORDER BY updated_at DESC
-            LIMIT 1
+            SELECT max(metric_date) AS dt
+            FROM performance
+            WHERE network = %(network)s
         """
+
+        params = {'network': network}
         try:
-            result = self.client.query(query).result_rows
+            result = self.client.query(query, parameters=params).result_rows
             return result[0][0] if result else None
         except Exception as e:
             logging.error(f"Failed to get latest performance update date: {e}", exc_info=True)
-            return None
-        
+            return None        
 
-    # Set the latest performance update date to the current date
-    def set_latest_perf_data_date(self, network):
-
-        return False
-    
-        query = """
-            INSERT INTO application_state (state_key, state_value, updated_at)
-            VALUES ('last_performance_update', %(current_date)s, now())
-        """
-        
-        params = {
-            'current_date': datetime.now().strftime('%Y-%m-%d')
-        }
-        
-        try:
-            self.client.query(query, params)
-            return True
-        except Exception as e:
-            logging.error(f"Failed to set latest performance update date: {e}", exc_info=True)
-            return False
 
     def get_subscriptions_by_type(self, network, subscription_type):
         results = {}

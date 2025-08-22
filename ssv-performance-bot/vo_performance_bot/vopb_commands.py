@@ -231,7 +231,7 @@ Thresholds displayed are subject to change.
             fee_data = storage.get_latest_fee_data(network)
 
             if not fee_data:
-                logging.error(f"alerts() fee_data empty [077188]")
+                logging.error(f"alerts() fee_data empty")
                 await ctx.followup.send("Fee data not available.", ephemeral=True)
                 return
 
@@ -277,7 +277,7 @@ Thresholds displayed are subject to change.
             perf_data = merge_operator_performance(perf_data_24h, perf_data_30d)
 
             if not perf_data:
-                logging.error(f"alerts() perf_data empty [077001]")
+                logging.error(f"alerts() perf_data empty")
                 await ctx.followup.send("Performance data not available.", ephemeral=True)
                 return
 
@@ -304,18 +304,19 @@ Thresholds displayed are subject to change.
 
             latest_date = storage.get_latest_perf_data_date(network)
 
-            hello = "Hello! This is VO Performance Bot!\n"
+            hello = "Hello! This is SSV Performance Bot!"
             if latest_date:
-                hello += f"Results are from a snapshot of 24h performance last collected on {latest_date}."
+                hello += f"\nResults are from a snapshot of 24h/30d performance, validator counts and fees taken daily and last collected on {latest_date}."
             else:
-                logging.error("Could not retrieve latest data point date. [077002]")
-                hello += "Results are from a snapshot of 24h performance."
+                logging.error("Could not retrieve latest data point date.")
+
+            hello += f"\nType `/help` to see available commands."
 
             await ctx.followup.send(hello, ephemeral=False)
 
         except Exception as e:
             logging.error(f"Error fetching bot information: {e}", exc_info=True)
-            await ctx.followup.send("An error occurred while fetching bot information.", ephemeral=True)
+            await ctx.followup.send("An error occurred while fetching bot data.", ephemeral=True)
 
 
     @bot.event
