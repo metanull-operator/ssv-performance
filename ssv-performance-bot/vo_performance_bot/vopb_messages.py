@@ -815,6 +815,7 @@ def compile_validator_messages(operators_by_id, extra_message=None, availability
 
     all_items = []
     public_items, private_items = [], []
+    verified_items, unverified_items = [], []
     public_vo_items, public_non_vo_items = [], []
     private_vo_items, private_non_vo_items = [], []
 
@@ -827,6 +828,11 @@ def compile_validator_messages(operators_by_id, extra_message=None, availability
 
         is_private = bool(op.get(FIELD_IS_PRIVATE))
         is_vo = bool(op.get(FIELD_IS_VO))
+
+        if is_vo:
+            verified_items.append(item) 
+        else:
+            unverified_items.append(item)
 
         if is_private:
             private_items.append(item)
@@ -880,9 +886,17 @@ def compile_validator_messages(operators_by_id, extra_message=None, availability
         lines += bucket_lines
         return bundle_messages(lines)
 
-    if availability == "all" and verified == "all":
-        logging.debug(f"All items count: {len(all_items)}")
-        messages.extend(summarize("All", all_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
+    if availability == "all":
+        logging.debug(f"Filtered to all availability")
+        if verified == "all":
+            logging.debug(f"All items count: {len(all_items)}")
+            messages.extend(summarize("All", all_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
+        if verified == "verified":
+            logging.debug(f"Public VO items count: {len(verified_items)}")
+            messages.extend(summarize("All Verified", verified_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
+        if verified == "unverified":
+            logging.debug(f"Public non-VO items count: {len(public_non_vo_items)}")
+            messages.extend(summarize("All Unverified", unverified_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
 
     # Public breakdown
     if availability == "public":
