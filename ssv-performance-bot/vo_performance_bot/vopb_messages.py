@@ -656,3 +656,291 @@ async def send_direct_message_test(bot, user_id, message):
     except Exception as e:
         logging.error(f"Failed to send direct message test to {user_id}: {e}", exc_info=True)
         return False
+    
+
+def iqr_bucket_lines_for_counts(values, items, num_buckets=5, iqr_multiplier=1.5):
+    """
+    items: List[(count:int, operator:dict)]
+    values: List[int] extracted from items
+    """
+    zero_items = [(c, op) for c, op in items if c == 0]
+    non_zero_items = [(c, op) for c, op in items if c > 0]
+
+    if not non_zero_items:
+        # No positive counts: just a zero bucket
+        return [], [], len(zero_items), []
+
+    non_zero_values = [c for c, _ in non_zero_items]
+
+    # Small sample: just 1 bucket spanning min..max
+    if len(non_zero_values) < 2:
+        min_val = min(non_zero_values)
+        max_val = max(non_zero_values)
+        return [non_zero_items], [(min_val, max_val)], len(zero_items), []
+
+    # IQR to detect high outliers
+    q1 = statistics.quantiles(non_zero_values, n=4)[0]
+    q3 = statistics.quantiles(non_zero_values, n=4)[2]
+    iqr = q3 - q1
+    upper_bound = q3 + iqr_multiplier * iqr
+
+    inliers = [(c, op) for c, op in non_zero_items if 0 < c <= upper_bound]
+    outliers = [(c, op) for c, op in non_zero_items if c > upper_bound]
+
+    # Degenerate case: everything got marked outlier; fall back to treating all as inliers.
+    if not inliers:
+        inliers, outliers = non_zero_items, []
+
+    # Bucket domain
+    if zero_items:
+        min_val = min(c for c, _ in inliers)  # start at smallest positive (zeros are their own bucket)
+    else:
+        min_val = min(c for c, _ in (inliers + outliers))
+    max_val = max(c for c, _ in inliers)
+
+    # Guard against zero-width
+    if max_val == min_val:
+        num_buckets = 1
+        bucket_size = 1
+    else:
+        bucket_size = (max_val - min_val) / (num_buckets or 1)
+
+    # Build bucket ranges
+    buckets = [[] for _ in range(num_buckets)]
+    bucket_ranges = []
+    for i in range(num_buckets):
+        lower = min_val + i * bucket_size
+        upper = lower + bucket_size
+        bucket_ranges.append((lower, upper))
+
+    # Assign inliers to buckets
+    for c, op in inliers:
+        if bucket_size > 0:
+            idx = int((c - min_val) / bucket_size)
+        else:
+            idx = 0
+        if idx == num_buckets:
+            idx -= 1
+        buckets[idx].append((c, op))
+
+    # Sanity check
+    assert len(zero_items) + sum(len(b) for b in buckets) + len(outliers) == len(items), \
+        "Mismatch in total operator counts"
+
+    return buckets, bucket_ranges, len(zero_items), outliers
+
+
+def render_bucket_lines_counts(buckets_with_ranges, zero_count, outliers, items, mean, median, max_segments=20):
+    """
+    buckets_with_ranges: List[(bucket:list[(count, op)], lower:float, upper:float)]
+    items: original list[(count, op)]
+    mean/median: of counts
+    Renders a bar per bucket where bar length is number of operators in that range.
+    """
+    def build_bar(n):
+        if n == 0:
+            return ""
+        return "■" * max(1, int((n / max_count) * max_segments))
+
+    def fmt_range(lower, upper):
+        return f"{int(round(lower))}–{int(round(upper))}"
+
+    max_count = max([len(b) for b, _, _ in buckets_with_ranges] + [zero_count, len(outliers), 1])
+
+    # Precompute widths for nice alignment
+    all_counts = [zero_count] + [len(b) for b, _, _ in buckets_with_ranges] + [len(outliers)]
+    count_width = max(len(str(c)) for c in all_counts) + 2
+
+    labels = ["0"]
+    for _, lower, upper in buckets_with_ranges:
+        labels.append(fmt_range(lower, upper))
+    if outliers:
+        labels.append(f">= {int(min(c for c, _ in outliers))}")
+    label_width = max(len(label) for label in labels) + 1
+
+    rows = []
+
+    # Zero bucket
+    if zero_count > 0:
+        bar = build_bar(zero_count)
+        markers = []
+        if mean is not None and mean == 0:
+            markers.append("mean")
+        if median is not None and median == 0:
+            markers.append("median")
+        marker_str = f"⟵ {', '.join(markers)}" if markers else ""
+        count_str = f"({zero_count})"
+        rows.append(f"{'0':>{label_width}} {bar:<{max_segments}} {count_str:<{count_width}} {marker_str}")
+
+    # Inlier buckets
+    for b, lower, upper in buckets_with_ranges:
+        label = fmt_range(lower, upper)
+        b_len = len(b)
+        bar = build_bar(b_len)
+
+        markers = []
+        if mean is not None and lower <= mean <= upper:
+            markers.append("mean")
+        if median is not None and lower <= median <= upper:
+            markers.append("median")
+        marker_str = f"⟵ {', '.join(markers)}" if markers else ""
+
+        count_str = f"({b_len})"
+        rows.append(f"{label:>{label_width}} {bar:<{max_segments}} {count_str:<{count_width}} {marker_str}")
+
+    # Outliers (if any)
+    if outliers:
+        count = len(outliers)
+        bar = build_bar(count)
+        out_min = int(min(c for c, _ in outliers))
+        out_max = int(max(c for c, _ in outliers))
+        count_str = f"({count})"
+        if out_min == out_max:
+            out_info = f"⟵ outlier{'s' if count != 1 else ''}: {out_min}"
+        else:
+            out_info = f"⟵ outliers: {out_min}-{out_max}"
+        label = f">= {out_min}"
+        rows.append(f"{label:>{label_width}} {bar:<{max_segments}} {count_str:<{count_width}} {out_info}")
+
+    # Wrap in code block and bundle
+    lines = ["```"] + rows + ["```"]
+    return bundle_messages(lines)
+
+
+def compile_validator_messages(operators_by_id, extra_message=None, availability="all", verified="all", num_segments=20):
+    """
+    operators_by_id: dict[op_id] -> operator dict with FIELD_VALIDATOR_COUNT, FIELD_IS_PRIVATE, FIELD_IS_VO, etc.
+    """
+    messages = []
+
+    all_items = []
+    public_items, private_items = [], []
+    verified_items, unverified_items = [], []
+    public_vo_items, public_non_vo_items = [], []
+    private_vo_items, private_non_vo_items = [], []
+
+    for op in operators_by_id.values():
+        count = op.get(FIELD_VALIDATOR_COUNT)
+        if count is None:
+            continue  # skip unknowns
+        item = (int(count), op)
+        all_items.append(item)
+
+        is_private = bool(op.get(FIELD_IS_PRIVATE))
+        is_vo = bool(op.get(FIELD_IS_VO))
+
+        if is_vo:
+            verified_items.append(item) 
+        else:
+            unverified_items.append(item)
+
+        if is_private:
+            private_items.append(item)
+            (private_vo_items if is_vo else private_non_vo_items).append(item)
+        else:
+            public_items.append(item)
+            (public_vo_items if is_vo else public_non_vo_items).append(item)
+
+    def summarize(label, items, num_buckets=10, iqr_multiplier=1.5, num_segments=20):
+        if not items:
+            return [f"No {label} operators found."]
+
+        values = [c for c, _ in items]
+        n_ops = len(values)
+
+        mean = statistics.mean(values)
+        median = statistics.median(values)
+
+        hi = max(values)
+        hi_ops = [op for c, op in items if c == hi]
+        hi_example = random.choice(hi_ops)
+        hi_others = max(0, len(hi_ops) - 1)
+        highest_line = (
+            f"- Highest validators: {hi:,} — "
+            f"{hi_example[FIELD_OPERATOR_NAME]} (ID: {hi_example[FIELD_OPERATOR_ID]})"
+            + (f" and {hi_others} other{'s' if hi_others != 1 else ''}" if hi_others > 0 else "")
+        )
+
+        buckets, bucket_ranges, zero_count, outliers = iqr_bucket_lines_for_counts(
+            values, items, num_buckets=num_buckets, iqr_multiplier=iqr_multiplier
+        )
+        bucket_lines = render_bucket_lines_counts(
+            buckets_with_ranges=[(b, lo, hi_) for b, (lo, hi_) in zip(buckets, bucket_ranges)],
+            zero_count=zero_count,
+            outliers=outliers,
+            items=items,
+            max_segments=num_segments,
+            mean=mean,
+            median=median
+        )
+
+        lines = [
+            f"**{label} Operator Validator Counts**",
+            f"*{n_ops} operators*",
+            f"*{zero_count} operators with 0 active validators, excluded below*",
+            highest_line,                        
+            f"- Mean active validators per operator: {mean:.2f}",
+            f"- Median validators/operator: {int(median) if median == int(median) else round(median, 2)}",
+            f"### {label} Validator Count Distribution (Operators)",
+        ]
+        lines += bucket_lines
+        return bundle_messages(lines)
+
+    if availability == "all":
+        logging.debug(f"Filtered to all availability")
+        if verified == "all":
+            logging.debug(f"All items count: {len(all_items)}")
+            messages.extend(summarize("All", all_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
+        if verified == "verified":
+            logging.debug(f"Public VO items count: {len(verified_items)}")
+            messages.extend(summarize("All Verified", verified_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
+        if verified == "unverified":
+            logging.debug(f"Public non-VO items count: {len(public_non_vo_items)}")
+            messages.extend(summarize("All Unverified", unverified_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
+
+    # Public breakdown
+    if availability == "public":
+        logging.debug(f"Filtered to public items")
+        if verified == "all":
+            logging.debug(f"Public items count: {len(public_items)}")
+            messages.extend(summarize("All Public", public_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
+        if verified == "verified":
+            logging.debug(f"Public VO items count: {len(public_vo_items)}")
+            messages.extend(summarize("Public Verified", public_vo_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
+        if verified == "unverified":
+            logging.debug(f"Public non-VO items count: {len(public_non_vo_items)}")
+            messages.extend(summarize("Public Unverified", public_non_vo_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
+
+    # Private breakdown
+    if availability == "private":
+        logging.debug(f"Filtered to private items")
+        if verified == "all":
+            logging.debug(f"Private items count: {len(private_items)}")
+            messages.extend(summarize("All Private", private_items, iqr_multiplier=2.5, num_buckets=5, num_segments=num_segments))
+        if verified == "verified":
+            logging.debug(f"Private VO items count: {len(private_vo_items)}")
+            messages.extend(summarize("Private Verified", private_vo_items, iqr_multiplier=2.5, num_buckets=5, num_segments=num_segments))
+        if verified == "unverified":
+            logging.debug(f"Private non-VO items count: {len(private_non_vo_items)}")
+            messages.extend(summarize("Private Unverified", private_non_vo_items, iqr_multiplier=2.5, num_buckets=5, num_segments=num_segments))
+
+    if extra_message:
+        messages.append(extra_message)
+
+    return bundle_messages(messages)
+
+async def respond_validator_messages(ctx, operators_by_id, extra_message=None, availability="all", verified="all", num_segments=20):
+    try:
+        messages = compile_validator_messages(
+            operators_by_id, availability=availability, verified=verified,
+            extra_message=extra_message,
+            num_segments=num_segments
+        )
+        if messages:
+            for message in messages:
+                # Note: assumes ctx.defer() already called by the command handler.
+                await ctx.followup.send(message.strip(), ephemeral=False)
+        else:
+            await ctx.followup.send("Validator data not found.", ephemeral=True)
+    except Exception as e:
+        logging.error(f"Failed to respond with validator data message: {e}", exc_info=True)

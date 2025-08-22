@@ -9,7 +9,8 @@ from vo_performance_bot.vopb_messages import (
     send_operator_performance_messages,
     respond_vo_threshold_messages,
     send_direct_message_test,
-    respond_fee_messages
+    respond_fee_messages,
+    respond_validator_messages
 )
 
 
@@ -231,7 +232,7 @@ Thresholds displayed are subject to change.
             fee_data = storage.get_latest_fee_data(network)
 
             if not fee_data:
-                logging.error(f"alerts() fee_data empty")
+                logging.error(f"Fee data empty in fees command")
                 await ctx.followup.send("Fee data not available.", ephemeral=True)
                 return
 
@@ -240,6 +241,36 @@ Thresholds displayed are subject to change.
         except Exception as e:
             logging.error(f"Error fetching fee information: {e}", exc_info=True)
             await ctx.followup.send("An error occurred while fetching fee data.", ephemeral=True)
+
+
+    @bot.slash_command(name='validators', description='Show current active validator set information')
+    async def validators(ctx,
+            availability: Option(str, "Which operators to include", choices=["public", "private", "all"], default="all"),
+            verified: Option(str, "Which operators to include", choices=["verified", "unverified", "all"], default="all")
+    ):
+
+        logging.info(f"/validators called")
+
+        if not allowed_channel(ctx):
+            await ctx.respond("VO Performance Bot commands are not allowed in this channel.", ephemeral=True)
+            return
+
+        await ctx.defer()
+
+        try:
+            storage = StorageFactory.get_storage('ssv_performance')
+            validator_data = storage.get_operators_with_validator_counts(network, max_age_days=0)
+
+            if not validator_data:
+                logging.error(f"validator data empty in validators command")
+                await ctx.followup.send("Validator data not available.", ephemeral=True)
+                return
+
+            await respond_validator_messages(ctx, validator_data, availability=availability, verified=verified, extra_message=extra_message, num_segments=num_segments)
+
+        except Exception as e:
+            logging.error(f"Error fetching validator information: {e}", exc_info=True)
+            await ctx.followup.send("An error occurred while fetching validator data.", ephemeral=True)
 
 
     def merge_operator_performance(dict1, dict2):
