@@ -835,30 +835,33 @@ def compile_validator_messages(operators_by_id, extra_message=None, availability
             public_items.append(item)
             (public_vo_items if is_vo else public_non_vo_items).append(item)
 
-
     def summarize(label, items, num_buckets=10, iqr_multiplier=1.5, num_segments=20):
         if not items:
             return [f"No {label} operators found."]
 
         values = [c for c, _ in items]
-        total_active = sum(values)
         n_ops = len(values)
 
         mean = statistics.mean(values)
         median = statistics.median(values)
 
-        # Highest with random tiebreak
+        # Highest with random tiebreak + "and X others"
         hi = max(values)
         hi_ops = [op for c, op in items if c == hi]
         hi_example = random.choice(hi_ops)
+        hi_others = max(0, len(hi_ops) - 1)
+        highest_line = (
+            f"- Highest validators: {hi:,} — "
+            f"{hi_example[FIELD_OPERATOR_NAME]} (ID: {hi_example[FIELD_OPERATOR_ID]})"
+            + (f" and {hi_others} other{'s' if hi_others != 1 else ''}" if hi_others > 0 else "")
+        )
 
-        # Build buckets
+        # Build buckets (you already have this)
         buckets, bucket_ranges, zero_count, outliers = iqr_bucket_lines_for_counts(
             values, items, num_buckets=num_buckets, iqr_multiplier=iqr_multiplier
         )
-
         bucket_lines = render_bucket_lines_counts(
-            buckets_with_ranges=[(b, lo, hi) for b, (lo, hi) in zip(buckets, bucket_ranges)],
+            buckets_with_ranges=[(b, lo, hi_) for b, (lo, hi_) in zip(buckets, bucket_ranges)],
             zero_count=zero_count,
             outliers=outliers,
             items=items,
@@ -869,44 +872,15 @@ def compile_validator_messages(operators_by_id, extra_message=None, availability
 
         lines = [
             f"**{label} Operators (Validator Counts)**",
-            f"*{n_ops} total operators*",
-            f"*{zero_count} operators with 0 active validators, excluded below*",
-            f"- Highest active validators per operator: {hi:,} — {hi_example[FIELD_OPERATOR_NAME]} (ID: {hi_example[FIELD_OPERATOR_ID]})",
+            f"*{n_ops} operators*",
+            f"*{zero_count} operators with 0 active validators, excluded below*"
+            highest_line,                                     # ← uses the new format
             f"- Mean active validators per operator: {mean:.2f}",
-            f"- Median validators/active operator: {int(median) if median == int(median) else round(median, 2)}",
-            f"- Operators with 0 validators: {zero_count}",
-            f"*"
+            f"- Median validators/operator: {int(median) if median == int(median) else round(median, 2)}",
             f"### {label} Validator Count Distribution (Operators)",
         ]
         lines += bucket_lines
         return bundle_messages(lines)
-
-    # "All" set (only when explicitly requested to mirror your fee defaults)
-    if availability == "all" and verified == "all":
-        messages.extend(summarize("All", all_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
-
-    # Public breakdown
-    if availability in ("public",):
-        if verified == "all":
-            messages.extend(summarize("All Public", public_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
-        if verified in ("all", "verified"):
-            messages.extend(summarize("Public Verified", public_vo_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
-        if verified in ("all", "unverified"):
-            messages.extend(summarize("Public Unverified", public_non_vo_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
-
-    # Private breakdown
-    if availability in ("private",):
-        if verified == "all":
-            messages.extend(summarize("All Private", private_items, iqr_multiplier=2.5, num_buckets=5, num_segments=num_segments))
-        if verified in ("all", "verified"):
-            messages.extend(summarize("Private Verified", private_vo_items, iqr_multiplier=2.5, num_buckets=5, num_segments=num_segments))
-        if verified in ("all", "unverified"):
-            messages.extend(summarize("Private Unverified", private_non_vo_items, iqr_multiplier=2.5, num_buckets=5, num_segments=num_segments))
-
-    if extra_message:
-        messages.append(extra_message)
-
-    return bundle_messages(messages)
 
 
 async def respond_validator_messages(ctx, operators_by_id, extra_message=None, num_segments=20):
