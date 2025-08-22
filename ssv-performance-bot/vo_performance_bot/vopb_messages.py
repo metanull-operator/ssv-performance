@@ -886,6 +886,7 @@ def compile_validator_messages(operators_by_id, extra_message=None, availability
 
     # Public breakdown
     if availability == "public":
+        logging.debug(f"Filtered to public items")
         if verified == "all":
             logging.debug(f"Public items count: {len(public_items)}")
             messages.extend(summarize("All Public", public_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
@@ -898,6 +899,7 @@ def compile_validator_messages(operators_by_id, extra_message=None, availability
 
     # Private breakdown
     if availability == "private":
+        logging.debug(f"Filtered to private items")
         if verified == "all":
             logging.debug(f"Private items count: {len(private_items)}")
             messages.extend(summarize("All Private", private_items, iqr_multiplier=2.5, num_buckets=5, num_segments=num_segments))
