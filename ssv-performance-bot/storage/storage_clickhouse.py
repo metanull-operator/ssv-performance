@@ -355,13 +355,14 @@ class ClickHouseStorage():
             return None
 
 
-    def get_operators_with_validator_counts(self, network: str, as_of_date: date | None = None) -> dict:
+    def get_operators_with_validator_counts(self, network, as_of_date=None):
         """
-        Return: dict[operator_id] -> {
-            FIELD_OPERATOR_ID, FIELD_OPERATOR_NAME, FIELD_IS_PRIVATE, FIELD_IS_VO,
-            FIELD_VALIDATOR_COUNT, FIELD_NETWORK
+        Returns dict[operator_id] -> {
+            FIELD_NETWORK, FIELD_OPERATOR_ID, FIELD_OPERATOR_NAME,
+            FIELD_IS_VO, FIELD_IS_PRIVATE, FIELD_VALIDATOR_COUNT
         }
-        Uses validator_counts for the latest (or <= as_of_date) count, with fallback to operators.validator_count.
+        Uses validator_counts (latest per operator, or latest <= as_of_date)
+        with fallback to operators.validator_count.
         """
         if as_of_date is None:
             query = """
@@ -394,7 +395,14 @@ class ClickHouseStorage():
             """
             params = {"network": network}
         else:
-            # Get each operator's latest metric_date <= as_of_date, then pick the row with max(updated_at) on that date
+            # Accepts date, datetime, or 'YYYY-MM-DD' string
+            if isinstance(as_of_date, datetime):
+                as_of_iso = as_of_date.date().isoformat()
+            elif isinstance(as_of_date, date):
+                as_of_iso = as_of_date.isoformat()
+            else:
+                as_of_iso = str(as_of_date)[:10]
+
             query = """
             WITH latest AS (
                 SELECT operator_id, max(metric_date) AS metric_date
@@ -424,12 +432,17 @@ class ClickHouseStorage():
             WHERE o.network = %(network)s
             ORDER BY o.operator_id
             """
-            params = {"network": network, "as_of_date": as_of_date}
+            params = {"network": network, "as_of_date": as_of_iso}
 
-        result = self.client.query(query, parameters=params)
-        rows = result.named_results  # list of dicts keyed by column names
+        res = self.client.query(query, parameters=params)
 
-        ops: dict[int, dict] = {}
+        # Normalize rows to list[dict] without helpers
+        nr = getattr(res, "named_results", None)
+        rows = nr() if callable(nr) else nr
+        if not rows:
+            rows = [dict(zip(res.column_names, r)) for r in res.result_rows]
+
+        ops = {}
         for r in rows:
             op_id = int(r["operator_id"])
             ops[op_id] = {
@@ -440,5 +453,5 @@ class ClickHouseStorage():
                 FIELD_IS_PRIVATE: int(r["is_private"]),
                 FIELD_VALIDATOR_COUNT: int(r["validator_count"] or 0),
             }
-
         return ops
+
