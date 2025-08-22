@@ -9,7 +9,8 @@ from vo_performance_bot.vopb_messages import (
     send_operator_performance_messages,
     respond_vo_threshold_messages,
     send_direct_message_test,
-    respond_fee_messages
+    respond_fee_messages,
+    respond_validator_messages
 )
 
 
@@ -242,7 +243,7 @@ Thresholds displayed are subject to change.
             await ctx.followup.send("An error occurred while fetching fee data.", ephemeral=True)
 
 
-    @bot.slash_command(name='validators', description='Show current fee information')
+    @bot.slash_command(name='validators', description='Show current active validator set information')
     async def validators(ctx):
 
         logging.info(f"/validators called")
