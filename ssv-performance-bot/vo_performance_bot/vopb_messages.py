@@ -890,18 +890,18 @@ def compile_validator_messages(operators_by_id, extra_message=None, availability
     if availability in ("public",):
         if verified == "all":
             messages.extend(summarize("All Public", public_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
-        if verified in ("all", "verified"):
+        if verified in ("verified"):
             messages.extend(summarize("Public Verified", public_vo_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
-        if verified in ("all", "unverified"):
+        if verified in ("unverified"):
             messages.extend(summarize("Public Unverified", public_non_vo_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
 
     # Private breakdown
     if availability in ("private",):
         if verified == "all":
             messages.extend(summarize("All Private", private_items, iqr_multiplier=2.5, num_buckets=5, num_segments=num_segments))
-        if verified in ("all", "verified"):
+        if verified in ("verified"):
             messages.extend(summarize("Private Verified", private_vo_items, iqr_multiplier=2.5, num_buckets=5, num_segments=num_segments))
-        if verified in ("all", "unverified"):
+        if verified in ("unverified"):
             messages.extend(summarize("Private Unverified", private_non_vo_items, iqr_multiplier=2.5, num_buckets=5, num_segments=num_segments))
 
     if extra_message:
