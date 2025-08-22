@@ -873,7 +873,7 @@ def compile_validator_messages(operators_by_id, extra_message=None, availability
         lines = [
             f"**{label} Operators (Validator Counts)**",
             f"*{n_ops} operators*",
-            f"*{zero_count} operators with 0 active validators, excluded below*"
+            f"*{zero_count} operators with 0 active validators, excluded below*",
             highest_line,                                     # ← uses the new format
             f"- Mean active validators per operator: {mean:.2f}",
             f"- Median validators/operator: {int(median) if median == int(median) else round(median, 2)}",
