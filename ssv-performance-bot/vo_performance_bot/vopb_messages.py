@@ -882,6 +882,32 @@ def compile_validator_messages(operators_by_id, extra_message=None, availability
         lines += bucket_lines
         return bundle_messages(lines)
 
+    # "All" set (only when explicitly requested to mirror your fee defaults)
+    if availability == "all" and verified == "all":
+        messages.extend(summarize("All", all_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
+
+    # Public breakdown
+    if availability in ("public",):
+        if verified == "all":
+            messages.extend(summarize("All Public", public_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
+        if verified in ("all", "verified"):
+            messages.extend(summarize("Public Verified", public_vo_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
+        if verified in ("all", "unverified"):
+            messages.extend(summarize("Public Unverified", public_non_vo_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
+
+    # Private breakdown
+    if availability in ("private",):
+        if verified == "all":
+            messages.extend(summarize("All Private", private_items, iqr_multiplier=2.5, num_buckets=5, num_segments=num_segments))
+        if verified in ("all", "verified"):
+            messages.extend(summarize("Private Verified", private_vo_items, iqr_multiplier=2.5, num_buckets=5, num_segments=num_segments))
+        if verified in ("all", "unverified"):
+            messages.extend(summarize("Private Unverified", private_non_vo_items, iqr_multiplier=2.5, num_buckets=5, num_segments=num_segments))
+
+    if extra_message:
+        messages.append(extra_message)
+
+    return bundle_messages(messages)
 
 async def respond_validator_messages(ctx, operators_by_id, extra_message=None, num_segments=20):
     try:
