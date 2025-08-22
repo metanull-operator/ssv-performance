@@ -835,6 +835,7 @@ def compile_validator_messages(operators_by_id, extra_message=None, availability
             public_items.append(item)
             (public_vo_items if is_vo else public_non_vo_items).append(item)
 
+
     def summarize(label, items, num_buckets=10, iqr_multiplier=1.5, num_segments=20):
         if not items:
             return [f"No {label} operators found."]
@@ -868,11 +869,13 @@ def compile_validator_messages(operators_by_id, extra_message=None, availability
 
         lines = [
             f"**{label} Operators (Validator Counts)**",
-            f"*{n_ops} operators*",
-            f"- Total active validators: {total_active:,}",
-            f"- Highest validators: {hi:,} — {hi_example[FIELD_OPERATOR_NAME]} (ID: {hi_example[FIELD_OPERATOR_ID]})",
-            f"- Average validators/operator: {mean:.2f}",
-            f"- Median validators/operator: {int(median) if median == int(median) else round(median, 2)}",
+            f"*{n_ops} total operators*",
+            f"*{zero_count} operators with 0 active validators, excluded below*",
+            f"- Highest active validators per operator: {hi:,} — {hi_example[FIELD_OPERATOR_NAME]} (ID: {hi_example[FIELD_OPERATOR_ID]})",
+            f"- Mean active validators per operator: {mean:.2f}",
+            f"- Median validators/active operator: {int(median) if median == int(median) else round(median, 2)}",
+            f"- Operators with 0 validators: {zero_count}",
+            f"*"
             f"### {label} Validator Count Distribution (Operators)",
         ]
         lines += bucket_lines
