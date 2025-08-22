@@ -2,13 +2,24 @@ import time
 import os
 import logging
 from common.config import *
-from datetime import datetime, timezone, date
+from datetime import datetime, timezone, date, timedelta
 from clickhouse_connect import create_client
 from clickhouse_connect.driver.exceptions import ClickHouseError
 
-class ClickHouseStorage():
 
-    def __init__(self, retries=5, delay=2, **kwargs):
+class ClickHouseStorage:
+    """
+    Set a global default recency window via DATA_MAX_AGE_DAYS env or constructor.
+    Override per call with the optional max_age_days param on each method.
+    0 or negative => no filter (uses 1970-01-01 as the threshold).
+    """
+
+    def __init__(self, retries=5, delay=2, default_max_age_days=None, **kwargs):
+        # Global default for this instance; per-call overrides are supported.
+        self.default_max_age_days = int(
+            os.environ.get("DATA_MAX_AGE_DAYS", 0) if default_max_age_days is None else default_max_age_days
+        )
+
         for attempt in range(1, retries + 1):
             try:
                 self.client = create_client(
@@ -20,21 +31,34 @@ class ClickHouseStorage():
                 )
                 break  # Success!
             except ClickHouseError as e:
-                print(f"⚠️ Attempt {attempt} failed to connect to ClickHouse: {e}")
+                print(f"Attempt {attempt} failed to connect to ClickHouse: {e}")
                 if attempt < retries:
                     time.sleep(delay)
                 else:
                     raise  # Raise the last exception after exhausting retries
 
+    def _updated_after(self, max_age_days: int | None) -> datetime:
+        """
+        Convert 'days' into an absolute timestamp for filtering updated_at.
+        0 or None (when default is 0) => epoch (i.e., include everything).
+        """
+        days = self.default_max_age_days if max_age_days is None else int(max_age_days)
+        if days <= 0:
+            return datetime(1970, 1, 1, tzinfo=timezone.utc)
+        return datetime.now(timezone.utc) - timedelta(days=days)
 
     # Get all performance data
-    def get_performance_all(self, network):
+    def get_performance_all(self, network, max_age_days: int | None = None):
         query = """
             SELECT *
             FROM performance
             WHERE network = %(network)s
+              AND updated_at >= %(updated_after)s
         """
-        params = {'network': network}
+        params = {
+            'network': network,
+            'updated_after': self._updated_after(max_age_days),
+        }
         rows = self.client.query(query, parameters=params).result_rows
 
         perf_data = {}
@@ -43,8 +67,7 @@ class ClickHouseStorage():
 
         return perf_data
 
-
-    def get_latest_fee_data(self, network):
+    def get_latest_fee_data(self, network, max_age_days: int | None = None):
         query = """
             SELECT 
                 o.operator_id,
@@ -57,10 +80,11 @@ class ClickHouseStorage():
                 o.updated_at
             FROM operators o
             WHERE o.network = %(network)s
+              AND o.updated_at >= %(updated_after)s
         """
-
         params = {
-            'network': network # e.g., 'mainnet'
+            'network': network,
+            'updated_after': self._updated_after(max_age_days),
         }
 
         rows = self.client.query(query, parameters=params).result_rows
@@ -82,14 +106,15 @@ class ClickHouseStorage():
 
         return fee_data
 
-
-    def get_latest_performance_data(self, network, period):
+    def get_latest_performance_data(self, network, period, max_age_days: int | None = None):
+        # Note: we constrain both the snapshot computation and the operator set by updated_at.
         query = """
             WITH max_dt AS (
-            SELECT max(metric_date) AS dt
-            FROM performance
-            WHERE network = %(network)s
-                AND metric_type = %(metric_type)s
+                SELECT max(metric_date) AS dt
+                FROM performance
+                WHERE network = %(network)s
+                  AND metric_type = %(metric_type)s
+                  AND updated_at >= %(updated_after)s
             )
             SELECT
                 o.operator_id,
@@ -107,23 +132,25 @@ class ClickHouseStorage():
                 SELECT
                     p.operator_id,
                     p.network,
-                    -- only rows ON the snapshot date are eligible
                     any(p.metric_date) AS metric_date,           -- all equal to max_dt here
                     argMax(p.metric_value, (p.updated_at, p.source)) AS metric_value  -- tie-break
                 FROM performance p
                 WHERE p.network     = %(network)s
-                AND p.metric_type = %(metric_type)s
-                AND p.metric_date = (SELECT dt FROM max_dt)
+                  AND p.metric_type = %(metric_type)s
+                  AND p.metric_date = (SELECT dt FROM max_dt)
+                  AND p.updated_at >= %(updated_after)s
                 GROUP BY p.operator_id, p.network
             ) pm
-            ON pm.operator_id = o.operator_id
-            AND pm.network     = o.network
+              ON pm.operator_id = o.operator_id
+             AND pm.network     = o.network
             WHERE o.network = %(network)s
+              AND o.updated_at >= %(updated_after)s
         """
 
         params = {
-            'metric_type': period,    # e.g., '30d'
-            'network': network        # e.g., 'mainnet'
+            'metric_type': period,            # e.g., '30d'
+            'network': network,               # e.g., 'mainnet'
+            'updated_after': self._updated_after(max_age_days),
         }
 
         rows = self.client.query(query, parameters=params).result_rows
@@ -145,10 +172,8 @@ class ClickHouseStorage():
 
         return perf_data
 
-
     # Get performance data for specific operator IDs
-    def get_performance_by_opids(self, network, op_ids):
-
+    def get_performance_by_opids(self, network, op_ids, max_age_days: int | None = None):
         query = """
             SELECT 
                 pd.operator_id,
@@ -172,17 +197,20 @@ class ClickHouseStorage():
                 WHERE 
                     network = %(network)s
                     AND operator_id IN %(operator_ids)s
+                    AND updated_at >= %(updated_after)s
             ) pd
             LEFT JOIN operators o 
                 ON pd.network = o.network 
-                AND pd.operator_id = o.operator_id
+               AND pd.operator_id = o.operator_id
+               AND o.updated_at >= %(updated_after)s
             WHERE pd.rn <= 5
             ORDER BY pd.operator_id, pd.metric_type, pd.metric_date DESC
         """
 
         params = {
-            "network": network,             # e.g., 'mainnet'
-            "operator_ids": tuple(op_ids),  # tuple of ints from user input
+            "network": network,                         # e.g., 'mainnet'
+            "operator_ids": tuple(op_ids),              # tuple of ints from user input
+            "updated_after": self._updated_after(max_age_days),
         }
 
         rows = self.client.query(query, parameters=params).result_rows
@@ -214,24 +242,25 @@ class ClickHouseStorage():
 
         return perf_data
 
-
     # Get the latest performance data update date from the application state
-    def get_latest_perf_data_date(self, network):
-
+    def get_latest_perf_data_date(self, network, max_age_days: int | None = None):
         query = """
             SELECT max(metric_date) AS dt
             FROM performance
             WHERE network = %(network)s
+              AND updated_at >= %(updated_after)s
         """
 
-        params = {'network': network}
+        params = {
+            'network': network,
+            'updated_after': self._updated_after(max_age_days),
+        }
         try:
             result = self.client.query(query, parameters=params).result_rows
             return result[0][0] if result else None
         except Exception as e:
             logging.error(f"Failed to get latest performance update date: {e}", exc_info=True)
             return None        
-
 
     def get_subscriptions_by_type(self, network, subscription_type):
         results = {}
@@ -240,13 +269,13 @@ class ClickHouseStorage():
             SELECT operator_id, user_id, subscription_type
             FROM subscriptions
             WHERE subscription_type = %(subscription_type)s
-            AND network = %(network)s
-            AND enabled = 1
+              AND network = %(network)s
+              AND enabled = 1
         """
 
         params = {
             'subscription_type': subscription_type,
-            'network': network
+            'network': network,
         }
 
         try:
@@ -256,7 +285,6 @@ class ClickHouseStorage():
                 op_id, user_id, sub_type = row
                 if op_id not in results:
                     results[op_id] = {}
-                # Merge if user already exists for this op_id
                 if user_id not in results[op_id]:
                     results[op_id][user_id] = {}
                 results[op_id][user_id][sub_type] = True
@@ -266,7 +294,6 @@ class ClickHouseStorage():
             logging.error(f"Failed to get subscriptions by type: {e}", exc_info=True)
             return {}
 
-        
     def get_subscriptions_by_userid(self, network, user_id):
         results = {}
 
@@ -276,7 +303,7 @@ class ClickHouseStorage():
             WHERE 
                 user_id = %(user_id)s AND 
                 network = %(network)s AND 
-                enabled = 1
+                enabled = 1 AND
         """
         params = {
             'user_id': user_id,
@@ -297,8 +324,6 @@ class ClickHouseStorage():
         except Exception as e:
             logging.error(f"Failed to get subscriptions by user ID: {e}", exc_info=True)
             return {}
-
-
 
     def add_user_subscription(self, network, user_id, op_id, subscription_type):
         query = """
@@ -329,7 +354,6 @@ class ClickHouseStorage():
             logging.error(f"Failed to add user subscription: {e}", exc_info=True)
             return None
 
-
     def del_user_subscription(self, network, user_id, op_id, subscription_type):
         query = """
             ALTER TABLE subscriptions 
@@ -354,89 +378,28 @@ class ClickHouseStorage():
             logging.error(f"Failed to delete user subscription: {e}", exc_info=True)
             return None
 
-
-    def get_operators_with_validator_counts(self, network, as_of_date=None):
-        """
-        Returns dict[operator_id] -> {
-            FIELD_NETWORK, FIELD_OPERATOR_ID, FIELD_OPERATOR_NAME,
-            FIELD_IS_VO, FIELD_IS_PRIVATE, FIELD_VALIDATOR_COUNT
-        }
-        Uses validator_counts (latest per operator, or latest <= as_of_date)
-        with fallback to operators.validator_count.
-        """
-        if as_of_date is None:
-            query = """
-            WITH latest AS (
-                SELECT operator_id, max(metric_date) AS metric_date
-                FROM validator_counts
-                WHERE network = %(network)s
-                GROUP BY operator_id
-            ),
-            vc AS (
-                SELECT vc.operator_id, argMax(vc.validator_count, vc.updated_at) AS validator_count
-                FROM validator_counts AS vc
-                INNER JOIN latest AS l
-                    ON vc.operator_id = l.operator_id
-                AND vc.metric_date = l.metric_date
-                WHERE vc.network = %(network)s
-                GROUP BY vc.operator_id
-            )
+    def get_operators_with_validator_counts(self, network, max_age_days: int | None = None):
+        query = """
             SELECT
-                o.network,
-                o.operator_id,
-                o.operator_name,
-                o.is_vo,
-                o.is_private,
-                coalesce(vc.validator_count, o.validator_count, 0) AS validator_count
-            FROM operators AS o
-            LEFT JOIN vc ON vc.operator_id = o.operator_id
-            WHERE o.network = %(network)s
-            ORDER BY o.operator_id
-            """
-            params = {"network": network}
-        else:
-            # Accepts date, datetime, or 'YYYY-MM-DD' string
-            if isinstance(as_of_date, datetime):
-                as_of_iso = as_of_date.date().isoformat()
-            elif isinstance(as_of_date, date):
-                as_of_iso = as_of_date.isoformat()
-            else:
-                as_of_iso = str(as_of_date)[:10]
+                network,
+                operator_id,
+                operator_name,
+                is_vo,
+                is_private,
+                toUInt32OrZero(validator_count) AS validator_count
+            FROM operators
+            WHERE network = %(network)s
+              AND updated_at >= %(updated_after)s
+            ORDER BY operator_id
+        """
+        res = self.client.query(
+            query,
+            parameters={
+                "network": network,
+                "updated_after": self._updated_after(max_age_days),
+            },
+        )
 
-            query = """
-            WITH latest AS (
-                SELECT operator_id, max(metric_date) AS metric_date
-                FROM validator_counts
-                WHERE network = %(network)s
-                AND metric_date <= toDate(%(as_of_date)s)
-                GROUP BY operator_id
-            ),
-            vc AS (
-                SELECT vc.operator_id, argMax(vc.validator_count, vc.updated_at) AS validator_count
-                FROM validator_counts AS vc
-                INNER JOIN latest AS l
-                    ON vc.operator_id = l.operator_id
-                AND vc.metric_date = l.metric_date
-                WHERE vc.network = %(network)s
-                GROUP BY vc.operator_id
-            )
-            SELECT
-                o.network,
-                o.operator_id,
-                o.operator_name,
-                o.is_vo,
-                o.is_private,
-                coalesce(vc.validator_count, o.validator_count, 0) AS validator_count
-            FROM operators AS o
-            LEFT JOIN vc ON vc.operator_id = o.operator_id
-            WHERE o.network = %(network)s
-            ORDER BY o.operator_id
-            """
-            params = {"network": network, "as_of_date": as_of_iso}
-
-        res = self.client.query(query, parameters=params)
-
-        # Normalize rows to list[dict] without helpers
         nr = getattr(res, "named_results", None)
         rows = nr() if callable(nr) else nr
         if not rows:
@@ -454,4 +417,3 @@ class ClickHouseStorage():
                 FIELD_VALIDATOR_COUNT: int(r["validator_count"] or 0),
             }
         return ops
-

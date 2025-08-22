@@ -256,7 +256,7 @@ Thresholds displayed are subject to change.
 
         try:
             storage = StorageFactory.get_storage('ssv_performance')
-            validator_data = storage.get_operators_with_validator_counts(network)
+            validator_data = storage.get_operators_with_validator_counts(network, max_age_days=0)
 
             if not validator_data:
                 logging.error(f"validator data empty in validators command")
