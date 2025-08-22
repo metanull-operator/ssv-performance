@@ -845,7 +845,6 @@ def compile_validator_messages(operators_by_id, extra_message=None, availability
         mean = statistics.mean(values)
         median = statistics.median(values)
 
-        # Highest with random tiebreak + "and X others"
         hi = max(values)
         hi_ops = [op for c, op in items if c == hi]
         hi_example = random.choice(hi_ops)
@@ -856,7 +855,6 @@ def compile_validator_messages(operators_by_id, extra_message=None, availability
             + (f" and {hi_others} other{'s' if hi_others != 1 else ''}" if hi_others > 0 else "")
         )
 
-        # Build buckets (you already have this)
         buckets, bucket_ranges, zero_count, outliers = iqr_bucket_lines_for_counts(
             values, items, num_buckets=num_buckets, iqr_multiplier=iqr_multiplier
         )
@@ -871,10 +869,10 @@ def compile_validator_messages(operators_by_id, extra_message=None, availability
         )
 
         lines = [
-            f"**{label} Operators (Validator Counts)**",
+            f"**{label} Operator Validator Counts**",
             f"*{n_ops} operators*",
             f"*{zero_count} operators with 0 active validators, excluded below*",
-            highest_line,                                     # ← uses the new format
+            highest_line,                        
             f"- Mean active validators per operator: {mean:.2f}",
             f"- Median validators/operator: {int(median) if median == int(median) else round(median, 2)}",
             f"### {label} Validator Count Distribution (Operators)",
@@ -882,26 +880,32 @@ def compile_validator_messages(operators_by_id, extra_message=None, availability
         lines += bucket_lines
         return bundle_messages(lines)
 
-    # "All" set (only when explicitly requested to mirror your fee defaults)
     if availability == "all" and verified == "all":
+        log.debug(f"All items count: {len(all_items)}")
         messages.extend(summarize("All", all_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
 
     # Public breakdown
     if availability == "public":
         if verified == "all":
+            log.debug(f"Public items count: {len(public_items)}")
             messages.extend(summarize("All Public", public_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
         if verified == "verified":
+            log.debug(f"Public VO items count: {len(public_vo_items)}")
             messages.extend(summarize("Public Verified", public_vo_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
         if verified == "unverified":
+            log.debug(f"Public non-VO items count: {len(public_non_vo_items)}")
             messages.extend(summarize("Public Unverified", public_non_vo_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
 
     # Private breakdown
     if availability == "private":
         if verified == "all":
+            log.debug(f"Private items count: {len(private_items)}")
             messages.extend(summarize("All Private", private_items, iqr_multiplier=2.5, num_buckets=5, num_segments=num_segments))
         if verified == "verified":
+            log.debug(f"Private VO items count: {len(private_vo_items)}")
             messages.extend(summarize("Private Verified", private_vo_items, iqr_multiplier=2.5, num_buckets=5, num_segments=num_segments))
         if verified == "unverified":
+            log.debug(f"Private non-VO items count: {len(private_non_vo_items)}")
             messages.extend(summarize("Private Unverified", private_non_vo_items, iqr_multiplier=2.5, num_buckets=5, num_segments=num_segments))
 
     if extra_message:
