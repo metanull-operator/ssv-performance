@@ -312,7 +312,7 @@ Thresholds displayed are subject to change.
                 await ctx.followup.send("Performance data not available.", ephemeral=True)
                 return
 
-            await respond_vo_threshold_messages(ctx, perf_data, extra_message=extra_message)
+            await respond_vo_threshold_messages(ctx, perf_data, availability=availability, verified=verified, extra_message=extra_message)
 
         except Exception as e:
             logging.error(f"Error fetching alerts: {e}", exc_info=True)

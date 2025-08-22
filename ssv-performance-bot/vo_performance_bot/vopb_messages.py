@@ -909,7 +909,7 @@ def compile_validator_messages(operators_by_id, extra_message=None, availability
 
     return bundle_messages(messages)
 
-async def respond_validator_messages(ctx, operators_by_id, extra_message=None, availability="public", verified="all", num_segments=20):
+async def respond_validator_messages(ctx, operators_by_id, extra_message=None, availability="all", verified="all", num_segments=20):
     try:
         messages = compile_validator_messages(
             operators_by_id, availability=availability, verified=verified,
