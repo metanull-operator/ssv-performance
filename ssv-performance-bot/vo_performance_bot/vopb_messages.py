@@ -807,7 +807,7 @@ def render_bucket_lines_counts(buckets_with_ranges, zero_count, outliers, items,
     return bundle_messages(lines)
 
 
-def compile_validator_messages(operators_by_id, extra_message=None, availability="public", verified="all", num_segments=20):
+def compile_validator_messages(operators_by_id, extra_message=None, availability="all", verified="all", num_segments=20):
     """
     operators_by_id: dict[op_id] -> operator dict with FIELD_VALIDATOR_COUNT, FIELD_IS_PRIVATE, FIELD_IS_VO, etc.
     """
