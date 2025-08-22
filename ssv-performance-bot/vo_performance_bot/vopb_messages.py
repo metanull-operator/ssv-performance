@@ -881,31 +881,31 @@ def compile_validator_messages(operators_by_id, extra_message=None, availability
         return bundle_messages(lines)
 
     if availability == "all" and verified == "all":
-        log.debug(f"All items count: {len(all_items)}")
+        logging.debug(f"All items count: {len(all_items)}")
         messages.extend(summarize("All", all_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
 
     # Public breakdown
     if availability == "public":
         if verified == "all":
-            log.debug(f"Public items count: {len(public_items)}")
+            logging.debug(f"Public items count: {len(public_items)}")
             messages.extend(summarize("All Public", public_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
         if verified == "verified":
-            log.debug(f"Public VO items count: {len(public_vo_items)}")
+            logging.debug(f"Public VO items count: {len(public_vo_items)}")
             messages.extend(summarize("Public Verified", public_vo_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
         if verified == "unverified":
-            log.debug(f"Public non-VO items count: {len(public_non_vo_items)}")
+            logging.debug(f"Public non-VO items count: {len(public_non_vo_items)}")
             messages.extend(summarize("Public Unverified", public_non_vo_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
 
     # Private breakdown
     if availability == "private":
         if verified == "all":
-            log.debug(f"Private items count: {len(private_items)}")
+            logging.debug(f"Private items count: {len(private_items)}")
             messages.extend(summarize("All Private", private_items, iqr_multiplier=2.5, num_buckets=5, num_segments=num_segments))
         if verified == "verified":
-            log.debug(f"Private VO items count: {len(private_vo_items)}")
+            logging.debug(f"Private VO items count: {len(private_vo_items)}")
             messages.extend(summarize("Private Verified", private_vo_items, iqr_multiplier=2.5, num_buckets=5, num_segments=num_segments))
         if verified == "unverified":
-            log.debug(f"Private non-VO items count: {len(private_non_vo_items)}")
+            logging.debug(f"Private non-VO items count: {len(private_non_vo_items)}")
             messages.extend(summarize("Private Unverified", private_non_vo_items, iqr_multiplier=2.5, num_buckets=5, num_segments=num_segments))
 
     if extra_message:
