@@ -245,8 +245,8 @@ Thresholds displayed are subject to change.
 
     @bot.slash_command(name='validators', description='Show current active validator set information')
     async def validators(ctx,
-            availability: Option(str, "Which operators to include", choices=["public", "private", "all"], default="public"),
-            verified: Option(str, "Which operators to include", choices=["verified", "unverified", "all"], default="verified")
+            availability: Option(str, "Which operators to include", choices=["public", "private", "all"], default="all"),
+            verified: Option(str, "Which operators to include", choices=["verified", "unverified", "all"], default="all")
     ):
 
         logging.info(f"/validators called")
@@ -266,7 +266,7 @@ Thresholds displayed are subject to change.
                 await ctx.followup.send("Validator data not available.", ephemeral=True)
                 return
 
-            await respond_validator_messages(ctx, validator_data, extra_message=extra_message, num_segments=num_segments)
+            await respond_validator_messages(ctx, validator_data, availability=availability, verified=verified, extra_message=extra_message, num_segments=num_segments)
 
         except Exception as e:
             logging.error(f"Error fetching validator information: {e}", exc_info=True)
@@ -312,7 +312,7 @@ Thresholds displayed are subject to change.
                 await ctx.followup.send("Performance data not available.", ephemeral=True)
                 return
 
-            await respond_vo_threshold_messages(ctx, perf_data, availability=availability, verified=verified, extra_message=extra_message)
+            await respond_vo_threshold_messages(ctx, perf_data, extra_message=extra_message)
 
         except Exception as e:
             logging.error(f"Error fetching alerts: {e}", exc_info=True)
