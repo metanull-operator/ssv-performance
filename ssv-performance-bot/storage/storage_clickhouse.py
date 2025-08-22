@@ -2,7 +2,7 @@ import time
 import os
 import logging
 from common.config import *
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 from clickhouse_connect import create_client
 from clickhouse_connect.driver.exceptions import ClickHouseError
 
