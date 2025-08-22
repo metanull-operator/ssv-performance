@@ -386,10 +386,10 @@ class ClickHouseStorage:
                 operator_name,
                 is_vo,
                 is_private,
-                toUInt32OrZero(validator_count) AS validator_count
+                validator_count
             FROM operators
             WHERE network = %(network)s
-              AND updated_at >= %(updated_after)s
+            AND updated_at >= %(updated_after)s
             ORDER BY operator_id
         """
         res = self.client.query(
@@ -414,6 +414,8 @@ class ClickHouseStorage:
                 FIELD_OPERATOR_NAME: r["operator_name"],
                 FIELD_IS_VO: int(r["is_vo"]),
                 FIELD_IS_PRIVATE: int(r["is_private"]),
-                FIELD_VALIDATOR_COUNT: int(r["validator_count"] or 0),
+                # Preserve NULL from DB as Python None
+                FIELD_VALIDATOR_COUNT: r["validator_count"],
             }
         return ops
+
