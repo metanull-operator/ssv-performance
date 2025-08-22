@@ -310,9 +310,9 @@ Thresholds displayed are subject to change.
             else:
                 logging.error("Could not retrieve latest data point date.")
 
-            await ctx.followup.send(hello, ephemeral=False)
-
             hello += f"\nType `/help` to see available commands."
+
+            await ctx.followup.send(hello, ephemeral=False)
 
         except Exception as e:
             logging.error(f"Error fetching bot information: {e}", exc_info=True)
