@@ -2,12 +2,11 @@ import time
 import os
 import logging
 from common.config import *
-from .storage_data_interface import DataStorageInterface
 from datetime import datetime, timezone
 from clickhouse_connect import create_client
 from clickhouse_connect.driver.exceptions import ClickHouseError
 
-class ClickHouseStorage(DataStorageInterface):
+class ClickHouseStorage():
 
     def __init__(self, retries=5, delay=2, **kwargs):
         for attempt in range(1, retries + 1):
