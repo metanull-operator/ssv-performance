@@ -355,90 +355,90 @@ class ClickHouseStorage():
             return None
 
 
-def get_operators_with_validator_counts(self, network: str, as_of_date: date | None = None) -> dict:
-    """
-    Return: dict[operator_id] -> {
-        FIELD_OPERATOR_ID, FIELD_OPERATOR_NAME, FIELD_IS_PRIVATE, FIELD_IS_VO,
-        FIELD_VALIDATOR_COUNT, FIELD_NETWORK
-    }
-    Uses validator_counts for the latest (or <= as_of_date) count, with fallback to operators.validator_count.
-    """
-    if as_of_date is None:
-        query = """
-        WITH latest AS (
-            SELECT operator_id, max(metric_date) AS metric_date
-            FROM validator_counts
-            WHERE network = %(network)s
-            GROUP BY operator_id
-        ),
-        vc AS (
-            SELECT vc.operator_id, argMax(vc.validator_count, vc.updated_at) AS validator_count
-            FROM validator_counts AS vc
-            INNER JOIN latest AS l
-                ON vc.operator_id = l.operator_id
-               AND vc.metric_date = l.metric_date
-            WHERE vc.network = %(network)s
-            GROUP BY vc.operator_id
-        )
-        SELECT
-            o.network,
-            o.operator_id,
-            o.operator_name,
-            o.is_vo,
-            o.is_private,
-            coalesce(vc.validator_count, o.validator_count, 0) AS validator_count
-        FROM operators AS o
-        LEFT JOIN vc ON vc.operator_id = o.operator_id
-        WHERE o.network = %(network)s
-        ORDER BY o.operator_id
+    def get_operators_with_validator_counts(self, network: str, as_of_date: date | None = None) -> dict:
         """
-        params = {"network": network}
-    else:
-        # Get each operator's latest metric_date <= as_of_date, then pick the row with max(updated_at) on that date
-        query = """
-        WITH latest AS (
-            SELECT operator_id, max(metric_date) AS metric_date
-            FROM validator_counts
-            WHERE network = %(network)s
-              AND metric_date <= toDate(%(as_of_date)s)
-            GROUP BY operator_id
-        ),
-        vc AS (
-            SELECT vc.operator_id, argMax(vc.validator_count, vc.updated_at) AS validator_count
-            FROM validator_counts AS vc
-            INNER JOIN latest AS l
-                ON vc.operator_id = l.operator_id
-               AND vc.metric_date = l.metric_date
-            WHERE vc.network = %(network)s
-            GROUP BY vc.operator_id
-        )
-        SELECT
-            o.network,
-            o.operator_id,
-            o.operator_name,
-            o.is_vo,
-            o.is_private,
-            coalesce(vc.validator_count, o.validator_count, 0) AS validator_count
-        FROM operators AS o
-        LEFT JOIN vc ON vc.operator_id = o.operator_id
-        WHERE o.network = %(network)s
-        ORDER BY o.operator_id
-        """
-        params = {"network": network, "as_of_date": as_of_date}
-
-    result = self.client.query(query, parameters=params)
-    rows = result.named_results  # list of dicts keyed by column names
-
-    ops: dict[int, dict] = {}
-    for r in rows:
-        op_id = int(r["operator_id"])
-        ops[op_id] = {
-            FIELD_NETWORK: r["network"],
-            FIELD_OPERATOR_ID: op_id,
-            FIELD_OPERATOR_NAME: r["operator_name"],
-            FIELD_IS_VO: int(r["is_vo"]),
-            FIELD_IS_PRIVATE: int(r["is_private"]),
-            FIELD_VALIDATOR_COUNT: int(r["validator_count"] or 0),
+        Return: dict[operator_id] -> {
+            FIELD_OPERATOR_ID, FIELD_OPERATOR_NAME, FIELD_IS_PRIVATE, FIELD_IS_VO,
+            FIELD_VALIDATOR_COUNT, FIELD_NETWORK
         }
+        Uses validator_counts for the latest (or <= as_of_date) count, with fallback to operators.validator_count.
+        """
+        if as_of_date is None:
+            query = """
+            WITH latest AS (
+                SELECT operator_id, max(metric_date) AS metric_date
+                FROM validator_counts
+                WHERE network = %(network)s
+                GROUP BY operator_id
+            ),
+            vc AS (
+                SELECT vc.operator_id, argMax(vc.validator_count, vc.updated_at) AS validator_count
+                FROM validator_counts AS vc
+                INNER JOIN latest AS l
+                    ON vc.operator_id = l.operator_id
+                AND vc.metric_date = l.metric_date
+                WHERE vc.network = %(network)s
+                GROUP BY vc.operator_id
+            )
+            SELECT
+                o.network,
+                o.operator_id,
+                o.operator_name,
+                o.is_vo,
+                o.is_private,
+                coalesce(vc.validator_count, o.validator_count, 0) AS validator_count
+            FROM operators AS o
+            LEFT JOIN vc ON vc.operator_id = o.operator_id
+            WHERE o.network = %(network)s
+            ORDER BY o.operator_id
+            """
+            params = {"network": network}
+        else:
+            # Get each operator's latest metric_date <= as_of_date, then pick the row with max(updated_at) on that date
+            query = """
+            WITH latest AS (
+                SELECT operator_id, max(metric_date) AS metric_date
+                FROM validator_counts
+                WHERE network = %(network)s
+                AND metric_date <= toDate(%(as_of_date)s)
+                GROUP BY operator_id
+            ),
+            vc AS (
+                SELECT vc.operator_id, argMax(vc.validator_count, vc.updated_at) AS validator_count
+                FROM validator_counts AS vc
+                INNER JOIN latest AS l
+                    ON vc.operator_id = l.operator_id
+                AND vc.metric_date = l.metric_date
+                WHERE vc.network = %(network)s
+                GROUP BY vc.operator_id
+            )
+            SELECT
+                o.network,
+                o.operator_id,
+                o.operator_name,
+                o.is_vo,
+                o.is_private,
+                coalesce(vc.validator_count, o.validator_count, 0) AS validator_count
+            FROM operators AS o
+            LEFT JOIN vc ON vc.operator_id = o.operator_id
+            WHERE o.network = %(network)s
+            ORDER BY o.operator_id
+            """
+            params = {"network": network, "as_of_date": as_of_date}
 
-    return ops
+        result = self.client.query(query, parameters=params)
+        rows = result.named_results  # list of dicts keyed by column names
+
+        ops: dict[int, dict] = {}
+        for r in rows:
+            op_id = int(r["operator_id"])
+            ops[op_id] = {
+                FIELD_NETWORK: r["network"],
+                FIELD_OPERATOR_ID: op_id,
+                FIELD_OPERATOR_NAME: r["operator_name"],
+                FIELD_IS_VO: int(r["is_vo"]),
+                FIELD_IS_PRIVATE: int(r["is_private"]),
+                FIELD_VALIDATOR_COUNT: int(r["validator_count"] or 0),
+            }
+
+        return ops
