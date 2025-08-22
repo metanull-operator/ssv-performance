@@ -1,7 +1,6 @@
 import logging
 from datetime import datetime, timedelta
 from discord.ext import tasks
-from storage.storage_factory import StorageFactory
 from vo_performance_bot.vopb_messages import send_daily_direct_messages, send_vo_threshold_messages
 import asyncio
 import copy

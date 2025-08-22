@@ -3,7 +3,6 @@ import logging
 from collections import defaultdict
 import copy
 from discord.commands import Option
-from storage.storage_factory import StorageFactory
 from vo_performance_bot.vopb_messages import (
     create_subscriptions_message,
     send_operator_performance_messages,
