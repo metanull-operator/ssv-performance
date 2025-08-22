@@ -86,7 +86,13 @@ class ClickHouseStorage(DataStorageInterface):
 
     def get_latest_performance_data(self, network, period):
         query = """
-            SELECT 
+            WITH max_dt AS (
+            SELECT max(metric_date) AS dt
+            FROM performance
+            WHERE network = %(network)s
+                AND metric_type = %(metric_type)s
+            )
+            SELECT
                 o.operator_id,
                 o.operator_name,
                 o.is_vo,
@@ -94,24 +100,26 @@ class ClickHouseStorage(DataStorageInterface):
                 o.validator_count,
                 o.address,
                 pm.metric_date,
-                pm.metric_value
+                pm.metric_value,
+                /* sanity: 0 when present on snapshot, NULL when missing */
+                if(isNull(pm.metric_date), NULL, dateDiff('day', pm.metric_date, (SELECT dt FROM max_dt))) AS days_behind
             FROM operators o
             LEFT JOIN (
-                SELECT 
-                    operator_id,
-                    network,
-                    metric_date,
-                    metric_value,
-                    row_number() OVER (
-                        PARTITION BY network, operator_id 
-                        ORDER BY metric_date DESC
-                    ) AS rn
-                FROM performance
-                WHERE 
-                    metric_type = %(metric_type)s AND 
-                    network = %(network)s
-            ) pm ON o.operator_id = pm.operator_id AND o.network = pm.network
-            WHERE o.network = %(network)s AND (pm.rn = 1 OR pm.rn IS NULL)
+                SELECT
+                    p.operator_id,
+                    p.network,
+                    -- only rows ON the snapshot date are eligible
+                    any(p.metric_date) AS metric_date,           -- all equal to max_dt here
+                    argMax(p.metric_value, (p.updated_at, p.source)) AS metric_value  -- tie-break
+                FROM performance p
+                WHERE p.network     = %(network)s
+                AND p.metric_type = %(metric_type)s
+                AND p.metric_date = (SELECT dt FROM max_dt)
+                GROUP BY p.operator_id, p.network
+            ) pm
+            ON pm.operator_id = o.operator_id
+            AND pm.network     = o.network
+            WHERE o.network = %(network)s
         """
 
         params = {
