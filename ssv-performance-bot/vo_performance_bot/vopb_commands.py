@@ -244,7 +244,10 @@ Thresholds displayed are subject to change.
 
 
     @bot.slash_command(name='validators', description='Show current active validator set information')
-    async def validators(ctx):
+    async def validators(ctx,
+            availability: Option(str, "Which operators to include", choices=["public", "private", "all"], default="public"),
+            verified: Option(str, "Which operators to include", choices=["verified", "unverified", "all"], default="verified")
+    ):
 
         logging.info(f"/validators called")
 
