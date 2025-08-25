@@ -409,6 +409,13 @@ def main():
     for op_id, op in operators.items():
         op["validators_count"] = final_active_counts.get(op_id, 0)
 
+        if op_id == 14:
+            logging.debug("Operator 14 has %d active validators", op["validators_count"])
+
+            for pk in (operator_validators.get(op_id) or []):
+                st = all_pubkeys_status.get(pk, "unknown")
+                logging.debug("  Validator %s status: %s", pk, st)
+
     target_date = datetime.now(timezone.utc if not args.local_time else None).date()
 
     client = get_clickhouse_client(clickhouse_password)
