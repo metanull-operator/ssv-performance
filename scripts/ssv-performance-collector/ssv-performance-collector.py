@@ -267,6 +267,15 @@ def fetch_beacon_statuses(pubkeys: set[str]) -> dict[str, str]:
 
 
 def count_active_from_status_map(operator_validators: dict[int, set[str]], status_map: dict[str, str]) -> dict[int, int]:
+
+    for op_id, pubkeys in operator_validators.items():
+        if op_id == 14:
+            active_count = sum(1 for pk in pubkeys if status_map.get(pk, "") in ACTIVE_STATUSES)
+            logging.debug("Operator 14 has %d total validators and %d active validators", len(pubkeys), active_count)
+            for pk in pubkeys:
+                st = status_map.get(pk, "unknown")
+                logging.debug("  Validator %s status: %s", pk, st)
+
     return {
         op_id: sum(1 for pk in pubkeys if status_map.get(pk, "") in ACTIVE_STATUSES)
         for op_id, pubkeys in operator_validators.items()
@@ -408,13 +417,6 @@ def main():
     # Set the final active count into operators[op]['validators_count'] (used by DB writer)
     for op_id, op in operators.items():
         op["validators_count"] = final_active_counts.get(op_id, 0)
-
-        if op_id == 14:
-            logging.debug("Operator 14 has %d active validators", op["validators_count"])
-
-            for pk in (operator_validators.get(op_id) or []):
-                st = all_pubkeys_status.get(pk, "unknown")
-                logging.debug("  Validator %s status: %s", pk, st)
 
     target_date = datetime.now(timezone.utc if not args.local_time else None).date()
 
