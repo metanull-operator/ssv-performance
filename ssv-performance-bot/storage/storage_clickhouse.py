@@ -238,6 +238,9 @@ class ClickHouseStorage:
                 ON pd.network = o.network 
                AND pd.operator_id = o.operator_id
                AND o.updated_at >= %(updated_after)s
+            LEFT JOIN latest_counts AS lc
+                ON lc.network = pd.network
+                AND lc.operator_id = pd.operator_id
             WHERE pd.rn <= 5
             ORDER BY pd.operator_id, pd.metric_type, pd.metric_date DESC
         """
