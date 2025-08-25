@@ -345,16 +345,6 @@ def insert_clickhouse_validator_count_data(client, network, validator_counts, ta
     now = datetime.now(timezone.utc)
 
     for operator_id, validator_count in validator_counts.items():
-
-        operator_rows.append((
-            network,
-            operator_id,
-            metric_date,
-            validator_count,
-            source,
-            now
-        ))
-
         if validator_count is not None:
             validator_counts_rows.append((network, operator_id, target_date, validator_count, source, now))
 
