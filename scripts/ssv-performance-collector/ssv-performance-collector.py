@@ -430,6 +430,13 @@ def compare_status_sets_for_operator(
                 "beacon_status": bcn_st or "missing",
             })
 
+    # ---- NEW: totals
+    ssv_total = len(op_pks)
+    ssv_active_total = len(ssv_active)
+    # Count only pubkeys that actually have a Beacon status (non-empty)
+    beacon_total = sum(1 for pk in op_pks if beacon.get(pk, ""))
+    beacon_active_total = len(beacon_active)
+
     return {
         "only_in_ssv_active": only_in_ssv_active,
         "only_in_beacon_active": only_in_beacon_active,
@@ -437,7 +444,12 @@ def compare_status_sets_for_operator(
     }
 
 def log_operator_compare_report(diff: dict, operator_id: int = 14) -> None:
-    # Compact, grep-friendly logging
+    t = diff.get("totals", {}) or {}
+    logging.info("[op %d] Totals — SSV: %s total / %s active | Beacon: %s total / %s active",
+                 operator_id,
+                 t.get("ssv_total", 0), t.get("ssv_active", 0),
+                 t.get("beacon_total", 0), t.get("beacon_active", 0))
+
     logging.info("[op %d] SSV active but NOT Beacon: %d", operator_id, len(diff["only_in_ssv_active"]))
     for pk in diff["only_in_ssv_active"]:
         logging.info("[op %d]   SSV-only-active: %s", operator_id, pk)
@@ -450,6 +462,7 @@ def log_operator_compare_report(diff: dict, operator_id: int = 14) -> None:
     for row in diff["status_mismatches_nonactive"]:
         logging.info("[op %d]   MISMATCH %s  SSV='%s'  Beacon='%s'",
                      operator_id, row["pubkey"], row["ssv_status"], row["beacon_status"])
+
 
 
 
