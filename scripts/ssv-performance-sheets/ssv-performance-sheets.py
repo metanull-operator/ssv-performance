@@ -63,7 +63,7 @@ def get_clickhouse_client(clickhouse_password):
     )
 
 
-def _updated_after(self, max_age_days: int | None) -> datetime:
+def _updated_after(max_age_days: int | None) -> datetime:
     """
     Convert 'days' into an absolute timestamp for filtering updated_at.
     0 or None (when default is 0) => epoch (i.e., include everything).
