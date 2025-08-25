@@ -176,7 +176,7 @@ def fetch_validators_maps(network: str, per_page: int = 1000):
 
             # Prefer specific validator status or general is_active flag
             st = ((v.get("validator_info") or {}).get("status") or "").lower()
-            if "validator_info" is not None and st != "":
+            if st is not None and st != "":
                 all_pubkeys_status[pubkey] = st
             else:
                 all_pubkeys_status[pubkey] = "active"
