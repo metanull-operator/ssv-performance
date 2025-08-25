@@ -63,32 +63,61 @@ def get_clickhouse_client(clickhouse_password):
     )
 
 
-def get_operator_performance_data(network: str, days: int, metric_type: str, clickhouse_password: str):
+def _updated_after(self, max_age_days: int | None) -> datetime:
+    """
+    Convert 'days' into an absolute timestamp for filtering updated_at.
+    0 or None (when default is 0) => epoch (i.e., include everything).
+    """
+    days = self.default_max_age_days if max_age_days is None else int(max_age_days)
+    if days <= 0:
+        return datetime(1970, 1, 1, tzinfo=timezone.utc)
+    return datetime.now(timezone.utc) - timedelta(days=days)
+
+
+def get_operator_performance_data(network: str, days: int, metric_type: str, clickhouse_password: str, max_age_days: int | None = None):
     client = get_clickhouse_client(clickhouse_password=clickhouse_password)
 
     since_date = (date.today() - timedelta(days=days)).isoformat()
 
     query = """
+        WITH latest_counts AS (
+            SELECT
+                network,
+                operator_id,
+                argMax(validator_count, updated_at) AS validator_count
+            FROM validators_counts
+            WHERE network = %(network)s
+            AND updated_at >= %(updated_after)s   -- bind to your freshness threshold
+            GROUP BY network, operator_id
+        )
         SELECT 
             o.operator_id,
             o.operator_name,
             o.is_vo,
             o.is_private,
-            o.validator_count,
+            lc.validator_count AS validator_count,   -- now from validators_counts
             o.address,
             p.metric_date,
             p.metric_value
-        FROM operators o
-        LEFT JOIN performance p
-            ON o.operator_id = p.operator_id AND o.network = p.network
-        WHERE 
-            o.network = %(network)s AND 
-            p.metric_type = %(metric_type)s AND 
-            p.metric_date >= %(since_date)s
+        FROM operators AS o
+        LEFT JOIN latest_counts AS lc
+            ON lc.network = o.network
+            AND lc.operator_id = o.operator_id
+        LEFT JOIN performance AS p
+            ON p.operator_id = o.operator_id
+            AND p.network = o.network
+            AND p.metric_type = %(metric_type)s
+            AND p.metric_date >= %(since_date)s
+        WHERE o.network = %(network)s
         ORDER BY o.operator_id, p.metric_date
     """
 
-    params = {'network': network, 'metric_type': metric_type, 'since_date': since_date}
+    params = {
+        'network': network,
+        'metric_type': metric_type,
+        'since_date': since_date,
+        'updated_after': _updated_after(max_age_days),
+    }
     rows = client.query(query, parameters=params).result_rows
 
     result = {}
@@ -120,6 +149,7 @@ def main():
     parser = argparse.ArgumentParser(description="Export SSV operator performance to Google Sheets")
     parser.add_argument('-c', '--google_credentials', type=str, default=os.environ.get('GOOGLE_CREDENTIALS_FILE', '/etc/ssv-performance-sheets/credentials/google-credentials.json'))
     parser.add_argument('-p', '--clickhouse_password', type=str, default=os.environ.get('CLICKHOUSE_PASSWORD_FILE', '/etc/ssv-performance-sheets/credentials/clickhouse-password.txt'))
+    parser.add_argument('-p', '--max_age_days', type=int, default=os.environ.get('MAX_AGE_DAYS', 7), help='Max age in days for data freshness filtering (0 or None means no limit)')
     parser.add_argument('-d', '--document', type=str, required=True)
     parser.add_argument('-w', '--worksheet', type=str, required=True)
     parser.add_argument('-n', '--network', type=str, default='mainnet')
@@ -138,6 +168,7 @@ def main():
     credentials_file = args.google_credentials
     document_name = args.document
     worksheet_name = args.worksheet
+    max_age_days = args.max_age_days
 
     try:
         clickhouse_password = read_clickhouse_password_from_file(clickhouse_password_file)
@@ -157,7 +188,7 @@ def main():
         return
 
     try:
-        perf_data = get_operator_performance_data(network=args.network, days=args.days, metric_type=args.metric, clickhouse_password=clickhouse_password)
+        perf_data = get_operator_performance_data(network=args.network, days=args.days, metric_type=args.metric, clickhouse_password=clickhouse_password, max_age_days=max_age_days)
         logging.info("Retrieved performance data from ClickHouse.")
 
     except Exception as e:

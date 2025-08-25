@@ -59,12 +59,36 @@ def get_clickhouse_client(clickhouse_password):
     )
 
 
-def get_operator_validator_count_data(network: str, days: int, clickhouse_password: str):
+def _updated_after(self, max_age_days: int | None) -> datetime:
+    """
+    Convert 'days' into an absolute timestamp for filtering updated_at.
+    0 or None (when default is 0) => epoch (i.e., include everything).
+    """
+    days = self.default_max_age_days if max_age_days is None else int(max_age_days)
+    if days <= 0:
+        return datetime(1970, 1, 1, tzinfo=timezone.utc)
+    return datetime.now(timezone.utc) - timedelta(days=days)
+
+
+def get_operator_validator_count_data(network: str, days: int, clickhouse_password: str, max_age_days: int | None = None):
     client = get_clickhouse_client(clickhouse_password=clickhouse_password)
 
     since_date = (date.today() - timedelta(days=days)).isoformat()
 
     query = """
+        WITH v_dedup AS (
+            SELECT
+                network,
+                operator_id,
+                metric_date,
+                argMax(validator_count, updated_at) AS validator_count,
+                max(updated_at) AS vc_updated_at
+            FROM validator_counts
+            WHERE network = %(network)s
+            AND metric_date >= %(since_date)s
+            AND updated_at >= %(updated_after)s   -- freshness window
+            GROUP BY network, operator_id, metric_date
+        )
         SELECT 
             o.operator_id,
             o.operator_name,
@@ -73,16 +97,19 @@ def get_operator_validator_count_data(network: str, days: int, clickhouse_passwo
             o.address,
             v.metric_date,
             v.validator_count
-        FROM operators o
-        LEFT JOIN validator_counts v
-            ON o.operator_id = v.operator_id AND o.network = v.network
-        WHERE 
-            o.network = %(network)s AND 
-            v.metric_date >= %(since_date)s
+        FROM operators AS o
+        LEFT JOIN v_dedup AS v
+            ON v.network = o.network
+            AND v.operator_id = o.operator_id
+        WHERE o.network = %(network)s
         ORDER BY o.operator_id, v.metric_date
     """
 
-    params = {'network': network, 'since_date': since_date}
+    params = {
+        'network': network,
+        'since_date': since_date,
+        'updated_after': _updated_after(max_age_days),
+    }
     rows = client.query(query, parameters=params).result_rows
 
     result = {}
@@ -113,6 +140,7 @@ def main():
     parser = argparse.ArgumentParser(description="Export SSV validator count data to Google Sheets")
     parser.add_argument('-c', '--google_credentials_file', type=str, default=os.environ.get('GOOGLE_CREDENTIALS_FILE'))
     parser.add_argument('-p', '--clickhouse_password_file', type=str, default=os.environ.get('CLICKHOUSE_PASSWORD_FILE'))
+    parser.add_argument('-p', '--max_age_days', type=int, default=os.environ.get('MAX_AGE_DAYS', 7), help='Max age in days for data freshness filtering (0 or None means no limit)')
     parser.add_argument('-d', '--document', type=str, required=True)
     parser.add_argument('-w', '--worksheet', type=str, required=True)
     parser.add_argument('-n', '--network', type=str, default=os.environ.get('NETWORK', 'mainnet'))
@@ -130,6 +158,7 @@ def main():
     credentials_file = args.google_credentials_file
     document_name = args.document
     worksheet_name = args.worksheet
+    max_age_days = args.max_age_days
 
     try:
         clickhouse_password = read_clickhouse_password_from_file(clickhouse_password_file)
@@ -149,7 +178,7 @@ def main():
         return
 
     try:
-        count_data = get_operator_validator_count_data(network=args.network, days=args.days, clickhouse_password=clickhouse_password)
+        count_data = get_operator_validator_count_data(network=args.network, days=args.days, clickhouse_password=clickhouse_password, max_age_days=max_age_days)
         logging.info("Retrieved performance data from ClickHouse.")
 
     except Exception as e:
