@@ -69,12 +69,12 @@ class ClickHouseStorage:
 
     def get_latest_fee_data(self, network, max_age_days: int | None = None):
         query = """
-            WITH validator_counts AS (
+            WITH latest_counts AS (
                 SELECT
                     network,
                     operator_id,
                     argMax(validator_count, updated_at) AS validator_count
-                FROM validators
+                FROM validator_counts
                 WHERE network = %(network)s
                 AND updated_at >= %(updated_after)s
                 GROUP BY network, operator_id
@@ -84,12 +84,12 @@ class ClickHouseStorage:
                 o.operator_name,
                 o.is_vo,
                 o.is_private,
-                lc.validator_count,         -- from validators table
+                lc.validator_count,         -- from validator_counts table
                 o.address,
                 o.operator_fee,
                 o.updated_at
             FROM operators o
-            LEFT JOIN validator_counts lc
+            LEFT JOIN latest_counts lc
             ON lc.network = o.network
             AND lc.operator_id = o.operator_id
             WHERE o.network = %(network)s
@@ -129,12 +129,12 @@ class ClickHouseStorage:
                 AND metric_type = %(metric_type)s
                 AND updated_at >= %(updated_after)s
             ),
-            validator_counts AS (
+            latest_counts AS (
                 SELECT
                     network,
                     operator_id,
                     argMax(validator_count, updated_at) AS validator_count
-                FROM validators
+                FROM validator_counts
                 WHERE network = %(network)s
                 AND updated_at >= %(updated_after)s
                 GROUP BY network, operator_id
@@ -144,7 +144,7 @@ class ClickHouseStorage:
                 o.operator_name,
                 o.is_vo,
                 o.is_private,
-                lc.validator_count,                             -- from validators table
+                lc.validator_count,                             -- from validator_counts table
                 o.address,
                 pm.metric_date,
                 pm.metric_value,
@@ -165,7 +165,7 @@ class ClickHouseStorage:
             ) pm
             ON pm.operator_id = o.operator_id
             AND pm.network     = o.network
-            LEFT JOIN validator_counts lc
+            LEFT JOIN latest_counts lc
             ON lc.network = o.network
             AND lc.operator_id = o.operator_id
             WHERE o.network = %(network)s
@@ -200,12 +200,12 @@ class ClickHouseStorage:
     # Get performance data for specific operator IDs
     def get_performance_by_opids(self, network, op_ids, max_age_days: int | None = None):
         query = """
-            WITH validator_counts AS (
+            WITH latest_counts AS (
                 SELECT
                     network,
                     operator_id,
                     argMax(validator_count, updated_at) AS validator_count
-                FROM validators
+                FROM validator_counts
                 WHERE network = %(network)s
                 AND updated_at >= %(updated_after)s
                 GROUP BY network, operator_id
@@ -215,7 +215,7 @@ class ClickHouseStorage:
                 o.operator_name,
                 o.is_vo,
                 o.is_private,
-                lc.validator_count,            -- from validators table (via lc)
+                lc.validator_count,            -- from validator_counts table (via lc)
                 o.address,
                 pd.metric_date,
                 pd.metric_value,
@@ -238,7 +238,7 @@ class ClickHouseStorage:
                 ON pd.network = o.network
                 AND pd.operator_id = o.operator_id
                 AND o.updated_at >= %(updated_after)s
-            LEFT JOIN validator_counts AS lc
+            LEFT JOIN latest_counts AS lc
                 ON lc.network = pd.network
                 AND lc.operator_id = pd.operator_id
             WHERE pd.rn <= 5
@@ -418,12 +418,12 @@ class ClickHouseStorage:
 
     def get_operators_with_validator_counts(self, network, max_age_days: int | None = None):
         query = """
-            WITH validator_counts AS (
+            WITH latest_counts AS (
                 SELECT
                     network,
                     operator_id,
                     argMax(validator_count, updated_at) AS validator_count
-                FROM validators
+                FROM validator_counts
                 WHERE network = %(network)s
                 AND updated_at >= %(updated_after)s
                 GROUP BY network, operator_id
@@ -434,9 +434,9 @@ class ClickHouseStorage:
                 o.operator_name,
                 o.is_vo,
                 o.is_private,
-                lc.validator_count                 -- from validators table
+                lc.validator_count                 -- from validator_counts table
             FROM operators o
-            LEFT JOIN validator_counts lc
+            LEFT JOIN latest_counts lc
             ON lc.network = o.network
             AND lc.operator_id = o.operator_id
             WHERE o.network = %(network)s
