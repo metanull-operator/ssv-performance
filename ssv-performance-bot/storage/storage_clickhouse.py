@@ -434,7 +434,7 @@ class ClickHouseStorage:
                 o.operator_name,
                 o.is_vo,
                 o.is_private,
-                lc.validator_count                 -- from validator_counts table
+                lc.validator_count AS validator_count
             FROM operators o
             LEFT JOIN latest_counts lc
             ON lc.network = o.network
