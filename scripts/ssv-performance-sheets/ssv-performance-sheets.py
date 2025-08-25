@@ -85,7 +85,7 @@ def get_operator_performance_data(network: str, days: int, metric_type: str, cli
                 network,
                 operator_id,
                 argMax(validator_count, updated_at) AS validator_count
-            FROM validators_counts
+            FROM validator_counts
             WHERE network = %(network)s
             AND updated_at >= %(updated_after)s   -- bind to your freshness threshold
             GROUP BY network, operator_id
