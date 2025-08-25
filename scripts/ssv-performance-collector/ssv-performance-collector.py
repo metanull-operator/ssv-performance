@@ -373,10 +373,6 @@ def insert_clickhouse_validator_count_data(client, network, validator_counts, ta
         'network', 'operator_id', 'metric_date', 'operator_fee', 'source', 'updated_at'
     ])
 
-    client.insert('validator_counts', validator_counts_rows, column_names=[
-        'network', 'operator_id', 'metric_date', 'validator_count', 'source', 'updated_at'
-    ])
-
 
 def deduplicate_table(client, table_name: str, network: str):
     try:
