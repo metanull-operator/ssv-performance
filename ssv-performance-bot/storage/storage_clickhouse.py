@@ -215,7 +215,7 @@ class ClickHouseStorage:
                 o.operator_name,
                 o.is_vo,
                 o.is_private,
-                lc.validator_count,            -- from validators table
+                lc.validator_count,            -- from validators table (via lc)
                 o.address,
                 pd.metric_date,
                 pd.metric_value,
@@ -233,16 +233,16 @@ class ClickHouseStorage:
                     network = %(network)s
                     AND operator_id IN %(operator_ids)s
                     AND updated_at >= %(updated_after)s
-            ) pd
-            LEFT JOIN operators o 
-                ON pd.network = o.network 
-               AND pd.operator_id = o.operator_id
-               AND o.updated_at >= %(updated_after)s
+            ) AS pd
+            LEFT JOIN operators AS o
+                ON pd.network = o.network
+                AND pd.operator_id = o.operator_id
+                AND o.updated_at >= %(updated_after)s
             LEFT JOIN latest_counts AS lc
                 ON lc.network = pd.network
                 AND lc.operator_id = pd.operator_id
             WHERE pd.rn <= 5
-            ORDER BY pd.operator_id, pd.metric_type, pd.metric_date DESC
+            ORDER BY pd.operator_id ASC, pd.metric_type ASC, pd.metric_date DESC
         """
 
         params = {
