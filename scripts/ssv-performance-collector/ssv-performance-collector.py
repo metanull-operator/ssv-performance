@@ -339,7 +339,7 @@ def insert_clickhouse_performance_data(client, network, clickhouse_table_operato
     ])
 
 
-def insert_clickhouse_validator_count_data(client, network, clickhouse_table_operators, clickhouse_table_performance, validator_counts, target_date, source):
+def insert_clickhouse_validator_count_data(client, network, validator_counts, target_date, source):
     validator_counts_rows = []
 
     now = datetime.now(timezone.utc)
