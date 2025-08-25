@@ -334,10 +334,6 @@ def insert_clickhouse_performance_data(client, network, clickhouse_table_operato
         'network', 'operator_id', 'metric_date', 'operator_fee', 'source', 'updated_at'
     ])
 
-    client.insert('validator_counts', validator_counts_rows, column_names=[
-        'network', 'operator_id', 'metric_date', 'validator_count', 'source', 'updated_at'
-    ])
-
 
 def insert_clickhouse_validator_count_data(client, network, validator_counts, target_date, source):
     validator_counts_rows = []
@@ -348,19 +344,10 @@ def insert_clickhouse_validator_count_data(client, network, validator_counts, ta
         if validator_count is not None:
             validator_counts_rows.append((network, operator_id, target_date, validator_count, source, now))
 
-    logging.info("CLICKHOUSE: inserting %d operators, %d perf rows, %d validator count rows, %d fee rows",
-                 len(operator_rows), len(performance_rows), len(validator_counts_rows), len(operator_fees_rows))
+    logging.info("CLICKHOUSE: inserting %d validator counts", len(validator_counts_rows))
 
-    client.insert(clickhouse_table_operators, operator_rows, column_names=[
-        'network', 'operator_id', 'operator_name', 'is_vo', 'is_private', 'validator_count', 'operator_fee', 'address', 'updated_at'
-    ])
-
-    client.insert(clickhouse_table_performance, performance_rows, column_names=[
-        'network', 'operator_id', 'metric_type', 'metric_date', 'metric_value', 'source', 'updated_at'
-    ])
-
-    client.insert('operator_fees', operator_fees_rows, column_names=[
-        'network', 'operator_id', 'metric_date', 'operator_fee', 'source', 'updated_at'
+    client.insert('validator_counts', validator_counts_rows, column_names=[
+        'network', 'operator_id', 'metric_date', 'validator_count', 'source', 'updated_at'
     ])
 
 
