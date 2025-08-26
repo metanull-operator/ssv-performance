@@ -479,6 +479,7 @@ def main():
     parser.add_argument('-n', '--network', type=str, choices=['mainnet', 'holesky', 'hoodi'], default='mainnet')
     parser.add_argument('-p', '--clickhouse_password_file', type=str, default=os.environ.get('CLICKHOUSE_PASSWORD_FILE'))
     parser.add_argument('--ops-page-size', type=int, default=100, help='perPage for /operators')
+    parser.add_argument('--comp_id', type=int, default=14)
     parser.add_argument('--val-page-size', type=int, default=1000, help='perPage for /validators (lastId cursor)')
     parser.add_argument('--local_time', action='store_true')
     parser.add_argument('--ch-operators-table', default=os.environ.get('CH_OPERATORS_TABLE', 'operators'))
@@ -513,14 +514,16 @@ def main():
         beacon_statuses = fetch_beacon_statuses(all_pubkeys)
         final_active_counts = count_active_from_status_map(operator_validators, beacon_statuses)
 
+        comp_id = args.comp_id
+
         # >>> NEW: compare SSV vs Beacon for operator 14
         diff_14 = compare_status_sets_for_operator(
             operator_validators=operator_validators,
             ssv_status_map=all_pubkeys_status,
             beacon_status_map=beacon_statuses,
-            operator_id=111,
+            operator_id=comp_id,
         )
-        log_operator_compare_report(diff_14, operator_id=111)
+        log_operator_compare_report(diff_14, operator_id=comp_id)
     else:
         logging.info("No BEACON_API_URL set; using SSV-based active counts.")
         final_active_counts = count_active_from_status_map(operator_validators, all_pubkeys_status)
