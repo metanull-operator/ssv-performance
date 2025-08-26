@@ -119,11 +119,11 @@ def fetch_validators_maps(network: str, per_page: int = 1000):
     Returns:
       - operator_validators: {op_id -> set(pubkeys)}
       - all_pubkeys: set(pubkeys)
-      - ssv_active_map: {pubkey -> bool}
+      - all_pubkeys_status: {pubkey -> bool}
     """
     operator_validators: dict[int, set[str]] = {}
     all_pubkeys: set[str] = set()
-    ssv_active_map: dict[str, bool] = {}
+    all_pubkeys_status: dict[str, bool] = {}
 
     last_id: int | None = None
     batch = 0
@@ -150,6 +150,8 @@ def fetch_validators_maps(network: str, per_page: int = 1000):
         max_id_in_batch: int | None = None
 
         for v in validators:
+
+            # Tracking last ID retrieved from API for next query cursor
             vid_raw = v.get("id")
             try:
                 vid = int(vid_raw) if vid_raw is not None else None
@@ -159,29 +161,34 @@ def fetch_validators_maps(network: str, per_page: int = 1000):
                 if max_id_in_batch is None or vid > max_id_in_batch:
                     max_id_in_batch = vid
 
+            # Get a pubkey or move along
             pubkey = v.get("public_key")
             if not pubkey:
+                logging.warning(f"SSV_API: Validator with missing/empty pubkey (id={vid_raw}); skipping.")
                 continue
-            else:
+            
+            # Make sure all pubkeys are 0x-prefixed
+            if isinstance(pubkey, str) and not pubkey.startswith("0x"):
                 pubkey = "0x" + pubkey.strip()
 
-            # Prefer explicit is_active; fallback to status
-            if "is_active" in v:
-                is_active = bool(v.get("is_active"))
-            else:
-                st = ((v.get("validator_info") or {}).get("status") or "").lower()
-                is_active = st in ACTIVE_STATUSES
-
-            # Record active map & global set
-            ssv_active_map[pubkey] = is_active
+            # Add to lists of all validators and active validators
             all_pubkeys.add(pubkey)
 
-            # Associate with each operator listed on validator
+            # Prefer specific validator status or general is_active flag
+            st = ((v.get("validator_info") or {}).get("status") or "").lower()
+            if st is not None and st != "":
+                all_pubkeys_status[pubkey] = st
+            else:
+                all_pubkeys_status[pubkey] = "active"
+
+            # Build map of operators to their validators
+            #   Dict with operator ID key and valus is a set of pubkeys
             for op in (v.get("operators") or []):
                 raw_id = op.get("id", op.get("id_str"))
                 try:
                     op_id = int(raw_id)
                 except Exception:
+                    logging.warning(f"SSV_API: Validator {pubkey} has invalid operator ID: {raw_id}; skipping this operator.")
                     continue
                 operator_validators.setdefault(op_id, set()).add(pubkey)
 
@@ -211,7 +218,8 @@ def fetch_validators_maps(network: str, per_page: int = 1000):
 
     logging.info("SSV_API: Validators done. Unique validators=%d, operators_with_validators=%d",
                  len(all_pubkeys), len(operator_validators))
-    return operator_validators, all_pubkeys, ssv_active_map
+    
+    return operator_validators, all_pubkeys, all_pubkeys_status
 
 
 def fetch_beacon_statuses(pubkeys: set[str]) -> dict[str, str]:
@@ -240,7 +248,7 @@ def fetch_beacon_statuses(pubkeys: set[str]) -> dict[str, str]:
                 pk = (item.get("validator") or {}).get("pubkey", "")
                 st = (item.get("status") or "").lower()
                 if pk:
-                    result[pk] = st
+                    result[pk.lower()] = st
 
             # If fewer returned than requested, the missing ones likely aren't on-chain/deposited.
             if len(validators) < len(batch):
@@ -259,6 +267,15 @@ def fetch_beacon_statuses(pubkeys: set[str]) -> dict[str, str]:
 
 
 def count_active_from_status_map(operator_validators: dict[int, set[str]], status_map: dict[str, str]) -> dict[int, int]:
+
+    for op_id, pubkeys in operator_validators.items():
+        if op_id == 14:
+            active_count = sum(1 for pk in pubkeys if status_map.get(pk, "") in ACTIVE_STATUSES)
+            logging.debug("Operator 14 has %d total validators and %d active validators", len(pubkeys), active_count)
+            for pk in pubkeys:
+                st = status_map.get(pk, "unknown")
+                logging.debug("  Validator %s status: %s", pk, st)
+
     return {
         op_id: sum(1 for pk in pubkeys if status_map.get(pk, "") in ACTIVE_STATUSES)
         for op_id, pubkeys in operator_validators.items()
@@ -277,7 +294,7 @@ def insert_clickhouse_performance_data(client, network, clickhouse_table_operato
         perf_24h = (operator.get("performance") or {}).get("24h", 0.0)
         perf_30d = (operator.get("performance") or {}).get("30d", 0.0)
 
-        validator_count = operator.get("validators_count", None)  # final active count
+        validator_count = operator.get("validators_count", None)  # Fallback to None, failsafe
 
         is_vo = 1 if operator.get("type", "") == "verified_operator" else 0
         is_private = 1 if operator.get("is_private", False) else 0
@@ -326,6 +343,18 @@ def insert_clickhouse_performance_data(client, network, clickhouse_table_operato
         'network', 'operator_id', 'metric_date', 'operator_fee', 'source', 'updated_at'
     ])
 
+
+def insert_clickhouse_validator_count_data(client, network, validator_counts, target_date, source):
+    validator_counts_rows = []
+
+    now = datetime.now(timezone.utc)
+
+    for operator_id, validator_count in validator_counts.items():
+        if validator_count is not None:
+            validator_counts_rows.append((network, operator_id, target_date, validator_count, source, now))
+
+    logging.info("CLICKHOUSE: inserting %d validator counts", len(validator_counts_rows))
+
     client.insert('validator_counts', validator_counts_rows, column_names=[
         'network', 'operator_id', 'metric_date', 'validator_count', 'source', 'updated_at'
     ])
@@ -371,54 +400,21 @@ def main():
     # Step 1: full operators list (metadata)
     operators = fetch_operators_from_ssv(args.network, args.ops_page_size)
 
-    # Step 2: validators → build counts
-    operator_validators, all_pubkeys, ssv_active_map = fetch_validators_maps(args.network, args.val_page_size)
-
-    # Attach SSV counts (total and active) to operators (keep unknown ops too)
-    ssv_active_counts = {
-        op_id: sum(1 for pk in pubkeys if ssv_active_map.get(pk, False))
-        for op_id, pubkeys in operator_validators.items()
-    }
-
-    for op_id, op in operators.items():
-        total = len(operator_validators.get(op_id, set()))
-        active_ssv = ssv_active_counts.get(op_id, 0)
-        op["ssv_total_validators"]  = total
-        op["ssv_active_validators"] = active_ssv
-
+    # Step 2: Query validators endpoint and optionally beacon API for statuses
+    operator_validators, all_pubkeys, all_pubkeys_status = fetch_validators_maps(args.network, args.val_page_size)
     logging.info("SSV_API: Operators with > 0 validators: %d/%d total).",
                  len([k for k,v in operator_validators.items() if v]), len(operators))
 
-    # Step 3 (optional): Beacon cross-check — only query each pubkey once
-    beacon_statuses = {}
+    # Step 3: If BEACON_API_URL set, fetch statuses and use those counts instead of SSV-based
     final_active_counts: dict[int, int] = {}
+    beacon_statuses: dict[str, str] = {}
     if BEACON_API_URL:
         logging.info("Getting BEACON_API validator statuses")
         beacon_statuses = fetch_beacon_statuses(all_pubkeys)
-        beacon_active_counts = count_active_from_status_map(operator_validators, beacon_statuses)
-        final_active_counts = beacon_active_counts
+        final_active_counts = count_active_from_status_map(operator_validators, beacon_statuses)
     else:
         logging.info("No BEACON_API_URL set; using SSV-based active counts.")
-        final_active_counts = ssv_active_counts
-
-    missing_ops = sorted(set(operator_validators.keys()) - set(operators.keys()))
-    if missing_ops:
-        for op_id in missing_ops:
-            # Use Beacon-active when available; fallback to SSV-active
-            def is_active(pk: str) -> bool:
-                if BEACON_API_URL:
-                    return beacon_statuses.get(pk, "").lower() in ACTIVE_STATUSES
-                return ssv_active_map.get(pk, False)
-
-            active_vals = sorted(pk for pk in operator_validators.get(op_id, set()) if is_active(pk))
-            if active_vals:
-                logging.warning(
-                    "SSV_API: Operator %d found in /validators but missing from /operators. "
-                    "Active validators (%d): %s",
-                    op_id, len(active_vals), ", ".join(active_vals)
-                )
-    else:
-        logging.debug("SSV_API: No operators present in /validators that are missing from /operators.")
+        final_active_counts = count_active_from_status_map(operator_validators, all_pubkeys_status)
 
 
     # Set the final active count into operators[op]['validators_count'] (used by DB writer)
@@ -430,7 +426,8 @@ def main():
     client = get_clickhouse_client(clickhouse_password)
 
     insert_clickhouse_performance_data(client, args.network, args.ch_operators_table, args.ch_performance_table, operators, target_date, IMPORT_SOURCE)
-    
+    insert_clickhouse_validator_count_data(client, args.network, final_active_counts, target_date, IMPORT_SOURCE)
+
     deduplicate_table(client, args.ch_operators_table, args.network)
     deduplicate_table(client, args.ch_performance_table, args.network)
     deduplicate_table(client, 'operator_fees', args.network)

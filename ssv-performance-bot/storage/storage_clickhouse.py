@@ -69,18 +69,31 @@ class ClickHouseStorage:
 
     def get_latest_fee_data(self, network, max_age_days: int | None = None):
         query = """
+            WITH latest_counts AS (
+                SELECT
+                    network,
+                    operator_id,
+                    argMax(validator_count, updated_at) AS validator_count
+                FROM validator_counts
+                WHERE network = %(network)s
+                AND updated_at >= %(updated_after)s
+                GROUP BY network, operator_id
+            )
             SELECT 
                 o.operator_id,
                 o.operator_name,
                 o.is_vo,
                 o.is_private,
-                o.validator_count,
+                lc.validator_count,         -- from validator_counts table
                 o.address,
                 o.operator_fee,
                 o.updated_at
             FROM operators o
+            LEFT JOIN latest_counts lc
+            ON lc.network = o.network
+            AND lc.operator_id = o.operator_id
             WHERE o.network = %(network)s
-              AND o.updated_at >= %(updated_after)s
+            AND o.updated_at >= %(updated_after)s
         """
         params = {
             'network': network,
@@ -106,45 +119,57 @@ class ClickHouseStorage:
 
         return fee_data
 
+
     def get_latest_performance_data(self, network, period, max_age_days: int | None = None):
-        # Note: we constrain both the snapshot computation and the operator set by updated_at.
         query = """
             WITH max_dt AS (
                 SELECT max(metric_date) AS dt
                 FROM performance
                 WHERE network = %(network)s
-                  AND metric_type = %(metric_type)s
-                  AND updated_at >= %(updated_after)s
+                AND metric_type = %(metric_type)s
+                AND updated_at >= %(updated_after)s
+            ),
+            latest_counts AS (
+                SELECT
+                    network,
+                    operator_id,
+                    argMax(validator_count, updated_at) AS validator_count
+                FROM validator_counts
+                WHERE network = %(network)s
+                AND updated_at >= %(updated_after)s
+                GROUP BY network, operator_id
             )
             SELECT
                 o.operator_id,
                 o.operator_name,
                 o.is_vo,
                 o.is_private,
-                o.validator_count,
+                lc.validator_count,                             -- from validator_counts table
                 o.address,
                 pm.metric_date,
                 pm.metric_value,
-                /* sanity: 0 when present on snapshot, NULL when missing */
                 if(isNull(pm.metric_date), NULL, dateDiff('day', pm.metric_date, (SELECT dt FROM max_dt))) AS days_behind
             FROM operators o
             LEFT JOIN (
                 SELECT
                     p.operator_id,
                     p.network,
-                    any(p.metric_date) AS metric_date,           -- all equal to max_dt here
-                    argMax(p.metric_value, (p.updated_at, p.source)) AS metric_value  -- tie-break
+                    any(p.metric_date) AS metric_date,
+                    argMax(p.metric_value, (p.updated_at, p.source)) AS metric_value
                 FROM performance p
                 WHERE p.network     = %(network)s
-                  AND p.metric_type = %(metric_type)s
-                  AND p.metric_date = (SELECT dt FROM max_dt)
-                  AND p.updated_at >= %(updated_after)s
+                AND p.metric_type = %(metric_type)s
+                AND p.metric_date = (SELECT dt FROM max_dt)
+                AND p.updated_at >= %(updated_after)s
                 GROUP BY p.operator_id, p.network
             ) pm
-              ON pm.operator_id = o.operator_id
-             AND pm.network     = o.network
+            ON pm.operator_id = o.operator_id
+            AND pm.network     = o.network
+            LEFT JOIN latest_counts lc
+            ON lc.network = o.network
+            AND lc.operator_id = o.operator_id
             WHERE o.network = %(network)s
-              AND o.updated_at >= %(updated_after)s
+            AND o.updated_at >= %(updated_after)s
         """
 
         params = {
@@ -175,12 +200,22 @@ class ClickHouseStorage:
     # Get performance data for specific operator IDs
     def get_performance_by_opids(self, network, op_ids, max_age_days: int | None = None):
         query = """
+            WITH latest_counts AS (
+                SELECT
+                    network,
+                    operator_id,
+                    argMax(validator_count, updated_at) AS validator_count
+                FROM validator_counts
+                WHERE network = %(network)s
+                AND updated_at >= %(updated_after)s
+                GROUP BY network, operator_id
+            )
             SELECT 
                 pd.operator_id,
                 o.operator_name,
                 o.is_vo,
                 o.is_private,
-                o.validator_count,
+                lc.validator_count,            -- from validator_counts table (via lc)
                 o.address,
                 pd.metric_date,
                 pd.metric_value,
@@ -198,13 +233,16 @@ class ClickHouseStorage:
                     network = %(network)s
                     AND operator_id IN %(operator_ids)s
                     AND updated_at >= %(updated_after)s
-            ) pd
-            LEFT JOIN operators o 
-                ON pd.network = o.network 
-               AND pd.operator_id = o.operator_id
-               AND o.updated_at >= %(updated_after)s
+            ) AS pd
+            LEFT JOIN operators AS o
+                ON pd.network = o.network
+                AND pd.operator_id = o.operator_id
+                AND o.updated_at >= %(updated_after)s
+            LEFT JOIN latest_counts AS lc
+                ON lc.network = pd.network
+                AND lc.operator_id = pd.operator_id
             WHERE pd.rn <= 5
-            ORDER BY pd.operator_id, pd.metric_type, pd.metric_date DESC
+            ORDER BY pd.operator_id ASC, pd.metric_type ASC, pd.metric_date DESC
         """
 
         params = {
@@ -380,17 +418,30 @@ class ClickHouseStorage:
 
     def get_operators_with_validator_counts(self, network, max_age_days: int | None = None):
         query = """
+            WITH latest_counts AS (
+                SELECT
+                    network,
+                    operator_id,
+                    argMax(validator_count, updated_at) AS validator_count
+                FROM validator_counts
+                WHERE network = %(network)s
+                AND updated_at >= %(updated_after)s
+                GROUP BY network, operator_id
+            )
             SELECT
-                network,
-                operator_id,
-                operator_name,
-                is_vo,
-                is_private,
-                validator_count
-            FROM operators
-            WHERE network = %(network)s
-            AND updated_at >= %(updated_after)s
-            ORDER BY operator_id
+                o.network,
+                o.operator_id,
+                o.operator_name,
+                o.is_vo,
+                o.is_private,
+                lc.validator_count AS validator_count
+            FROM operators o
+            LEFT JOIN latest_counts lc
+            ON lc.network = o.network
+            AND lc.operator_id = o.operator_id
+            WHERE o.network = %(network)s
+            AND o.updated_at >= %(updated_after)s
+            ORDER BY o.operator_id
         """
         res = self.client.query(
             query,
@@ -418,4 +469,3 @@ class ClickHouseStorage:
                 FIELD_VALIDATOR_COUNT: r["validator_count"],
             }
         return ops
-
