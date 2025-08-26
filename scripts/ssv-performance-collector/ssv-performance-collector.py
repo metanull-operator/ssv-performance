@@ -518,9 +518,9 @@ def main():
             operator_validators=operator_validators,
             ssv_status_map=all_pubkeys_status,
             beacon_status_map=beacon_statuses,
-            operator_id=14,
+            operator_id=11,
         )
-        log_operator_compare_report(diff_14, operator_id=14)
+        log_operator_compare_report(diff_14, operator_id=11)
     else:
         logging.info("No BEACON_API_URL set; using SSV-based active counts.")
         final_active_counts = count_active_from_status_map(operator_validators, all_pubkeys_status)
