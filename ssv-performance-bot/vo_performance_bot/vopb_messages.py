@@ -807,7 +807,7 @@ def render_bucket_lines_counts(buckets_with_ranges, zero_count, outliers, items,
     return bundle_messages(lines)
 
 
-def compile_validator_messages(operators_by_id, extra_message=None, availability="all", verified="all", num_segments=20):
+def compile_validator_messages(operators_by_id, total_unique_validators, active_unique_validators, extra_message=None, availability="all", verified="all", num_segments=20):
     """
     operators_by_id: dict[op_id] -> operator dict with FIELD_VALIDATOR_COUNT, FIELD_IS_PRIVATE, FIELD_IS_VO, etc.
     """
@@ -876,6 +876,7 @@ def compile_validator_messages(operators_by_id, extra_message=None, availability
 
         lines = [
             f"**{label} Operator Validator Counts**",
+            f"*{active_unique_validators} active validators*",
             f"*{n_ops} operators*",
             f"*{zero_count} operators with 0 active validators, excluded below*",
             highest_line,                        
@@ -929,10 +930,10 @@ def compile_validator_messages(operators_by_id, extra_message=None, availability
 
     return bundle_messages(messages)
 
-async def respond_validator_messages(ctx, operators_by_id, extra_message=None, availability="all", verified="all", num_segments=20):
+async def respond_validator_messages(ctx, operators_by_id, total_unique_validators, active_unique_validators, extra_message=None, availability="all", verified="all", num_segments=20):
     try:
         messages = compile_validator_messages(
-            operators_by_id, availability=availability, verified=verified,
+            operators_by_id, total_unique_validators, active_unique_validators, availability=availability, verified=verified,
             extra_message=extra_message,
             num_segments=num_segments
         )

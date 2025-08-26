@@ -300,6 +300,67 @@ class ClickHouseStorage:
             logging.error(f"Failed to get latest performance update date: {e}", exc_info=True)
             return None        
 
+
+    def get_latest_unique_counts(self, network, max_age_days: int | None = None):
+        """
+        Return {'total_unique_validators': int, 'active_unique_validators': int}
+        using the latest status per pubkey within the max_age window.
+        """
+        query = """
+            WITH latest AS (
+                SELECT
+                    pubkey,
+                    argMax(status, updated_at) AS status
+                FROM validators
+                WHERE network = %(network)s
+                AND updated_at >= %(updated_after)s
+                GROUP BY pubkey
+            )
+            SELECT
+                count() AS total_unique_validators,
+                countIf(
+                    lower(status) IN (
+                        'active','active_ongoing','active_exiting','active_slashed',
+                        'pending_queued','pending_initialized'
+                    )
+                ) AS active_unique_validators
+            FROM latest
+        """
+        params = {
+            'network': network,
+            'updated_after': self._updated_after(max_age_days),
+        }
+
+        try:
+            res = self.client.query(query, parameters=params)
+
+            # Prefer named results if available
+            nr = getattr(res, "named_results", None)
+            if callable(nr):
+                rows = nr()
+                if rows:
+                    return {
+                        'total_unique_validators': int(rows[0]['total_unique_validators']),
+                        'active_unique_validators': int(rows[0]['active_unique_validators']),
+                    }
+
+            # Fallback to positional rows
+            rows = res.result_rows
+            if rows:
+                total, active = rows[0][0], rows[0][1]
+                return {
+                    'total_unique_validators': int(total),
+                    'active_unique_validators': int(active),
+                }
+
+            # No rows (unlikely with ClickHouse counts, but safe default)
+            return {'total_unique_validators': 0, 'active_unique_validators': 0}
+
+        except Exception as e:
+            logging.error("Failed to get latest unique validator counts: %s", e, exc_info=True)
+            return {'total_unique_validators': 0, 'active_unique_validators': 0}
+
+
     def get_subscriptions_by_type(self, network, subscription_type):
         results = {}
 

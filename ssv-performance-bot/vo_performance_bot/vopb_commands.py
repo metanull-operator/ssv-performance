@@ -261,12 +261,14 @@ Thresholds displayed are subject to change.
             storage = StorageFactory.get_storage('ssv_performance')
             validator_data = storage.get_operators_with_validator_counts(network, max_age_days=0)
 
+            total_unique_validators, active_unique_validators = storage.get_latest_unique_counts(network, max_age_days=7)
+
             if not validator_data:
                 logging.error(f"validator data empty in validators command")
                 await ctx.followup.send("Validator data not available.", ephemeral=True)
                 return
 
-            await respond_validator_messages(ctx, validator_data, availability=availability, verified=verified, extra_message=extra_message, num_segments=num_segments)
+            await respond_validator_messages(ctx, validator_data, total_unique_validators, active_unique_validators, availability=availability, verified=verified, extra_message=extra_message, num_segments=num_segments)
 
         except Exception as e:
             logging.error(f"Error fetching validator information: {e}", exc_info=True)
