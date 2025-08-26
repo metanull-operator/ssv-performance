@@ -351,7 +351,7 @@ class ClickHouseStorage:
                 return int(total), int(active)
 
             # No rows (unlikely with ClickHouse counts, but safe default)
-            return 0, 0}
+            return 0, 0
 
         except Exception as e:
             logging.error("Failed to get latest unique validator counts: %s", e, exc_info=True)
