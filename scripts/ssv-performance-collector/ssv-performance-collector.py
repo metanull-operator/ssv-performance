@@ -374,112 +374,11 @@ def read_clickhouse_password_from_file(password_file_path):
         return file.read().strip()
 
 
-
-
-def _is_active(status: str | None) -> bool:
-    return (status or "").lower() in ACTIVE_STATUSES
-
-def _normalize_pk_map(d: dict[str, str]) -> dict[str, str]:
-    # lowercase keys defensively; values already lowercased in your fetchers
-    return { (k.lower() if isinstance(k, str) else k): (v or "").lower() for k, v in d.items() }
-
-def compare_status_sets_for_operator(
-    operator_validators: dict[int, set[str]],
-    ssv_status_map: dict[str, str],
-    beacon_status_map: dict[str, str],
-    operator_id: int = 14,
-) -> dict:
-    """
-    Compares SSV vs Beacon for the given operator_id.
-    Returns:
-      {
-        "only_in_ssv_active": [pubkey, ...],
-        "only_in_beacon_active": [pubkey, ...],
-        "status_mismatches_nonactive": [{"pubkey":..., "ssv_status":..., "beacon_status":...}, ...]
-      }
-    """
-    pubkeys_for_op = operator_validators.get(operator_id, set())
-    if not pubkeys_for_op:
-        logging.info("Operator %d has no validators; nothing to compare.", operator_id)
-        return {"only_in_ssv_active": [], "only_in_beacon_active": [], "status_mismatches_nonactive": []}
-
-    # Normalize keys so slight casing differences don't matter
-    op_pks = {pk.lower() for pk in pubkeys_for_op}
-    ssv = _normalize_pk_map({pk: ssv_status_map.get(pk, "") for pk in pubkeys_for_op})
-    beacon_full = _normalize_pk_map(beacon_status_map)
-    beacon = {pk: beacon_full.get(pk, "") for pk in op_pks}
-
-    # Sets of "active-equivalent"
-    ssv_active    = {pk for pk, st in ssv.items()    if _is_active(st)}
-    beacon_active = {pk for pk, st in beacon.items() if _is_active(st)}
-
-    only_in_ssv_active    = sorted(ssv_active - beacon_active)
-    only_in_beacon_active = sorted(beacon_active - ssv_active)
-
-    # Status mismatches where at least one side is NOT active (treat all actives as equivalent)
-    mismatches = []
-    for pk in sorted(op_pks):
-        ssv_st = ssv.get(pk, "")
-        bcn_st = beacon.get(pk, "")
-        if _is_active(ssv_st) and _is_active(bcn_st):
-            continue  # both active-equivalent → not interesting
-        if ssv_st != bcn_st:  # at least one non-active and different
-            mismatches.append({
-                "pubkey": pk,
-                "ssv_status": ssv_st or "missing",
-                "beacon_status": bcn_st or "missing",
-            })
-
-    # ---- NEW: totals
-    ssv_total = len(op_pks)
-    ssv_active_total = len(ssv_active)
-    # Count only pubkeys that actually have a Beacon status (non-empty)
-    beacon_total = sum(1 for pk in op_pks if beacon.get(pk, ""))
-    beacon_active_total = len(beacon_active)
-
-    return {
-        "only_in_ssv_active": only_in_ssv_active,
-        "only_in_beacon_active": only_in_beacon_active,
-        "status_mismatches_nonactive": mismatches,
-        "totals": {
-            "ssv_total": ssv_total,
-            "ssv_active": ssv_active_total,
-            "beacon_total": beacon_total,
-            "beacon_active": beacon_active_total,
-        },
-    }
-
-def log_operator_compare_report(diff: dict, operator_id: int = 14) -> None:
-    t = diff.get("totals", {}) or {}
-    logging.info("[op %d] Totals — SSV: %s total / %s active | Beacon: %s total / %s active",
-                 operator_id,
-                 t.get("ssv_total", 0), t.get("ssv_active", 0),
-                 t.get("beacon_total", 0), t.get("beacon_active", 0))
-
-    logging.info("[op %d] SSV active but NOT Beacon: %d", operator_id, len(diff["only_in_ssv_active"]))
-    for pk in diff["only_in_ssv_active"]:
-        logging.info("[op %d]   SSV-only-active: %s", operator_id, pk)
-
-    logging.info("[op %d] Beacon active but NOT SSV: %d", operator_id, len(diff["only_in_beacon_active"]))
-    for pk in diff["only_in_beacon_active"]:
-        logging.info("[op %d]   Beacon-only-active: %s", operator_id, pk)
-
-    logging.info("[op %d] Non-active status mismatches: %d", operator_id, len(diff["status_mismatches_nonactive"]))
-    for row in diff["status_mismatches_nonactive"]:
-        logging.info("[op %d]   MISMATCH %s  SSV='%s'  Beacon='%s'",
-                     operator_id, row["pubkey"], row["ssv_status"], row["beacon_status"])
-
-
-
-
-
-
 def main():
     parser = argparse.ArgumentParser(description='Fetch/update operator data via operators + validators; optional Beacon cross-check.')
     parser.add_argument('-n', '--network', type=str, choices=['mainnet', 'holesky', 'hoodi'], default='mainnet')
     parser.add_argument('-p', '--clickhouse_password_file', type=str, default=os.environ.get('CLICKHOUSE_PASSWORD_FILE'))
     parser.add_argument('--ops-page-size', type=int, default=100, help='perPage for /operators')
-    parser.add_argument('--comp_id', type=int, default=14)
     parser.add_argument('--val-page-size', type=int, default=1000, help='perPage for /validators (lastId cursor)')
     parser.add_argument('--local_time', action='store_true')
     parser.add_argument('--ch-operators-table', default=os.environ.get('CH_OPERATORS_TABLE', 'operators'))
@@ -513,17 +412,6 @@ def main():
         logging.info("Getting BEACON_API validator statuses")
         beacon_statuses = fetch_beacon_statuses(all_pubkeys)
         final_active_counts = count_active_from_status_map(operator_validators, beacon_statuses)
-
-        comp_id = args.comp_id
-
-        # >>> NEW: compare SSV vs Beacon for operator 14
-        diff_14 = compare_status_sets_for_operator(
-            operator_validators=operator_validators,
-            ssv_status_map=all_pubkeys_status,
-            beacon_status_map=beacon_statuses,
-            operator_id=comp_id,
-        )
-        log_operator_compare_report(diff_14, operator_id=comp_id)
     else:
         logging.info("No BEACON_API_URL set; using SSV-based active counts.")
         final_active_counts = count_active_from_status_map(operator_validators, all_pubkeys_status)
