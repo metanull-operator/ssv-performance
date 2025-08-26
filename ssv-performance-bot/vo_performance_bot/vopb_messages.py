@@ -893,7 +893,7 @@ def compile_operator_messages(operators_data, extra_message=None, availability="
         if verified == 'all':
             lines.append(f"- Verified operators: {verified_count} ({(verified_count / n_ops * 100):.2f}%)")
 
-        if availability in ('all', 'public') and verified in ('all', 'verified'):
+        if availability in ('all', 'public') and verified in ('verified'):
             lines.append(f"- Public verified operators: {public_verified_count} ({(public_verified_count / n_ops * 100):.2f}%)")
 
         lines.append(f"### {label} Active Validator Distribution Across Operators")
