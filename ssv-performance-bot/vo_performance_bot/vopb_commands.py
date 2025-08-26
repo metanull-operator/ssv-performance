@@ -10,7 +10,7 @@ from vo_performance_bot.vopb_messages import (
     respond_vo_threshold_messages,
     send_direct_message_test,
     respond_fee_messages,
-    respond_validator_messages
+    respond_operator_messages
 )
 
 
