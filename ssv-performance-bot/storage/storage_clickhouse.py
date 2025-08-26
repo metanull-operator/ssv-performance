@@ -348,17 +348,14 @@ class ClickHouseStorage:
             rows = res.result_rows
             if rows:
                 total, active = rows[0][0], rows[0][1]
-                return {
-                    'total_unique_validators': int(total),
-                    'active_unique_validators': int(active),
-                }
+                return int(total), int(active)
 
             # No rows (unlikely with ClickHouse counts, but safe default)
-            return {'total_unique_validators': 0, 'active_unique_validators': 0}
+            return 0, 0}
 
         except Exception as e:
             logging.error("Failed to get latest unique validator counts: %s", e, exc_info=True)
-            return {'total_unique_validators': 0, 'active_unique_validators': 0}
+            return 0, 0
 
 
     def get_subscriptions_by_type(self, network, subscription_type):
