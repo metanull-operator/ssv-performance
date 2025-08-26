@@ -50,6 +50,7 @@ Thresholds displayed are subject to change.
 - /help: Shows this help message
 - /info: Display bot information
 - /operator [operator_ids...]: Show recent performance for specified operator IDs
+- /operators: Show information about all operators
 - /subscribe daily|alerts [operator_ids...]: Subscribe to daily operator performance direct messages or threshold alert @mentions
 - /subscriptions: List all operator IDs to which you are subscribed for daily operator performance messages or threshold alert @mentions
 - /unsubscribe daily|alerts [operator_ids...]: Unsubscribe from daily operator performance direct messages or threshold alert @mentions
