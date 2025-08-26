@@ -339,7 +339,7 @@ class ClickHouseStorage:
             if callable(nr):
                 rows = nr()
                 if rows:
-                    return int(rows[0]['total_unique_validators']), int(rows[0]['active_unique_validators']),
+                    return int(rows[0]['total_unique_validators']), int(rows[0]['active_unique_validators'])
 
             # Fallback to positional rows
             rows = res.result_rows
