@@ -301,9 +301,9 @@ class ClickHouseStorage:
             return None        
 
 
-    def get_latest_unique_counts(self, network, max_age_days: int | None = None):
+    def get_latest_unique_counts(self, network, max_age_days: int | None = None) -> tuple[int, int]:
         """
-        Return {'total_unique_validators': int, 'active_unique_validators': int}
+        Returns (total_unique_validators, active_unique_validators),
         using the latest status per pubkey within the max_age window.
         """
         query = """
@@ -327,35 +327,40 @@ class ClickHouseStorage:
             FROM latest
         """
         params = {
-            'network': network,
-            'updated_after': self._updated_after(max_age_days),
+            "network": network,
+            "updated_after": self._updated_after(max_age_days),
         }
 
         try:
             res = self.client.query(query, parameters=params)
 
-            # Prefer named results if available
+            # 1) Try named results (generator of dicts)
             nr = getattr(res, "named_results", None)
             if callable(nr):
-                rows = nr()
-                if rows:
-                    total = int(rows[0].get('total_unique_validators', 0) or 0)
-                    active = int(rows[0].get('active_unique_validators', 0) or 0)
-                    return total, active
+                try:
+                    first = next(nr())  # pull first dict from generator
+                    if first is not None:
+                        total = int((first.get("total_unique_validators") or 0))
+                        active = int((first.get("active_unique_validators") or 0))
+                        return total, active
+                except StopIteration:
+                    pass  # fall back to positional
 
-            # Fallback to positional rows
-            rows = res.result_rows
-            if rows:
-                total = int(rows[0][0] or 0)
-                active = int(rows[0][1] or 0)
+            # 2) Fallback: positional rows (list/iterable of tuples)
+            it = iter(res.result_rows)
+            first_row = next(it, None)
+            if first_row is not None:
+                total = int(first_row[0] or 0)
+                active = int(first_row[1] or 0)
                 return total, active
 
-            # No rows (unlikely with ClickHouse counts, but safe default)
+            # No rows (shouldn't happen for COUNT), return zeros
             return 0, 0
 
         except Exception as e:
             logging.error("Failed to get latest unique validator counts: %s", e, exc_info=True)
             return 0, 0
+
 
 
     def get_subscriptions_by_type(self, network, subscription_type):
