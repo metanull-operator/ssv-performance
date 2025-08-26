@@ -339,13 +339,16 @@ class ClickHouseStorage:
             if callable(nr):
                 rows = nr()
                 if rows:
-                    return int(rows[0]['total_unique_validators']), int(rows[0]['active_unique_validators'])
+                    total = int(rows[0].get('total_unique_validators', 0) or 0)
+                    active = int(rows[0].get('active_unique_validators', 0) or 0)
+                    return total, active
 
             # Fallback to positional rows
             rows = res.result_rows
             if rows:
-                total, active = rows[0][0], rows[0][1]
-                return int(total), int(active)
+                total = int(rows[0][0] or 0)
+                active = int(rows[0][1] or 0)
+                return total, active
 
             # No rows (unlikely with ClickHouse counts, but safe default)
             return 0, 0
