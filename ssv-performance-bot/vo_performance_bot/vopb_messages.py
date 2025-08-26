@@ -807,9 +807,9 @@ def render_bucket_lines_counts(buckets_with_ranges, zero_count, outliers, items,
     return bundle_messages(lines)
 
 
-def compile_validator_messages(operators_by_id, extra_message=None, availability="all", verified="all", num_segments=20):
+def compile_operator_messages(operators_data, extra_message=None, availability="all", verified="all", num_segments=20):
     """
-    operators_by_id: dict[op_id] -> operator dict with FIELD_VALIDATOR_COUNT, FIELD_IS_PRIVATE, FIELD_IS_VO, etc.
+    operator_data: dict[op_id] -> operator dict with FIELD_VALIDATOR_COUNT, FIELD_IS_PRIVATE, FIELD_IS_VO, etc.
     """
     messages = []
 
@@ -819,7 +819,7 @@ def compile_validator_messages(operators_by_id, extra_message=None, availability
     public_vo_items, public_non_vo_items = [], []
     private_vo_items, private_non_vo_items = [], []
 
-    for op in operators_by_id.values():
+    for op in operators_data.values():
         count = op.get(FIELD_VALIDATOR_COUNT)
         if count is None:
             continue  # skip unknowns
@@ -856,7 +856,7 @@ def compile_validator_messages(operators_by_id, extra_message=None, availability
         hi_example = random.choice(hi_ops)
         hi_others = max(0, len(hi_ops) - 1)
         highest_line = (
-            f"- Highest validators: {hi:,} — "
+            f"- Most validators: {hi:,} — "
             f"{hi_example[FIELD_OPERATOR_NAME]} (ID: {hi_example[FIELD_OPERATOR_ID]})"
             + (f" and {hi_others} other{'s' if hi_others != 1 else ''}" if hi_others > 0 else "")
         )
@@ -875,13 +875,13 @@ def compile_validator_messages(operators_by_id, extra_message=None, availability
         )
 
         lines = [
-            f"**{label} Operator Validator Counts**",
-            f"*{n_ops} operators*",
-            f"*{zero_count} operators with 0 active validators, excluded below*",
-            highest_line,                        
+            f"**{label} Operators**",
+            f"*{n_ops} operators*",                
+            f"- Operators w/ > 0 validators: {n_ops - zero_count} ({zero_count} with 0 validators)",
             f"- Mean active validators per operator: {mean:.2f}",
-            f"- Median validators/operator: {int(median) if median == int(median) else round(median, 2)}",
-            f"### {label} Validator Count Distribution (Operators)",
+            f"- Median active validators per operator: {int(median) if median == int(median) else round(median, 2)}",
+            highest_line,        
+            f"### {label} Validator Distribution Across Operators",
         ]
         lines += bucket_lines
         return bundle_messages(lines)
@@ -929,10 +929,10 @@ def compile_validator_messages(operators_by_id, extra_message=None, availability
 
     return bundle_messages(messages)
 
-async def respond_validator_messages(ctx, operators_by_id, extra_message=None, availability="all", verified="all", num_segments=20):
+async def respond_operator_messages(ctx, operator_data, extra_message=None, availability="all", verified="all", num_segments=20):
     try:
-        messages = compile_validator_messages(
-            operators_by_id, availability=availability, verified=verified,
+        messages = compile_operator_messages(
+            operators_data, availability=availability, verified=verified,
             extra_message=extra_message,
             num_segments=num_segments
         )
