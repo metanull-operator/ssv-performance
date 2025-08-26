@@ -856,7 +856,7 @@ def compile_operator_messages(operators_data, extra_message=None, availability="
         hi_example = random.choice(hi_ops)
         hi_others = max(0, len(hi_ops) - 1)
         highest_line = (
-            f"- Most validators: {hi:,} — "
+            f"- Most active validators: {hi:,} — "
             f"{hi_example[FIELD_OPERATOR_NAME]} (ID: {hi_example[FIELD_OPERATOR_ID]})"
             + (f" and {hi_others} other{'s' if hi_others != 1 else ''}" if hi_others > 0 else "")
         )
@@ -874,15 +874,26 @@ def compile_operator_messages(operators_data, extra_message=None, availability="
             median=median
         )
 
+        private_count = sum(1 for _, op in items if op.get(FIELD_IS_PRIVATE))
+        verified_count = sum(1 for _, op in items if op.get(FIELD_IS_VO))
+
         lines = [
             f"**{label} Operators**",
             f"*{n_ops} operators*",                
-            f"- Operators w/ > 0 validators: {n_ops - zero_count} ({zero_count} with 0 validators)",
+            f"- Operators w/ active validators: {n_ops - zero_count}",
             f"- Mean active validators per operator: {mean:.2f}",
             f"- Median active validators per operator: {int(median) if median == int(median) else round(median, 2)}",
             highest_line,        
-            f"### {label} Validator Distribution Across Operators",
         ]
+
+        if availability == 'all':
+            lines.append(f"- Private operators: {private_count} ({(private_count / n_ops * 100):.2f}%)")
+
+        if verified == 'all':
+            line.append(f"- Verified operators: {verified_count} ({(verified_count / n_ops * 100):.2f}%)")
+
+        lines.append(f"### {label} Active Validator Distribution Across Operators")
+
         lines += bucket_lines
         return bundle_messages(lines)
 
