@@ -261,7 +261,7 @@ Thresholds displayed are subject to change.
             storage = StorageFactory.get_storage('ssv_performance')
             operator_data = storage.get_operators_with_validator_counts(network, max_age_days=0)
 
-            if not validator_data:
+            if not operator_data:
                 logging.error(f"Operator data empty in operators command")
                 await ctx.followup.send("Operator data not available.", ephemeral=True)
                 return
