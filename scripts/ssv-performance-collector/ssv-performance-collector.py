@@ -119,11 +119,13 @@ def fetch_validators_maps(network: str, per_page: int = 1000):
     Returns:
       - operator_validators: {op_id -> set(pubkeys)}
       - all_pubkeys: set(pubkeys)
-      - all_pubkeys_status: {pubkey -> bool}
+      - all_pubkeys_status: {pubkey -> status_lower}
+      - validator_details: {pubkey -> {"cluster": str|None, "ssv_status": str, "index": int|None}}
     """
     operator_validators: dict[int, set[str]] = {}
     all_pubkeys: set[str] = set()
-    all_pubkeys_status: dict[str, bool] = {}
+    all_pubkeys_status: dict[str, str] = {}
+    validator_details: dict[str, dict] = {}
 
     last_id: int | None = None
     batch = 0
@@ -170,19 +172,28 @@ def fetch_validators_maps(network: str, per_page: int = 1000):
             # Make sure all pubkeys are 0x-prefixed
             if isinstance(pubkey, str) and not pubkey.startswith("0x"):
                 pubkey = "0x" + pubkey.strip()
+            pubkey = pubkey.lower()
 
             # Add to lists of all validators and active validators
             all_pubkeys.add(pubkey)
 
-            # Prefer specific validator status or general is_active flag
-            st = ((v.get("validator_info") or {}).get("status") or "").lower()
-            if st is not None and st != "":
-                all_pubkeys_status[pubkey] = st
-            else:
-                all_pubkeys_status[pubkey] = "active"
+            vi = (v.get("validator_info") or {})
+            ssv_status = (vi.get("status") or "").lower()
+            try:
+                vi_index = vi.get("index")
+                vi_index = int(vi_index) if vi_index is not None else None
+            except Exception:
+                vi_index = None
 
-            # Build map of operators to their validators
-            #   Dict with operator ID key and valus is a set of pubkeys
+            all_pubkeys_status[pubkey] = ssv_status
+
+            validator_details[pubkey] = {
+                "cluster": v.get("cluster"),
+                "ssv_status": ssv_status or "",
+                "index": vi_index,
+            }
+
+            # operator membership
             for op in (v.get("operators") or []):
                 raw_id = op.get("id", op.get("id_str"))
                 try:
@@ -218,8 +229,8 @@ def fetch_validators_maps(network: str, per_page: int = 1000):
 
     logging.info("SSV_API: Validators done. Unique validators=%d, operators_with_validators=%d",
                  len(all_pubkeys), len(operator_validators))
-    
-    return operator_validators, all_pubkeys, all_pubkeys_status
+
+    return operator_validators, all_pubkeys, all_pubkeys_status, validator_details
 
 
 def fetch_beacon_statuses(pubkeys: set[str]) -> dict[str, str]:
@@ -360,6 +371,70 @@ def insert_clickhouse_validator_count_data(client, network, validator_counts, ta
     ])
 
 
+def insert_clickhouse_validator_details(
+    client,
+    network: str,
+    validator_details: dict[str, dict],
+    beacon_statuses: dict[str, str] | None,
+    snapshot_ts: datetime | None = None,
+):
+    """
+    Writes one row per pubkey with (network, pubkey, cluster, FINAL status, index, updated_at).
+    FINAL status = beacon status if present, else SSV status.
+    """
+    rows = []
+    now_ts = snapshot_ts or datetime.now(timezone.utc)
+    bmap = beacon_statuses or {}
+
+    for pk, d in validator_details.items():
+        ssv_status = (d.get("ssv_status") or "").lower()
+        final_status = (bmap.get(pk) or ssv_status or "")
+        rows.append((
+            network,
+            pk,
+            d.get("cluster"),
+            final_status,
+            d.get("index"),
+            now_ts,
+        ))
+
+    if not rows:
+        logging.info("CLICKHOUSE: no validator details to insert.")
+        return
+
+    logging.info("CLICKHOUSE: inserting validators validator detail rows into %s", len(rows))
+    client.insert('validators', rows, column_names=[
+        "network", "pubkey", "cluster", "status", "validator_index", "updated_at"
+    ])
+
+
+def cleanup_table(client, network: str, table_name: str):
+    """
+    Deletes any rows whose updated_at is older than the most recent snapshot time for this network.
+    Keeps only the latest snapshot.
+    """
+    try:
+        res = client.query(
+            f"SELECT max(updated_at) FROM {table_name} WHERE network = %(network)s",
+            parameters={"network": network},
+        ).result_rows
+        if not res or not res[0][0]:
+            logging.info("CLICKHOUSE: no rows in %s to clean for network=%s", table_name, network)
+            return
+        max_ts = res[0][0]
+        logging.info("CLICKHOUSE: cleaning %s — keeping snapshot at %s", table_name, max_ts)
+
+        client.query(
+            f"""
+            ALTER TABLE {table_name}
+            DELETE WHERE network = %(network)s AND updated_at < %(max_ts)s
+            """,
+            parameters={"network": network, "max_ts": max_ts},
+        )
+    except Exception as e:
+        logging.warning("CLICKHOUSE: cleanup for %s failed: %s", table_name, e)
+
+
 def deduplicate_table(client, table_name: str, network: str):
     try:
         query = f"OPTIMIZE TABLE {table_name} PARTITION %(network)s FINAL"
@@ -385,6 +460,8 @@ def main():
     parser.add_argument('--ch-performance-table', default=os.environ.get('CH_PERFORMANCE_TABLE', 'performance'))
     parser.add_argument("--log_level", default=os.environ.get("COLLECTOR_LOG_LEVEL", "INFO"),
                         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"])
+    parser.add_argument('--store-validator-details', action='store_true',
+                    help='If set, store latest validator details (pubkey, cluster, status, index) into validators table')
     args = parser.parse_args()
 
     # Set logging level dynamically
@@ -401,7 +478,8 @@ def main():
     operators = fetch_operators_from_ssv(args.network, args.ops_page_size)
 
     # Step 2: Query validators endpoint and optionally beacon API for statuses
-    operator_validators, all_pubkeys, all_pubkeys_status = fetch_validators_maps(args.network, args.val_page_size)
+    operator_validators, all_pubkeys, all_pubkeys_status, validator_details = fetch_validators_maps(args.network, args.val_page_size)
+
     logging.info("SSV_API: Operators with > 0 validators: %d/%d total).",
                  len([k for k,v in operator_validators.items() if v]), len(operators))
 
@@ -416,7 +494,6 @@ def main():
         logging.info("No BEACON_API_URL set; using SSV-based active counts.")
         final_active_counts = count_active_from_status_map(operator_validators, all_pubkeys_status)
 
-
     # Set the final active count into operators[op]['validators_count'] (used by DB writer)
     for op_id, op in operators.items():
         op["validators_count"] = final_active_counts.get(op_id, 0)
@@ -428,11 +505,23 @@ def main():
     insert_clickhouse_performance_data(client, args.network, args.ch_operators_table, args.ch_performance_table, operators, target_date, IMPORT_SOURCE)
     insert_clickhouse_validator_count_data(client, args.network, final_active_counts, target_date, IMPORT_SOURCE)
 
+    # --- Optional: store validator details snapshot
+    if args.store_validator_details:
+        snapshot_ts = datetime.now(timezone.utc if not args.local_time else None)
+        insert_clickhouse_validator_details(
+            client=client,
+            network=args.network,
+            validator_details=validator_details,
+            beacon_statuses=beacon_statuses,
+            snapshot_ts=snapshot_ts,
+        )
+        cleanup_table(client, args.network, 'validators')
+
     deduplicate_table(client, args.ch_operators_table, args.network)
     deduplicate_table(client, args.ch_performance_table, args.network)
     deduplicate_table(client, 'operator_fees', args.network)
     deduplicate_table(client, 'validator_counts', args.network)
-
+    deduplicate_table(client, 'validators', args.network)
 
 if __name__ == "__main__":
     main()
