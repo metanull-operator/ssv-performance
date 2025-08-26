@@ -932,7 +932,7 @@ def compile_operator_messages(operators_data, extra_message=None, availability="
 async def respond_operator_messages(ctx, operator_data, extra_message=None, availability="all", verified="all", num_segments=20):
     try:
         messages = compile_operator_messages(
-            operators_data, availability=availability, verified=verified,
+            operator_data, availability=availability, verified=verified,
             extra_message=extra_message,
             num_segments=num_segments
         )
