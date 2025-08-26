@@ -874,6 +874,8 @@ def compile_validator_messages(operators_by_id, total_unique_validators, active_
             median=median
         )
 
+        logging.debug(f"total_unique_validators: {total_unique_validators}, active_unique_validators: {active_unique_validators}")
+
         lines = [
             f"**{label} Operator Validator Counts**",
             f"*{active_unique_validators} active validators*",
