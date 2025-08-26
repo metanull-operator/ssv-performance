@@ -441,6 +441,12 @@ def compare_status_sets_for_operator(
         "only_in_ssv_active": only_in_ssv_active,
         "only_in_beacon_active": only_in_beacon_active,
         "status_mismatches_nonactive": mismatches,
+        "totals": {
+            "ssv_total": ssv_total,
+            "ssv_active": ssv_active_total,
+            "beacon_total": beacon_total,
+            "beacon_active": beacon_active_total,
+        },
     }
 
 def log_operator_compare_report(diff: dict, operator_id: int = 14) -> None:
