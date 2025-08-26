@@ -874,8 +874,9 @@ def compile_operator_messages(operators_data, extra_message=None, availability="
             median=median
         )
 
-        private_count = sum(1 for _, op in items if op.get(FIELD_IS_PRIVATE))
+        public_count = sum(1 for _, op in items if not op.get(FIELD_IS_PRIVATE))
         verified_count = sum(1 for _, op in items if op.get(FIELD_IS_VO))
+        public_verified_count = sum(1 for _, op in items if not op.get(FIELD_IS_PRIVATE) and op.get(FIELD_IS_VO))
 
         lines = [
             f"**{label} Operators**",
@@ -887,10 +888,13 @@ def compile_operator_messages(operators_data, extra_message=None, availability="
         ]
 
         if availability == 'all':
-            lines.append(f"- Private operators: {private_count} ({(private_count / n_ops * 100):.2f}%)")
+            lines.append(f"- Public operators: {public_count} ({(public_count / n_ops * 100):.2f}%)")
 
         if verified == 'all':
             lines.append(f"- Verified operators: {verified_count} ({(verified_count / n_ops * 100):.2f}%)")
+
+        if availability in ('all', 'public') and verified in ('all', 'verified'):
+            lines.append(f"- Public verified operators: {public_verified_count} ({(public_verified_count / n_ops * 100):.2f}%)")
 
         lines.append(f"### {label} Active Validator Distribution Across Operators")
 
