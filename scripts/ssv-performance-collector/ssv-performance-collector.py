@@ -282,7 +282,7 @@ def count_active_from_status_map(operator_validators: dict[int, set[str]], statu
     }
 
 
-def insert_clickhouse_performance_data(client, network, clickhouse_table_operators, clickhouse_table_performance, operators, target_date, source):
+def insert_clickhouse_performance_data(client, network, operators, target_date, source):
     performance_rows = []
     operator_rows = []
     validator_counts_rows = []
@@ -331,11 +331,11 @@ def insert_clickhouse_performance_data(client, network, clickhouse_table_operato
     logging.info("CLICKHOUSE: inserting %d operators, %d perf rows, %d validator count rows, %d fee rows",
                  len(operator_rows), len(performance_rows), len(validator_counts_rows), len(operator_fees_rows))
 
-    client.insert(clickhouse_table_operators, operator_rows, column_names=[
+    client.insert('operators', operator_rows, column_names=[
         'network', 'operator_id', 'operator_name', 'is_vo', 'is_private', 'validator_count', 'operator_fee', 'address', 'updated_at'
     ])
 
-    client.insert(clickhouse_table_performance, performance_rows, column_names=[
+    client.insert('performance', performance_rows, column_names=[
         'network', 'operator_id', 'metric_type', 'metric_date', 'metric_value', 'source', 'updated_at'
     ])
 
