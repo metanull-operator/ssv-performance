@@ -82,46 +82,55 @@ def get_operator_performance_data(network: str, days: int, metric_type: str, cli
     query = """
         WITH
         op AS (
-        SELECT network, operator_id,
-                argMax(operator_name, updated_at) AS operator_name,
-                argMax(is_vo, updated_at) AS is_vo,
-                argMax(is_private, updated_at) AS is_private,
-                argMax(address, updated_at) AS address,
-                max(updated_at) AS op_latest_at
+        SELECT
+            network,
+            operator_id,
+            argMax(operator_name, updated_at) AS operator_name,
+            argMax(is_vo,         updated_at) AS is_vo,
+            argMax(is_private,    updated_at) AS is_private,
+            argMax(address,       updated_at) AS address,
+            max(updated_at) AS op_latest_at
         FROM operators
         WHERE network = %(network)s
         GROUP BY network, operator_id
         ),
         cnt AS (
-        SELECT network, operator_id,
-                argMax(validator_count, updated_at) AS validator_count,
-                max(updated_at) AS counts_latest_at
+        SELECT
+            network,
+            operator_id,
+            argMax(validator_count, updated_at) AS validator_count,
+            max(updated_at) AS counts_latest_at
         FROM validator_counts
         WHERE network = %(network)s
         GROUP BY network, operator_id
         ),
         perf AS (
-        SELECT network, operator_id,
-                argMax(metric_value, metric_date) AS latest_metric_value,
-                max(metric_date)                  AS latest_metric_date
+        SELECT
+            network,
+            operator_id,
+            argMax(metric_value, metric_date) AS latest_metric_value,
+            max(metric_date)                  AS latest_metric_date
         FROM performance
         WHERE network = %(network)s AND metric_type = %(metric_type)s
         GROUP BY network, operator_id
         )
         SELECT
-        o.operator_id, o.operator_name, o.is_vo, o.is_private, o.address,
+        o.operator_id,
+        o.operator_name,
+        o.is_vo,
+        o.is_private,
+        o.address,
         c.validator_count,
 
-        /* NULL when no perf row; otherwise a proper Date */
-        if(p.latest_metric_date > toDate('1970-01-01'),
-            CAST(p.latest_metric_date AS Nullable(Date)),
-            CAST(NULL AS Nullable(Date)))         AS metric_date,
+        /* Always a real Date (never NULL): prefer perf date, else counts/op dates, else 1970 */
+        coalesce(
+            p.latest_metric_date,
+            toDate(c.counts_latest_at),
+            toDate(o.op_latest_at),
+            toDate('1970-01-01')
+        ) AS metric_date,
 
-        /* make value nullable in lockstep */
-        if(p.latest_metric_date > toDate('1970-01-01'),
-            CAST(p.latest_metric_value AS Nullable(Float64)),
-            CAST(NULL AS Nullable(Float64)))      AS latest_metric_value
-
+        p.latest_metric_value
         FROM op o
         LEFT JOIN cnt  c USING (network, operator_id)
         LEFT JOIN perf p USING (network, operator_id)
@@ -129,6 +138,7 @@ def get_operator_performance_data(network: str, days: int, metric_type: str, cli
         o.op_latest_at        >= toDateTime(%(updated_after)s)
         OR c.counts_latest_at >= toDateTime(%(updated_after)s)
         ORDER BY o.operator_id
+        SETTINGS join_use_nulls = 1
     """
 
     params = {
