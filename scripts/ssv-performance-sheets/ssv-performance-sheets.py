@@ -81,7 +81,7 @@ def get_operator_performance_data(network: str, days: int, metric_type: str, cli
 
     query = """
         WITH
-        op AS (
+        op_latest AS (
         SELECT
             network,
             operator_id,
@@ -94,7 +94,7 @@ def get_operator_performance_data(network: str, days: int, metric_type: str, cli
         WHERE network = %(network)s
         GROUP BY network, operator_id
         ),
-        cnt AS (
+        cnt_latest AS (
         SELECT
             network,
             operator_id,
@@ -104,45 +104,44 @@ def get_operator_performance_data(network: str, days: int, metric_type: str, cli
         WHERE network = %(network)s
         GROUP BY network, operator_id
         ),
-        perf AS (
+        eligible AS (   -- either/or freshness gate
+        SELECT network, operator_id FROM op_latest
+        WHERE op_latest_at   >= toDateTime(%(updated_after)s)
+        UNION ALL
+        SELECT network, operator_id FROM cnt_latest
+        WHERE counts_latest_at >= toDateTime(%(updated_after)s)
+        ),
+        eligible_distinct AS (
+        SELECT DISTINCT network, operator_id FROM eligible
+        ),
+
+        /* All performance rows for the metric (set since_date low if you truly want full history) */
+        perf_series AS (
         SELECT
             network,
             operator_id,
-            argMax(metric_value, metric_date) AS latest_metric_value,
-            max(metric_date)                  AS latest_metric_date
+            metric_date,            -- real Date from the table (no 1970 default)
+            metric_value
         FROM performance
-        WHERE network = %(network)s AND metric_type = %(metric_type)s
-        GROUP BY network, operator_id
+        WHERE network = %(network)s
+            AND metric_type = %(metric_type)s
+            AND metric_date >= toDate(%(since_date)s)
         )
+
         SELECT
         o.operator_id,
         o.operator_name,
         o.is_vo,
         o.is_private,
         o.address,
-
-        /* validator count: 0 if missing */
-        COALESCE(c.validator_count, toUInt32(0)) AS validator_count,
-
-        /* metric_date: prefer perf date; else counts/op timestamps cast to Date */
-        COALESCE(
-            NULLIF(p.latest_metric_date, toDate('1970-01-01')),
-            toDate(c.counts_latest_at),
-            toDate(o.op_latest_at),
-            toDate('1970-01-01')
-        ) AS metric_date,
-
-        /* metric value: 0.0 if missing */
-        COALESCE(p.latest_metric_value, toFloat64(0)) AS latest_metric_value
-
-        FROM op o
-        LEFT JOIN cnt  c USING (network, operator_id)
-        LEFT JOIN perf p USING (network, operator_id)
-        WHERE
-        o.op_latest_at >= toDateTime(%(updated_after)s)
-        OR (isNotNull(c.counts_latest_at) AND c.counts_latest_at >= toDateTime(%(updated_after)s))
-        ORDER BY o.operator_id
-        SETTINGS join_use_nulls = 1
+        c.validator_count,                                   -- latest count snapshot (nullable)
+        p.metric_date,                                       -- real Date; safe for strftime
+        COALESCE(p.metric_value, toFloat64(0)) AS metric_value  -- never NULL → avoids float(None)
+        FROM perf_series p
+        JOIN eligible_distinct e USING (network, operator_id)   -- ensures “at least one” perf row
+        JOIN op_latest o        USING (network, operator_id)    -- latest operator metadata
+        LEFT JOIN cnt_latest c  USING (network, operator_id)    -- counts are optional
+        ORDER BY o.operator_id, p.metric_date
     """
 
     params = {
