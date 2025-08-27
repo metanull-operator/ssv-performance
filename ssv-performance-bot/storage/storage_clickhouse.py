@@ -420,30 +420,65 @@ class ClickHouseStorage:
 
     def get_operators_with_validator_counts(self, network, max_age_days: int | None = None):
         query = """
-            WITH latest_counts AS (
-                SELECT
-                    network,
-                    operator_id,
-                    argMax(validator_count, updated_at) AS validator_count
-                FROM validator_counts
-                WHERE network = %(network)s
-                AND updated_at >= %(updated_after)s
-                GROUP BY network, operator_id
-            )
+            WITH
+            /* Collapse operators to a single latest snapshot (even if stale) */
+            latest_ops_any AS (
             SELECT
-                o.network,
-                o.operator_id,
-                o.operator_name,
-                o.is_vo,
-                o.is_private,
-                lc.validator_count AS validator_count
-            FROM operators o
-            LEFT JOIN latest_counts lc
-            ON lc.network = o.network
-            AND lc.operator_id = o.operator_id
-            WHERE o.network = %(network)s
-            AND o.updated_at >= %(updated_after)s
-            ORDER BY o.operator_id
+                network,
+                operator_id,
+                argMax(operator_name, updated_at) AS operator_name,
+                argMax(is_vo,         updated_at) AS is_vo,
+                argMax(is_private,    updated_at) AS is_private,
+                argMax(address,       updated_at) AS address,
+                max(updated_at) AS op_latest_at
+            FROM operators
+            WHERE network = %(network)s
+            GROUP BY network, operator_id
+            ),
+
+            /* Fresh operators (by latest operator row) */
+            fresh_ops AS (
+            SELECT network, operator_id
+            FROM latest_ops_any
+            WHERE op_latest_at >= toDateTime(%(updated_after)s)
+            ),
+
+            /* Latest validator_count per operator, but keep only if that latest row is fresh */
+            latest_fresh_counts AS (
+            SELECT
+                network,
+                operator_id,
+                argMax(validator_count, updated_at) AS validator_count,
+                max(updated_at) AS counts_latest_at
+            FROM validator_counts
+            WHERE network = %(network)s
+            GROUP BY network, operator_id
+            HAVING counts_latest_at >= toDateTime(%(updated_after)s)
+            ),
+
+            /* Eligible = fresh operator OR non-fresh operator with fresh counts */
+            eligible AS (
+            SELECT network, operator_id FROM fresh_ops
+            UNION ALL
+            SELECT network, operator_id FROM latest_fresh_counts
+            ),
+            eligible_distinct AS (
+            SELECT DISTINCT network, operator_id FROM eligible
+            )
+
+            SELECT
+            lo.network,
+            lo.operator_id,
+            lo.operator_name,
+            lo.is_vo,
+            lo.is_private,
+            /* NULL if no fresh counts (thanks to LEFT JOIN + join_use_nulls) */
+            lc.validator_count AS validator_count
+            FROM eligible_distinct e
+            JOIN latest_ops_any       AS lo USING (network, operator_id)
+            LEFT JOIN latest_fresh_counts AS lc USING (network, operator_id)
+            ORDER BY lo.operator_id
+            SETTINGS join_use_nulls = 1
         """
         res = self.client.query(
             query,

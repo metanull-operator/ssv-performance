@@ -54,6 +54,8 @@ services:
       start_period: 10s
     networks:
       - ssv-performance-network
+    ports:
+      - 8123:8123
 
 volumes:
   clickhouse-data:
