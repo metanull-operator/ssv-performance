@@ -55,7 +55,7 @@ services:
     networks:
       - ssv-performance-network
     ports:
-      - 8123:8123
+      - "${EXTERNAL_CLICKHOUSE_PORT:-8123}:8123"
 
 volumes:
   clickhouse-data:
