@@ -19,7 +19,7 @@ class ClickHouseStorage:
         
         env_max_age = os.environ.get("BOT_DEFAULT_MAX_AGE_DAYS", None) 
         if env_max_age is None or env_max_age != '':
-            env_max_age = None
+            env_max_age = 0
         self.default_max_age_days = int(env_max_age if default_max_age_days is None else default_max_age_days)
 
         for attempt in range(1, retries + 1):
