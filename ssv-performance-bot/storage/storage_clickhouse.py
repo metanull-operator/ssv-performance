@@ -16,9 +16,11 @@ class ClickHouseStorage:
 
     def __init__(self, retries=5, delay=2, default_max_age_days=None, **kwargs):
         # Global default for this instance; per-call overrides are supported.
-        self.default_max_age_days = int(
-            os.environ.get("DEFAULT_MAX_AGE_DAYS", 0) if default_max_age_days is None else default_max_age_days
-        )
+        
+        env_max_age = os.environ.get("BOT_DEFAULT_MAX_AGE_DAYS", None) 
+        if env_max_age is None or env_max_age != '':
+            env_max_age = None
+        self.default_max_age_days = int(env_max_age if default_max_age_days is None else default_max_age_days)
 
         for attempt in range(1, retries + 1):
             try:
