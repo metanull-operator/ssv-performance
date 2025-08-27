@@ -114,7 +114,7 @@ def get_operator_validator_count_data(network: str, days: int, clickhouse_passwo
         FROM op AS o
         LEFT JOIN cnt_latest AS c USING (network, operator_id)
         WHERE o.op_latest_at >= toDateTime(%(updated_after)s)   -- fresh operators only
-        ORDER BY o.operator_id;
+        ORDER BY o.operator_id
     """
 
     params = {
