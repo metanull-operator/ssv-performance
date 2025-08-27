@@ -418,72 +418,72 @@ class ClickHouseStorage:
             logging.error(f"Failed to delete user subscription: {e}", exc_info=True)
             return None
 
-def get_operators_with_validator_counts(self, network, max_age_days: int | None = None):
-    query = """
-    WITH latest_counts AS (
-      SELECT
-          network,
-          operator_id,
-          argMax(validator_count, updated_at) AS validator_count,
-          max(updated_at)                     AS counts_latest_at
-      FROM validator_counts
-      WHERE network = %(network)s
-      GROUP BY network, operator_id
-    )
-    SELECT
-        o.network        AS network,
-        o.operator_id    AS operator_id,
-        o.operator_name  AS operator_name,
-        o.is_vo          AS is_vo,
-        o.is_private     AS is_private,
-        IF(lc.counts_latest_at >= toDateTime(%(updated_after)s), lc.validator_count, NULL) AS validator_count
-    FROM operators AS o
-    LEFT JOIN latest_counts AS lc
-      ON lc.network = o.network
-     AND lc.operator_id = o.operator_id
-    WHERE o.network = %(network)s
-      AND (
-            o.updated_at       >= toDateTime(%(updated_after)s)
-         OR lc.counts_latest_at >= toDateTime(%(updated_after)s)
-          )
-    ORDER BY o.operator_id
-    SETTINGS join_use_nulls = 1
-    """
-    res = self.client.query(
-        query,
-        parameters={
-            "network": network,
-            "updated_after": self._updated_after(max_age_days),
-        },
-        settings={"join_use_nulls": 1},
-    )
+    def get_operators_with_validator_counts(self, network, max_age_days: int | None = None):
+        query = """
+        WITH latest_counts AS (
+        SELECT
+            network,
+            operator_id,
+            argMax(validator_count, updated_at) AS validator_count,
+            max(updated_at)                     AS counts_latest_at
+        FROM validator_counts
+        WHERE network = %(network)s
+        GROUP BY network, operator_id
+        )
+        SELECT
+            o.network        AS network,
+            o.operator_id    AS operator_id,
+            o.operator_name  AS operator_name,
+            o.is_vo          AS is_vo,
+            o.is_private     AS is_private,
+            IF(lc.counts_latest_at >= toDateTime(%(updated_after)s), lc.validator_count, NULL) AS validator_count
+        FROM operators AS o
+        LEFT JOIN latest_counts AS lc
+        ON lc.network = o.network
+        AND lc.operator_id = o.operator_id
+        WHERE o.network = %(network)s
+        AND (
+                o.updated_at       >= toDateTime(%(updated_after)s)
+            OR lc.counts_latest_at >= toDateTime(%(updated_after)s)
+            )
+        ORDER BY o.operator_id
+        SETTINGS join_use_nulls = 1
+        """
+        res = self.client.query(
+            query,
+            parameters={
+                "network": network,
+                "updated_after": self._updated_after(max_age_days),
+            },
+            settings={"join_use_nulls": 1},
+        )
 
-    # Materialize to a list of dicts (never a generator)
-    rows = None
-    nr = getattr(res, "named_results", None)
-    if callable(nr):
-        try:
-            rows = list(nr())
-        except Exception:
-            rows = None
-    if not rows:
-        cols = list(res.column_names)
-        rows = [dict(zip(cols, r)) for r in list(res.result_rows)]
+        # Materialize to a list of dicts (never a generator)
+        rows = None
+        nr = getattr(res, "named_results", None)
+        if callable(nr):
+            try:
+                rows = list(nr())
+            except Exception:
+                rows = None
+        if not rows:
+            cols = list(res.column_names)
+            rows = [dict(zip(cols, r)) for r in list(res.result_rows)]
 
-    # Optional: quick guard to catch unexpected column names
-    if rows and "operator_id" not in rows[0]:
-        raise KeyError(f"Expected 'operator_id' in columns, got: {list(rows[0].keys())}")
+        # Optional: quick guard to catch unexpected column names
+        if rows and "operator_id" not in rows[0]:
+            raise KeyError(f"Expected 'operator_id' in columns, got: {list(rows[0].keys())}")
 
-    ops = {}
-    for r in rows:
-        op_id = int(r["operator_id"])
-        ops[op_id] = {
-            FIELD_NETWORK: r["network"],
-            FIELD_OPERATOR_ID: op_id,
-            FIELD_OPERATOR_NAME: r["operator_name"],
-            FIELD_IS_VO: int(r["is_vo"]),
-            FIELD_IS_PRIVATE: int(r["is_private"]),
-            # Preserve NULL from DB as Python None
-            FIELD_VALIDATOR_COUNT: r["validator_count"],
-        }
-    return ops
+        ops = {}
+        for r in rows:
+            op_id = int(r["operator_id"])
+            ops[op_id] = {
+                FIELD_NETWORK: r["network"],
+                FIELD_OPERATOR_ID: op_id,
+                FIELD_OPERATOR_NAME: r["operator_name"],
+                FIELD_IS_VO: int(r["is_vo"]),
+                FIELD_IS_PRIVATE: int(r["is_private"]),
+                # Preserve NULL from DB as Python None
+                FIELD_VALIDATOR_COUNT: r["validator_count"],
+            }
+        return ops
