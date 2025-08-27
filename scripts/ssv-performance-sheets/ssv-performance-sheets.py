@@ -119,7 +119,7 @@ def get_operator_performance_data(network: str, days: int, metric_type: str, cli
         WHERE
         o.op_latest_at        >= toDateTime(%(updated_after)s)
         OR c.counts_latest_at >= toDateTime(%(updated_after)s)
-        ORDER BY o.operator_id;
+        ORDER BY o.operator_id
     """
 
     params = {
