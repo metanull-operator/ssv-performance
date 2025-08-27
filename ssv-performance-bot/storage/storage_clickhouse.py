@@ -418,91 +418,72 @@ class ClickHouseStorage:
             logging.error(f"Failed to delete user subscription: {e}", exc_info=True)
             return None
 
-    def get_operators_with_validator_counts(self, network, max_age_days: int | None = None):
-        query = """
-            WITH
-            /* Collapse operators to a single latest snapshot (even if stale) */
-            latest_ops_any AS (
-            SELECT
-                network,
-                operator_id,
-                argMax(operator_name, updated_at) AS operator_name,
-                argMax(is_vo,         updated_at) AS is_vo,
-                argMax(is_private,    updated_at) AS is_private,
-                argMax(address,       updated_at) AS address,
-                max(updated_at) AS op_latest_at
-            FROM operators
-            WHERE network = %(network)s
-            GROUP BY network, operator_id
-            ),
+def get_operators_with_validator_counts(self, network, max_age_days: int | None = None):
+    query = """
+    WITH latest_counts AS (
+      SELECT
+          network,
+          operator_id,
+          argMax(validator_count, updated_at) AS validator_count,
+          max(updated_at)                     AS counts_latest_at
+      FROM validator_counts
+      WHERE network = %(network)s
+      GROUP BY network, operator_id
+    )
+    SELECT
+        o.network        AS network,
+        o.operator_id    AS operator_id,
+        o.operator_name  AS operator_name,
+        o.is_vo          AS is_vo,
+        o.is_private     AS is_private,
+        IF(lc.counts_latest_at >= toDateTime(%(updated_after)s), lc.validator_count, NULL) AS validator_count
+    FROM operators AS o
+    LEFT JOIN latest_counts AS lc
+      ON lc.network = o.network
+     AND lc.operator_id = o.operator_id
+    WHERE o.network = %(network)s
+      AND (
+            o.updated_at       >= toDateTime(%(updated_after)s)
+         OR lc.counts_latest_at >= toDateTime(%(updated_after)s)
+          )
+    ORDER BY o.operator_id
+    SETTINGS join_use_nulls = 1
+    """
+    res = self.client.query(
+        query,
+        parameters={
+            "network": network,
+            "updated_after": self._updated_after(max_age_days),
+        },
+        settings={"join_use_nulls": 1},
+    )
 
-            /* Fresh operators (by latest operator row) */
-            fresh_ops AS (
-            SELECT network, operator_id
-            FROM latest_ops_any
-            WHERE op_latest_at >= toDateTime(%(updated_after)s)
-            ),
+    # Materialize to a list of dicts (never a generator)
+    rows = None
+    nr = getattr(res, "named_results", None)
+    if callable(nr):
+        try:
+            rows = list(nr())
+        except Exception:
+            rows = None
+    if not rows:
+        cols = list(res.column_names)
+        rows = [dict(zip(cols, r)) for r in list(res.result_rows)]
 
-            /* Latest validator_count per operator, but keep only if that latest row is fresh */
-            latest_fresh_counts AS (
-            SELECT
-                network,
-                operator_id,
-                argMax(validator_count, updated_at) AS validator_count,
-                max(updated_at) AS counts_latest_at
-            FROM validator_counts
-            WHERE network = %(network)s
-            GROUP BY network, operator_id
-            HAVING counts_latest_at >= toDateTime(%(updated_after)s)
-            ),
+    # Optional: quick guard to catch unexpected column names
+    if rows and "operator_id" not in rows[0]:
+        raise KeyError(f"Expected 'operator_id' in columns, got: {list(rows[0].keys())}")
 
-            /* Eligible = fresh operator OR non-fresh operator with fresh counts */
-            eligible AS (
-            SELECT network, operator_id FROM fresh_ops
-            UNION ALL
-            SELECT network, operator_id FROM latest_fresh_counts
-            ),
-            eligible_distinct AS (
-            SELECT DISTINCT network, operator_id FROM eligible
-            )
-
-            SELECT
-            lo.network,
-            lo.operator_id,
-            lo.operator_name,
-            lo.is_vo,
-            lo.is_private,
-            /* NULL if no fresh counts (thanks to LEFT JOIN + join_use_nulls) */
-            lc.validator_count AS validator_count
-            FROM eligible_distinct e
-            JOIN latest_ops_any       AS lo USING (network, operator_id)
-            LEFT JOIN latest_fresh_counts AS lc USING (network, operator_id)
-            ORDER BY lo.operator_id
-            SETTINGS join_use_nulls = 1
-        """
-        res = self.client.query(
-            query,
-            parameters={
-                "network": network,
-                "updated_after": self._updated_after(max_age_days),
-            },
-        )
-
-        nr = getattr(res, "named_results", None)
-        rows = nr() if callable(nr) else nr
-        if not rows:
-            rows = [dict(zip(res.column_names, r)) for r in res.result_rows]
-
-        ops = {}
-        for r in rows:
-            op_id = int(r["operator_id"])
-            ops[op_id] = {
-                FIELD_NETWORK: r["network"],
-                FIELD_OPERATOR_ID: op_id,
-                FIELD_OPERATOR_NAME: r["operator_name"],
-                FIELD_IS_VO: int(r["is_vo"]),
-                FIELD_IS_PRIVATE: int(r["is_private"]),
-                # Preserve NULL from DB as Python None
-                FIELD_VALIDATOR_COUNT: r["validator_count"],
-            }
-        return ops
+    ops = {}
+    for r in rows:
+        op_id = int(r["operator_id"])
+        ops[op_id] = {
+            FIELD_NETWORK: r["network"],
+            FIELD_OPERATOR_ID: op_id,
+            FIELD_OPERATOR_NAME: r["operator_name"],
+            FIELD_IS_VO: int(r["is_vo"]),
+            FIELD_IS_PRIVATE: int(r["is_private"]),
+            # Preserve NULL from DB as Python None
+            FIELD_VALIDATOR_COUNT: r["validator_count"],
+        }
+    return ops
