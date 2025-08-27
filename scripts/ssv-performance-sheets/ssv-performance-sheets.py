@@ -133,8 +133,8 @@ def get_operator_performance_data(network: str, days: int, metric_type: str, cli
         o.operator_name,
         o.is_vo,
         o.is_private,
-        o.address,
         c.validator_count,                                   -- latest count snapshot (nullable)
+        o.address,
         p.metric_date,                                       -- real Date; safe for strftime
         COALESCE(p.metric_value, toFloat64(0)) AS metric_value  -- never NULL → avoids float(None)
         FROM perf_series p
