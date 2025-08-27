@@ -120,23 +120,27 @@ def get_operator_performance_data(network: str, days: int, metric_type: str, cli
         o.is_vo,
         o.is_private,
         o.address,
-        c.validator_count,
 
-        /* Always a real Date (never NULL): prefer perf date, else counts/op dates, else 1970 */
-        coalesce(
-            p.latest_metric_date,
+        /* validator count: 0 if missing */
+        COALESCE(c.validator_count, toUInt32(0)) AS validator_count,
+
+        /* metric_date: prefer perf date; else counts/op timestamps cast to Date */
+        COALESCE(
+            NULLIF(p.latest_metric_date, toDate('1970-01-01')),
             toDate(c.counts_latest_at),
             toDate(o.op_latest_at),
             toDate('1970-01-01')
         ) AS metric_date,
 
-        p.latest_metric_value
+        /* metric value: 0.0 if missing */
+        COALESCE(p.latest_metric_value, toFloat64(0)) AS latest_metric_value
+
         FROM op o
         LEFT JOIN cnt  c USING (network, operator_id)
         LEFT JOIN perf p USING (network, operator_id)
         WHERE
-        o.op_latest_at        >= toDateTime(%(updated_after)s)
-        OR c.counts_latest_at >= toDateTime(%(updated_after)s)
+        o.op_latest_at >= toDateTime(%(updated_after)s)
+        OR (isNotNull(c.counts_latest_at) AND c.counts_latest_at >= toDateTime(%(updated_after)s))
         ORDER BY o.operator_id
         SETTINGS join_use_nulls = 1
     """
