@@ -423,7 +423,7 @@ def main():
 
     client = get_clickhouse_client(clickhouse_password)
 
-    insert_clickhouse_performance_data(client, args.network, args.ch_operators_table, args.ch_performance_table, operators, target_date, IMPORT_SOURCE)
+    insert_clickhouse_performance_data(client, args.network, operators, target_date, IMPORT_SOURCE)
     insert_clickhouse_validator_count_data(client, args.network, final_active_counts, target_date, IMPORT_SOURCE)
 
     deduplicate_table(client, 'operators', args.network)
