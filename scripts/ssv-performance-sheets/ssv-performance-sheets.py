@@ -84,9 +84,9 @@ def get_operator_performance_data(network: str, days: int, metric_type: str, cli
         op AS (
         SELECT network, operator_id,
                 argMax(operator_name, updated_at) AS operator_name,
-                argMax(is_vo,         updated_at) AS is_vo,
-                argMax(is_private,    updated_at) AS is_private,
-                argMax(address,       updated_at) AS address,
+                argMax(is_vo, updated_at) AS is_vo,
+                argMax(is_private, updated_at) AS is_private,
+                argMax(address, updated_at) AS address,
                 max(updated_at) AS op_latest_at
         FROM operators
         WHERE network = %(network)s
@@ -112,15 +112,15 @@ def get_operator_performance_data(network: str, days: int, metric_type: str, cli
         o.operator_id, o.operator_name, o.is_vo, o.is_private, o.address,
         c.validator_count,
 
-        /* return a STRING so Python never calls strftime on None */
+        /* NULL when no perf row; otherwise a proper Date */
         if(p.latest_metric_date > toDate('1970-01-01'),
-            toString(p.latest_metric_date),
-            '') AS metric_date,                      -- string ('' when missing)
+            CAST(p.latest_metric_date AS Nullable(Date)),
+            CAST(NULL AS Nullable(Date)))         AS metric_date,
 
-        /* make value nullable when perf is missing */
+        /* make value nullable in lockstep */
         if(p.latest_metric_date > toDate('1970-01-01'),
             CAST(p.latest_metric_value AS Nullable(Float64)),
-            CAST(NULL AS Nullable(Float64))) AS latest_metric_value
+            CAST(NULL AS Nullable(Float64)))      AS latest_metric_value
 
         FROM op o
         LEFT JOIN cnt  c USING (network, operator_id)
