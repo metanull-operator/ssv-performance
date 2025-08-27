@@ -80,36 +80,46 @@ def get_operator_performance_data(network: str, days: int, metric_type: str, cli
     since_date = (date.today() - timedelta(days=days)).isoformat()
 
     query = """
-        WITH latest_counts AS (
-            SELECT
-                network,
-                operator_id,
-                argMax(validator_count, updated_at) AS validator_count
-            FROM validator_counts
-            WHERE network = %(network)s
-            AND updated_at >= %(updated_after)s   -- bind to your freshness threshold
-            GROUP BY network, operator_id
+        WITH
+        op AS (
+        SELECT network, operator_id,
+                argMax(operator_name, updated_at) AS operator_name,
+                argMax(is_vo, updated_at) AS is_vo,
+                argMax(is_private, updated_at) AS is_private,
+                argMax(address, updated_at) AS address,
+                max(updated_at) AS op_latest_at
+        FROM operators
+        WHERE network = %(network)s
+        GROUP BY network, operator_id
+        ),
+        cnt AS (
+        SELECT network, operator_id,
+                argMax(validator_count, updated_at) AS validator_count,
+                max(updated_at) AS counts_latest_at
+        FROM validator_counts
+        WHERE network = %(network)s
+        GROUP BY network, operator_id
+        ),
+        perf AS (
+        SELECT network, operator_id,
+                argMax(metric_value, metric_date) AS latest_metric_value,
+                max(metric_date) AS latest_metric_date
+        FROM performance
+        WHERE network = %(network)s AND metric_type = %(metric_type)s
+        GROUP BY network, operator_id
         )
-        SELECT 
-            o.operator_id,
-            o.operator_name,
-            o.is_vo,
-            o.is_private,
-            lc.validator_count AS validator_count,   -- now from validators_counts
-            o.address,
-            p.metric_date,
-            p.metric_value
-        FROM operators AS o
-        LEFT JOIN latest_counts AS lc
-            ON lc.network = o.network
-            AND lc.operator_id = o.operator_id
-        LEFT JOIN performance AS p
-            ON p.operator_id = o.operator_id
-            AND p.network = o.network
-            AND p.metric_type = %(metric_type)s
-            AND p.metric_date >= %(since_date)s
-        WHERE o.network = %(network)s
-        ORDER BY o.operator_id, p.metric_date
+        SELECT
+        o.operator_id, o.operator_name, o.is_vo, o.is_private, o.address,
+        c.validator_count,
+        NULLIF(p.latest_metric_date, toDate('1970-01-01'))  AS metric_date,
+        p.latest_metric_value
+        FROM op o
+        LEFT JOIN cnt  c USING (network, operator_id)
+        LEFT JOIN perf p USING (network, operator_id)
+        WHERE
+        o.op_latest_at        >= toDateTime(%(updated_after)s)
+        OR c.counts_latest_at >= toDateTime(%(updated_after)s)
+        ORDER BY o.operator_id;
     """
 
     params = {
