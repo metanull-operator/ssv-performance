@@ -77,24 +77,32 @@ def get_operator_validator_count_data(network: str, days: int, clickhouse_passwo
 
     query = """
         WITH
-        op AS (
-        SELECT network, operator_id,
-                argMax(operator_name, updated_at) AS operator_name,
-                argMax(is_vo,         updated_at) AS is_vo,
-                argMax(is_private,    updated_at) AS is_private,
-                argMax(address,       updated_at) AS address,
-                max(updated_at) AS op_latest_at
+        latest_ops_fresh AS (
+        SELECT
+            network,
+            operator_id,
+            argMax(operator_name, updated_at) AS operator_name,
+            argMax(is_vo,         updated_at) AS is_vo,
+            argMax(is_private,    updated_at) AS is_private,
+            argMax(address,       updated_at) AS address,
+            max(updated_at) AS op_latest_at
         FROM operators
         WHERE network = %(network)s
         GROUP BY network, operator_id
+        HAVING op_latest_at >= toDateTime(%(updated_after)s)   -- fresh operators only
         ),
-        cnt_latest AS (
-        SELECT network, operator_id,
-                argMax(validator_count, updated_at) AS validator_count,
-                max(updated_at) AS vc_latest_at
+        v_dedup AS (
+        /* latest validator_count for each (operator, metric_date); no after-date filter */
+        SELECT
+            network,
+            operator_id,
+            metric_date,
+            argMax(validator_count, updated_at) AS validator_count
         FROM validator_counts
         WHERE network = %(network)s
-        GROUP BY network, operator_id
+            -- remove this line to truly get ALL time:
+            AND metric_date >= toDate(%(since_date)s)
+        GROUP BY network, operator_id, metric_date
         )
         SELECT
         o.operator_id,
@@ -102,25 +110,11 @@ def get_operator_validator_count_data(network: str, days: int, clickhouse_passwo
         o.is_vo,
         o.is_private,
         o.address,
-
-        /* column 6 — what your code likely strftime’s */
-        if(
-            c.vc_latest_at >= toDateTime(%(updated_after)s),
-            CAST(c.vc_latest_at AS Nullable(DateTime)),
-            CAST(NULL AS Nullable(DateTime))
-        ) AS metric_date,
-
-        /* column 7 — the count, nullable when stale/missing */
-        if(
-            c.vc_latest_at >= toDateTime(%(updated_after)s),
-            CAST(c.validator_count AS Nullable(UInt32)),   -- adjust type if needed
-            CAST(NULL AS Nullable(UInt32))
-        ) AS validator_count
-
-        FROM op o
-        LEFT JOIN cnt_latest c USING (network, operator_id)
-        WHERE o.op_latest_at >= toDateTime(%(updated_after)s)
-        ORDER BY o.operator_id
+        v.metric_date,
+        v.validator_count
+        FROM latest_ops_fresh o
+        JOIN v_dedup v USING (network, operator_id)      -- INNER JOIN: no NULL/1970 rows
+        ORDER BY o.operator_id, v.metric_date
     """
 
     params = {
