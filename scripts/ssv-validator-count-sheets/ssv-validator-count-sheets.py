@@ -78,32 +78,42 @@ def get_operator_validator_count_data(network: str, days: int, clickhouse_passwo
     query = """
         WITH
         op AS (
-        SELECT network, operator_id,
-                argMax(operator_name, updated_at) AS operator_name,
-                argMax(is_vo, updated_at) AS is_vo,
-                argMax(is_private, updated_at) AS is_private,
-                argMax(address, updated_at) AS address,
-                max(updated_at) AS op_latest_at
+        SELECT
+            network,
+            operator_id,
+            argMax(operator_name, updated_at) AS operator_name,
+            argMax(is_vo,         updated_at) AS is_vo,
+            argMax(is_private,    updated_at) AS is_private,
+            argMax(address,       updated_at) AS address,
+            max(updated_at) AS op_latest_at
         FROM operators
         WHERE network = %(network)s
         GROUP BY network, operator_id
         ),
-        cnt AS (
-        SELECT network, operator_id,
-                argMax(validator_count, updated_at) AS validator_count,
-                max(updated_at) AS counts_latest_at
+        cnt_latest AS (
+        /* one latest row per operator from validator_counts */
+        SELECT
+            network,
+            operator_id,
+            argMax(validator_count, updated_at) AS validator_count,
+            max(updated_at) AS vc_latest_at
         FROM validator_counts
         WHERE network = %(network)s
         GROUP BY network, operator_id
         )
         SELECT
-        o.operator_id, o.operator_name, o.is_vo, o.is_private, o.address,
-        c.validator_count,
-        FROM op o
-        LEFT JOIN cnt  c USING (network, operator_id)
-        WHERE
-        o.op_latest_at        >= toDateTime(%(updated_after)s)
-        OR c.counts_latest_at >= toDateTime(%(updated_after)s)
+        o.operator_id,
+        o.operator_name,
+        o.is_vo,
+        o.is_private,
+        o.address,
+        /* only return a count if the LATEST counts row is fresh; else NULL */
+        if(c.vc_latest_at >= toDateTime(%(updated_after)s), c.validator_count, NULL) AS validator_count,
+        /* optional: expose timestamp, but NULL when not fresh/missing */
+        if(c.vc_latest_at >= toDateTime(%(updated_after)s), c.vc_latest_at, NULL)     AS counts_latest_at
+        FROM op AS o
+        LEFT JOIN cnt_latest AS c USING (network, operator_id)
+        WHERE o.op_latest_at >= toDateTime(%(updated_after)s)   -- fresh operators only
         ORDER BY o.operator_id;
     """
 
