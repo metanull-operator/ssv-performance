@@ -381,8 +381,6 @@ def main():
     parser.add_argument('--ops-page-size', type=int, default=100, help='perPage for /operators')
     parser.add_argument('--val-page-size', type=int, default=1000, help='perPage for /validators (lastId cursor)')
     parser.add_argument('--local_time', action='store_true')
-    parser.add_argument('--ch-operators-table', default=os.environ.get('CH_OPERATORS_TABLE', 'operators'))
-    parser.add_argument('--ch-performance-table', default=os.environ.get('CH_PERFORMANCE_TABLE', 'performance'))
     parser.add_argument("--log_level", default=os.environ.get("COLLECTOR_LOG_LEVEL", "INFO"),
                         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"])
     args = parser.parse_args()
@@ -428,8 +426,8 @@ def main():
     insert_clickhouse_performance_data(client, args.network, args.ch_operators_table, args.ch_performance_table, operators, target_date, IMPORT_SOURCE)
     insert_clickhouse_validator_count_data(client, args.network, final_active_counts, target_date, IMPORT_SOURCE)
 
-    deduplicate_table(client, args.ch_operators_table, args.network)
-    deduplicate_table(client, args.ch_performance_table, args.network)
+    deduplicate_table(client, 'operators', args.network)
+    deduplicate_table(client, 'performance', args.network)
     deduplicate_table(client, 'operator_fees', args.network)
     deduplicate_table(client, 'validator_counts', args.network)
 
