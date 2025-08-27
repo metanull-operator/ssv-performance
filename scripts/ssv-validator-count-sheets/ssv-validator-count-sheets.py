@@ -76,33 +76,35 @@ def get_operator_validator_count_data(network: str, days: int, clickhouse_passwo
     since_date = (date.today() - timedelta(days=days)).isoformat()
 
     query = """
-        WITH v_dedup AS (
-            SELECT
-                network,
-                operator_id,
-                metric_date,
+        WITH
+        op AS (
+        SELECT network, operator_id,
+                argMax(operator_name, updated_at) AS operator_name,
+                argMax(is_vo, updated_at) AS is_vo,
+                argMax(is_private, updated_at) AS is_private,
+                argMax(address, updated_at) AS address,
+                max(updated_at) AS op_latest_at
+        FROM operators
+        WHERE network = %(network)s
+        GROUP BY network, operator_id
+        ),
+        cnt AS (
+        SELECT network, operator_id,
                 argMax(validator_count, updated_at) AS validator_count,
-                max(updated_at) AS vc_updated_at
-            FROM validator_counts
-            WHERE network = %(network)s
-            AND metric_date >= %(since_date)s
-            AND updated_at >= %(updated_after)s   -- freshness window
-            GROUP BY network, operator_id, metric_date
+                max(updated_at) AS counts_latest_at
+        FROM validator_counts
+        WHERE network = %(network)s
+        GROUP BY network, operator_id
         )
-        SELECT 
-            o.operator_id,
-            o.operator_name,
-            o.is_vo,
-            o.is_private,
-            o.address,
-            v.metric_date,
-            v.validator_count
-        FROM operators AS o
-        LEFT JOIN v_dedup AS v
-            ON v.network = o.network
-            AND v.operator_id = o.operator_id
-        WHERE o.network = %(network)s
-        ORDER BY o.operator_id, v.metric_date
+        SELECT
+        o.operator_id, o.operator_name, o.is_vo, o.is_private, o.address,
+        c.validator_count,
+        FROM op o
+        LEFT JOIN cnt  c USING (network, operator_id)
+        WHERE
+        o.op_latest_at        >= toDateTime(%(updated_after)s)
+        OR c.counts_latest_at >= toDateTime(%(updated_after)s)
+        ORDER BY o.operator_id;
     """
 
     params = {
