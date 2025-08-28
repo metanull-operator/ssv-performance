@@ -23,7 +23,7 @@ def operator_threshold_alert_24h(operator, threshold):
             else:
                 return None
         except (ValueError, TypeError) as e:
-            logging.warning(f"Error converting 24h data point to float for operator {operator[FIELD_OPERATOR_ID]} and date {most_recent_date}: {e}", exc_info=True)
+            logging.warning(f"Error converting 24h data point to float for operator {operator[FIELD_OPERATOR_ID]}: {e}", exc_info=True)
             return None
 
         logging.debug(f"Operator {operator[FIELD_OPERATOR_ID]}: 24h data point: {data_point}, threshold: {threshold}")
@@ -34,7 +34,7 @@ def operator_threshold_alert_24h(operator, threshold):
                 FIELD_OPERATOR_ID: operator[FIELD_OPERATOR_ID],
                 FIELD_OPERATOR_NAME: operator[FIELD_OPERATOR_NAME],
                 FIELD_VALIDATOR_COUNT: operator[FIELD_VALIDATOR_COUNT],
-                'Performance Period': most_recent_date,
+                #'Performance Period': most_recent_date,
                 'Performance Data Point': f"{data_point * 100:.2f}%"
             }
     except Exception as e:
@@ -60,7 +60,7 @@ def operator_threshold_alert_30d(operator, threshold):
             else:
                 return None
         except (ValueError, TypeError) as e:
-            logging.warning(f"Error converting 30d data point to float for operator {operator[FIELD_OPERATOR_ID]} and date {most_recent_date}: {e}", exc_info=True)
+            logging.warning(f"Error converting 30d data point to float for operator {operator[FIELD_OPERATOR_ID]}: {e}", exc_info=True)
             return None
 
         if data_point < threshold:
@@ -68,7 +68,7 @@ def operator_threshold_alert_30d(operator, threshold):
                 FIELD_OPERATOR_ID: operator[FIELD_OPERATOR_ID],
                 FIELD_OPERATOR_NAME: operator[FIELD_OPERATOR_NAME],
                 FIELD_VALIDATOR_COUNT: operator[FIELD_VALIDATOR_COUNT],
-                'Performance Period': most_recent_date,
+                #'Performance Period': most_recent_date,
                 'Performance Data Point': f"{data_point * 100:.2f}%"
             }
     except Exception as e:
