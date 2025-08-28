@@ -190,7 +190,10 @@ class ClickHouseStorage:
                     FIELD_VALIDATOR_COUNT: row[4],
                     FIELD_ADDRESS: row[5],
                     FIELD_PERFORMANCE_DATE: row[6],
-                    FIELD_PERFORMANCE: { period: row[7] }
+                    FIELD_PERFORMANCE: {
+                        '24h': row[7]
+                        '30d': row[8]
+                    }
                 }
 
         return perf_data
