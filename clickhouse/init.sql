@@ -114,3 +114,54 @@ SELECT
   max(updated_at)                     AS last_row_at
 FROM validator_counts
 GROUP BY network, operator_id, metric_date;
+
+-- Latest per metric (tiny table)
+CREATE TABLE IF NOT EXISTS performance_latest
+(
+  network       LowCardinality(String),
+  operator_id   UInt32,
+  metric_type   LowCardinality(String),
+  metric_value  Float64,
+  latest_at     DateTime
+)
+ENGINE = ReplacingMergeTree(latest_at)
+ORDER BY (network, metric_type, operator_id);
+
+-- Daily last value per metric
+CREATE TABLE IF NOT EXISTS performance_daily
+(
+  network       LowCardinality(String),
+  operator_id   UInt32,
+  metric_type   LowCardinality(String),
+  metric_date   Date,
+  metric_value  Float64,
+  last_row_at   DateTime
+)
+ENGINE = ReplacingMergeTree(last_row_at)
+PARTITION BY toYYYYMM(metric_date)
+ORDER BY (network, metric_type, operator_id, metric_date);
+
+-- Latest per operator+metric (across all time)
+CREATE MATERIALIZED VIEW IF NOT EXISTS performance_latest_mv
+TO performance_latest AS
+SELECT
+  network,
+  operator_id,
+  metric_type,
+  argMax(metric_value, updated_at) AS metric_value,
+  max(updated_at)                  AS latest_at
+FROM performance
+GROUP BY network, operator_id, metric_type;
+
+-- Daily last value (per operator+metric+day)
+CREATE MATERIALIZED VIEW IF NOT EXISTS performance_daily_mv
+TO performance_daily AS
+SELECT
+  network,
+  operator_id,
+  metric_type,
+  metric_date,
+  argMax(metric_value, updated_at) AS metric_value,
+  max(updated_at)                  AS last_row_at
+FROM performance
+GROUP BY network, operator_id, metric_type, metric_date;

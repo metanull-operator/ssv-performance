@@ -77,78 +77,31 @@ def _updated_after(max_age_days: int | None) -> datetime:
 def get_operator_performance_data(network: str, days: int, metric_type: str, clickhouse_password: str, max_age_days: int | None = None):
     client = get_clickhouse_client(clickhouse_password=clickhouse_password)
 
-    since_date = (date.today() - timedelta(days=days)).isoformat()
+    date_from = (date.today() - timedelta(days=days)).isoformat()
 
     query = """
-        WITH
-        op_latest AS (
-        SELECT
-            network,
-            operator_id,
-            argMax(operator_name, updated_at) AS operator_name,
-            argMax(is_vo,         updated_at) AS is_vo,
-            argMax(is_private,    updated_at) AS is_private,
-            argMax(address,       updated_at) AS address,
-            max(updated_at) AS op_latest_at
-        FROM operators
-        WHERE network = %(network)s
-        GROUP BY network, operator_id
-        ),
-        cnt_latest AS (
-        SELECT
-            network,
-            operator_id,
-            argMax(validator_count, updated_at) AS validator_count,
-            max(updated_at) AS counts_latest_at
-        FROM validator_counts
-        WHERE network = %(network)s
-        GROUP BY network, operator_id
-        ),
-        eligible AS (   -- either/or freshness gate
-        SELECT network, operator_id FROM op_latest
-        WHERE op_latest_at   >= toDateTime(%(updated_after)s)
-        UNION ALL
-        SELECT network, operator_id FROM cnt_latest
-        WHERE counts_latest_at >= toDateTime(%(updated_after)s)
-        ),
-        eligible_distinct AS (
-        SELECT DISTINCT network, operator_id FROM eligible
-        ),
-
-        /* All performance rows for the metric (set since_date low if you truly want full history) */
-        perf_series AS (
-        SELECT
-            network,
-            operator_id,
-            metric_date,            -- real Date from the table (no 1970 default)
-            metric_value
-        FROM performance
-        WHERE network = %(network)s
-            AND metric_type = %(metric_type)s
-            AND metric_date >= toDate(%(since_date)s)
-        )
-
         SELECT
         o.operator_id,
         o.operator_name,
         o.is_vo,
         o.is_private,
-        c.validator_count,                                   -- latest count snapshot (nullable)
         o.address,
-        p.metric_date,                                       -- real Date; safe for strftime
-        COALESCE(p.metric_value, toFloat64(0)) AS metric_value  -- never NULL → avoids float(None)
-        FROM perf_series p
-        JOIN eligible_distinct e USING (network, operator_id)   -- ensures “at least one” perf row
-        JOIN op_latest o        USING (network, operator_id)    -- latest operator metadata
-        LEFT JOIN cnt_latest c  USING (network, operator_id)    -- counts are optional
+        p.metric_date,
+        p.metric_value
+        FROM performance_daily AS p
+        INNER JOIN operators AS o
+        ON o.network = p.network
+        AND o.operator_id = p.operator_id
+        WHERE p.network = %(network)s
+        AND p.metric_type = %(metric_type)s
+        AND p.metric_date BETWEEN %(date_from)s AND %(date_to)s
         ORDER BY o.operator_id, p.metric_date
     """
 
     params = {
         'network': network,
         'metric_type': metric_type,
-        'since_date': since_date,
-        'updated_after': _updated_after(max_age_days),
+        'date_from': date_from,
     }
     rows = client.query(query, parameters=params).result_rows
 
