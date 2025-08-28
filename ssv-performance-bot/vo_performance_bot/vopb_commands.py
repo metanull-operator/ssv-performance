@@ -260,7 +260,7 @@ Thresholds displayed are subject to change.
 
         try:
             storage = StorageFactory.get_storage('ssv_performance')
-            operator_data = storage.get_operators_with_validator_counts(network, max_age_days=0)
+            operator_data = storage.get_operators_with_validator_counts(network)
 
             if not operator_data:
                 logging.error(f"Operator data empty in operators command")
@@ -303,10 +303,10 @@ Thresholds displayed are subject to change.
 
         try:
             storage = StorageFactory.get_storage('ssv_performance')
-            perf_data_24h = storage.get_latest_performance_data(network, '24h')
-            perf_data_30d = storage.get_latest_performance_data(network, '30d')
+            perf_data = storage.get_latest_performance_data(network)
+#            perf_data_30d = storage.get_latest_performance_data(network, '30d')
 
-            perf_data = merge_operator_performance(perf_data_24h, perf_data_30d)
+ #           perf_data = merge_operator_performance(perf_data_24h, perf_data_30d)
 
             if not perf_data:
                 logging.error(f"alerts() perf_data empty")
