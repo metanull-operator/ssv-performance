@@ -51,7 +51,7 @@ def operator_threshold_alert_30d(operator, threshold):
             return None
 
         # Get the most recent data point for which we have data points for this operator
-        most_recent_date = operator[FIELD_PERFORMANCE_DATE]
+#        most_recent_date = operator[FIELD_PERFORMANCE_DATE]
         data_point = operator[FIELD_PERFORMANCE]['30d']
 
         try:
