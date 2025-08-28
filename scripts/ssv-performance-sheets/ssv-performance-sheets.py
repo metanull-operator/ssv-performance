@@ -74,54 +74,52 @@ def _updated_after(max_age_days: int | None) -> datetime:
     return datetime.now(timezone.utc) - timedelta(days=days)
 
 
-def get_operator_performance_data(network: str, days: int, metric_type: str, clickhouse_password: str, max_age_days: int | None = None):
+def get_operator_performance_data(network: str, days: int, metric_type: str,
+                                  clickhouse_password: str, max_age_days: int | None = None):
     client = get_clickhouse_client(clickhouse_password=clickhouse_password)
-
     date_from = (date.today() - timedelta(days=days)).isoformat()
 
-    query = """
+    sql = """
         SELECT
-        o.operator_id,
-        o.operator_name,
-        o.is_vo,
-        o.is_private,
-        o.address,
-        p.metric_date,
-        p.metric_value
+            o.operator_id   AS operator_id,
+            o.operator_name AS operator_name,
+            o.is_vo         AS is_vo,
+            o.is_private    AS is_private,
+            o.address       AS address,
+            p.metric_date   AS metric_date,
+            p.metric_value  AS metric_value
         FROM performance_daily AS p
         INNER JOIN operators AS o
-        ON o.network = p.network
-        AND o.operator_id = p.operator_id
+          ON o.network = p.network
+         AND o.operator_id = p.operator_id
         WHERE p.network = %(network)s
-        AND p.metric_type = %(metric_type)s
-        AND p.metric_date BETWEEN %(date_from)s AND today()
+          AND p.metric_type = %(metric_type)s
+          AND p.metric_date BETWEEN %(date_from)s AND today()
         ORDER BY o.operator_id, p.metric_date
     """
+    params = {"network": network, "metric_type": metric_type, "date_from": date_from}
+    res = client.query(sql, parameters=params)
+    cols = list(res.column_names)
+    rows = [dict(zip(cols, r)) for r in res.result_rows]
 
-    params = {
-        'network': network,
-        'metric_type': metric_type,
-        'date_from': date_from,
-    }
-    rows = client.query(query, parameters=params).result_rows
-
-    result = {}
-    for row in rows:
-        op_id = row[0]
-        metric_date = row[6].strftime('%Y-%m-%d')
+    result: dict[int, dict] = {}
+    for r in rows:
+        op_id = int(r["operator_id"])
+        d = r["metric_date"].strftime("%Y-%m-%d")
         if op_id not in result:
             result[op_id] = {
                 FIELD_OPERATOR_ID: op_id,
-                FIELD_OPERATOR_NAME: row[1],
-                FIELD_IS_VO: row[2],
-                FIELD_IS_PRIVATE: row[3],
-                FIELD_VALIDATOR_COUNT: row[4],
-                FIELD_ADDRESS: row[5],
+                FIELD_OPERATOR_NAME: r["operator_name"],
+                FIELD_IS_VO: 1 if int(r["is_vo"] or 0) else 0,
+                FIELD_IS_PRIVATE: 1 if int(r["is_private"] or 0) else 0,
+                FIELD_ADDRESS: r["address"],
                 metric_type: {}
             }
-        result[op_id][metric_type][metric_date] = float(row[7])
+        mv = r["metric_value"]
+        result[op_id][metric_type][d] = float(mv) if mv is not None else None
 
     return result
+
 
 
 def authorize_google_sheets(credentials_file):
