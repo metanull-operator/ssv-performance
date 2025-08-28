@@ -49,6 +49,7 @@ def read_clickhouse_password_from_file(password_file_path):
     with open(password_file_path, 'r') as file:
         return file.read().strip()
 
+
 def get_clickhouse_client(clickhouse_password):
     return create_client(
         host=os.environ.get("CLICKHOUSE_HOST", "localhost"),
@@ -59,28 +60,27 @@ def get_clickhouse_client(clickhouse_password):
     )
 
 
-def _updated_after(max_age_days: int | None) -> datetime:
-    """
-    Convert 'days' into an absolute timestamp for filtering updated_at.
-    0 or None (when default is 0) => epoch (i.e., include everything).
-    """
-    days = self.default_max_age_days if max_age_days is None else int(max_age_days)
-    if days <= 0:
-        return datetime(1970, 1, 1, tzinfo=timezone.utc)
-    return datetime.now(timezone.utc) - timedelta(days=days)
-
-
 def get_operator_validator_count_data(network: str, days: int, clickhouse_password: str, max_age_days: int | None = None):
     client = get_clickhouse_client(clickhouse_password=clickhouse_password)
 
     date_from = (date.today() - timedelta(days=days)).isoformat()
 
     query = """
-        SELECT operator_id, metric_date, validator_count
-        FROM validator_counts_daily
-        WHERE network = %(network)s
-        AND metric_date BETWEEN %(date_from)s AND today()
-        ORDER BY operator_id, metric_date
+        SELECT
+            o.operator_id,
+            o.operator_name,
+            o.is_vo,
+            o.is_private,
+            o.address,
+            v.metric_date,
+            v.validator_count
+        FROM validator_counts_daily AS v
+        INNER JOIN operators AS o
+            ON o.network = v.network
+           AND o.operator_id = v.operator_id
+        WHERE v.network = %(network)s
+          AND v.metric_date BETWEEN %(date_from)s AND today()
+        ORDER BY o.operator_id, v.metric_date
     """
 
     params = {
