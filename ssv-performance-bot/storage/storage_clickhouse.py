@@ -187,12 +187,11 @@ class ClickHouseStorage:
                     FIELD_OPERATOR_NAME: row[1],
                     FIELD_IS_VO: row[2],
                     FIELD_IS_PRIVATE: row[3],
-                    FIELD_VALIDATOR_COUNT: row[4],
-                    FIELD_ADDRESS: row[5],
-                    FIELD_PERFORMANCE_DATE: row[6],
+                    FIELD_ADDRESS: row[4],
+                    FIELD_VALIDATOR_COUNT: row[5],
                     FIELD_PERFORMANCE: {
-                        '24h': row[7],
-                        '30d': row[8]
+                        '24h': row[6],
+                        '30d': row[7]
                     }
                 }
 
