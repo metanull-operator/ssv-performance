@@ -191,7 +191,7 @@ class ClickHouseStorage:
                     FIELD_ADDRESS: row[5],
                     FIELD_PERFORMANCE_DATE: row[6],
                     FIELD_PERFORMANCE: {
-                        '24h': row[7]
+                        '24h': row[7],
                         '30d': row[8]
                     }
                 }
