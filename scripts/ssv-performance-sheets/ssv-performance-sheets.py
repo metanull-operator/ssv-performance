@@ -94,7 +94,7 @@ def get_operator_performance_data(network: str, days: int, metric_type: str, cli
         AND o.operator_id = p.operator_id
         WHERE p.network = %(network)s
         AND p.metric_type = %(metric_type)s
-        AND p.metric_date BETWEEN %(date_from)s AND %(date_to)s
+        AND p.metric_date BETWEEN %(date_from)s AND today()
         ORDER BY o.operator_id, p.metric_date
     """
 
