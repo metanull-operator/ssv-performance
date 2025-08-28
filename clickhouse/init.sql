@@ -68,3 +68,49 @@ CREATE TABLE IF NOT EXISTS default.import_state (
 ENGINE = ReplacingMergeTree(updated_at)
 ORDER BY network;
 
+-- base tables: keep names
+--   operators
+--   validator_counts  (raw time series)
+
+-- precomputed targets must have different names than the source:
+CREATE TABLE IF NOT EXISTS validator_counts_latest
+(
+  network LowCardinality(String),
+  operator_id UInt32,
+  validator_count UInt32,
+  counts_latest_at DateTime
+)
+ENGINE = MergeTree
+ORDER BY (network, operator_id);
+
+CREATE TABLE IF NOT EXISTS validator_counts_daily
+(
+  network LowCardinality(String),
+  operator_id UInt32,
+  metric_date Date,
+  validator_count UInt32,
+  last_row_at DateTime
+)
+ENGINE = ReplacingMergeTree(last_row_at)
+ORDER BY (network, operator_id, metric_date);
+
+CREATE MATERIALIZED VIEW IF NOT EXISTS validator_counts_latest_mv
+TO validator_counts_latest AS
+SELECT
+  network,
+  operator_id,
+  argMax(validator_count, updated_at) AS validator_count,
+  max(updated_at)                     AS counts_latest_at
+FROM validator_counts
+GROUP BY network, operator_id;
+
+CREATE MATERIALIZED VIEW IF NOT EXISTS validator_counts_daily_mv
+TO validator_counts_daily AS
+SELECT
+  network,
+  operator_id,
+  metric_date,
+  argMax(validator_count, updated_at) AS validator_count,
+  max(updated_at)                     AS last_row_at
+FROM validator_counts
+GROUP BY network, operator_id, metric_date;

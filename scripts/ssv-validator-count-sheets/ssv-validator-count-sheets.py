@@ -73,54 +73,19 @@ def _updated_after(max_age_days: int | None) -> datetime:
 def get_operator_validator_count_data(network: str, days: int, clickhouse_password: str, max_age_days: int | None = None):
     client = get_clickhouse_client(clickhouse_password=clickhouse_password)
 
-    since_date = (date.today() - timedelta(days=days)).isoformat()
+    date_from = (date.today() - timedelta(days=days)).isoformat()
 
     query = """
-        WITH
-        latest_ops_fresh AS (
-        SELECT
-            network,
-            operator_id,
-            argMax(operator_name, updated_at) AS operator_name,
-            argMax(is_vo,         updated_at) AS is_vo,
-            argMax(is_private,    updated_at) AS is_private,
-            argMax(address,       updated_at) AS address,
-            max(updated_at) AS op_latest_at
-        FROM operators
+        SELECT operator_id, metric_date, validator_count
+        FROM validator_counts_daily
         WHERE network = %(network)s
-        GROUP BY network, operator_id
-        HAVING op_latest_at >= toDateTime(%(updated_after)s)   -- fresh operators only
-        ),
-        v_dedup AS (
-        /* latest validator_count for each (operator, metric_date); no after-date filter */
-        SELECT
-            network,
-            operator_id,
-            metric_date,
-            argMax(validator_count, updated_at) AS validator_count
-        FROM validator_counts
-        WHERE network = %(network)s
-            -- remove this line to truly get ALL time:
-            AND metric_date >= toDate(%(since_date)s)
-        GROUP BY network, operator_id, metric_date
-        )
-        SELECT
-        o.operator_id,
-        o.operator_name,
-        o.is_vo,
-        o.is_private,
-        o.address,
-        v.metric_date,
-        v.validator_count
-        FROM latest_ops_fresh o
-        JOIN v_dedup v USING (network, operator_id)      -- INNER JOIN: no NULL/1970 rows
-        ORDER BY o.operator_id, v.metric_date
+        AND metric_date BETWEEN %(date_from)s AND today()
+        ORDER BY operator_id, metric_date
     """
 
     params = {
         'network': network,
-        'since_date': since_date,
-        'updated_after': _updated_after(max_age_days),
+        'date_from': date_from,
     }
     rows = client.query(query, parameters=params).result_rows
 
