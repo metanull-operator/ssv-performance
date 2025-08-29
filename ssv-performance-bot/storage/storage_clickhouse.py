@@ -457,34 +457,31 @@ class ClickHouseStorage:
 
     def get_operators_with_validator_counts(self, network, max_age_days: int | None = None):
         query = """
-        WITH latest_counts AS (
-        SELECT
-            network,
-            operator_id,
-            argMax(validator_count, updated_at) AS validator_count,
-            max(updated_at)                     AS counts_latest_at
-        FROM validator_counts
-        WHERE network = %(network)s
-        GROUP BY network, operator_id
-        )
-        SELECT
-            o.network        AS network,
-            o.operator_id    AS operator_id,
-            o.operator_name  AS operator_name,
-            o.is_vo          AS is_vo,
-            o.is_private     AS is_private,
-            IF(lc.counts_latest_at >= toDateTime(%(updated_after)s), lc.validator_count, NULL) AS validator_count
-        FROM operators AS o
-        LEFT JOIN latest_counts AS lc
-        ON lc.network = o.network
-        AND lc.operator_id = o.operator_id
-        WHERE o.network = %(network)s
-        AND (
-                o.updated_at       >= toDateTime(%(updated_after)s)
-            OR lc.counts_latest_at >= toDateTime(%(updated_after)s)
-            )
-        ORDER BY o.operator_id
-        SETTINGS join_use_nulls = 1
+WITH
+  toDateTime(%(updated_after)s) AS updated_after
+SELECT
+  o.network        AS network,
+  o.operator_id    AS operator_id,
+  o.operator_name  AS operator_name,
+  o.is_vo          AS is_vo,
+  o.is_private     AS is_private,
+  /* display count only if its latest row is fresh */
+  IF(lc.counts_latest_at >= updated_after, lc.validator_count, NULL) AS validator_count
+FROM operators AS o
+LEFT JOIN (
+  SELECT network, operator_id, validator_count, counts_latest_at
+  FROM validator_counts_latest
+  WHERE network = %(network)s
+) AS lc
+  ON lc.network = o.network
+ AND lc.operator_id = o.operator_id
+WHERE o.network = %(network)s
+  AND (
+        o.updated_at >= updated_after
+     OR coalesce(lc.counts_latest_at, toDateTime('1970-01-01')) >= updated_after
+      )
+ORDER BY o.operator_id
+SETTINGS join_use_nulls = 1;
         """
         res = self.client.query(
             query,
