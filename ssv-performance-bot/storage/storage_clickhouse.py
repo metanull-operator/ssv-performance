@@ -227,30 +227,35 @@ class ClickHouseStorage:
     def get_performance_by_opids(self, network, op_ids, max_age_days: int | None = None):
         query = """
             WITH
-            %(date_from)s AS date_from,
-            today()       AS date_to
+            %(date_from)s AS date_from,           -- Date: e.g. date.today() - timedelta(days=X)
+            today()        AS date_to
 
-            , du AS (  -- distinct (op, date) where either 24h or 30d exists in window
-            SELECT DISTINCT network, operator_id, metric_date
-            FROM
-            (
-                SELECT network, operator_id, metric_date
-                FROM performance_daily
+            , ops_in_scope AS (  -- active OR (inactive with fresh counts>0), restricted to your operator_ids
+            SELECT o.network, o.operator_id, o.operator_name, o.is_vo, o.is_private
+            FROM operators o
+            LEFT JOIN (
+                SELECT network, operator_id
+                FROM validator_counts_latest
                 WHERE network = %(network)s
-                AND metric_type = '24h'
-                AND metric_date BETWEEN date_from AND date_to
+                AND counts_latest_at >= %(updated_after)s     -- freshness gate
+                AND validator_count > 0
                 AND operator_id IN %(operator_ids)s
-                UNION ALL
-                SELECT network, operator_id, metric_date
-                FROM performance_daily
-                WHERE network = %(network)s
-                AND metric_type = '30d'
-                AND metric_date BETWEEN date_from AND date_to
-                AND operator_id IN %(operator_ids)s
-            )
+            ) lc_fresh
+                ON lc_fresh.network = o.network AND lc_fresh.operator_id = o.operator_id
+            WHERE o.network = %(network)s
+                AND o.operator_id IN %(operator_ids)s
+                AND (
+                    o.updated_at >= %(updated_after)s          -- active operators
+                    OR lc_fresh.operator_id IS NOT NULL        -- inactive with fresh active validators
+                )
             )
 
-            , p24 AS (
+            , dates AS (  -- date spine: every day in [date_from, date_to]
+            SELECT addDays(date_from, step) AS metric_date
+            FROM (SELECT arrayJoin(range(toUInt32(dateDiff('day', date_from, date_to)) + 1)) AS step)
+            )
+
+            , p24 AS (  -- 24h values in window
             SELECT network, operator_id, metric_date, metric_value AS perf_24h
             FROM performance_daily
             WHERE network = %(network)s
@@ -259,7 +264,7 @@ class ClickHouseStorage:
                 AND operator_id IN %(operator_ids)s
             )
 
-            , p30 AS (
+            , p30 AS (  -- 30d values in window
             SELECT network, operator_id, metric_date, metric_value AS perf_30d
             FROM performance_daily
             WHERE network = %(network)s
@@ -268,48 +273,32 @@ class ClickHouseStorage:
                 AND operator_id IN %(operator_ids)s
             )
 
-            , lc_any AS (  -- latest validator count (display)
-            SELECT network, operator_id, validator_count, counts_latest_at
+            , lc_any AS (  -- latest validator count for display (not freshness-filtered)
+            SELECT network, operator_id, validator_count
             FROM validator_counts_latest
             WHERE network = %(network)s
-                AND operator_id IN %(operator_ids)s
-            )
-
-            , lc_fresh AS (  -- fresh active validators (gate)
-            SELECT network, operator_id
-            FROM validator_counts_latest
-            WHERE network = %(network)s
-                AND counts_latest_at >= %(updated_after)s
-                AND validator_count > 0
                 AND operator_id IN %(operator_ids)s
             )
 
             SELECT
+            o.network,
             o.operator_id,
             o.operator_name,
             o.is_vo,
             o.is_private,
             lc_any.validator_count,
-            du.metric_date,
+            d.metric_date,
             p24.perf_24h,
             p30.perf_30d
-            FROM du
-            JOIN operators o
-            ON o.network = du.network AND o.operator_id = du.operator_id
+            FROM ops_in_scope o
+            CROSS JOIN dates d
             LEFT JOIN p24
-            ON p24.network = du.network AND p24.operator_id = du.operator_id AND p24.metric_date = du.metric_date
+            ON p24.network = o.network AND p24.operator_id = o.operator_id AND p24.metric_date = d.metric_date
             LEFT JOIN p30
-            ON p30.network = du.network AND p30.operator_id = du.operator_id AND p30.metric_date = du.metric_date
+            ON p30.network = o.network AND p30.operator_id = o.operator_id AND p30.metric_date = d.metric_date
             LEFT JOIN lc_any
-            ON lc_any.network = du.network AND lc_any.operator_id = du.operator_id
-            LEFT JOIN lc_fresh
-            ON lc_fresh.network = du.network AND lc_fresh.operator_id = du.operator_id
-            WHERE o.network = %(network)s
-            AND (
-                    o.updated_at >= %(updated_after)s           -- active operators
-                OR lc_fresh.operator_id IS NOT NULL            -- inactive with fresh active validators
-                )
-            ORDER BY o.operator_id, du.metric_date
+            ON lc_any.network = o.network AND lc_any.operator_id = o.operator_id
+            ORDER BY o.operator_id, d.metric_date
             SETTINGS join_use_nulls = 1
         """
 
