@@ -137,19 +137,20 @@ class ClickHouseStorage:
                 FROM performance
                 WHERE network='mainnet' AND metric_type='30d' AND updated_at >= updated_after
             ),
+
             latest_counts AS (
                 SELECT network, operator_id, argMax(validator_count, updated_at) AS validator_count
                 FROM validator_counts
                 WHERE network='mainnet' AND updated_at >= updated_after
                 GROUP BY network, operator_id
             ),
+
             pm24 AS (
                 SELECT
                 p.network,
                 p.operator_id,
-                any(p.metric_date) AS metric_date_24h,
+                /* if you don't have p.source, use: argMax(p.metric_value, p.updated_at) */
                 argMax(p.metric_value, (p.updated_at, p.source)) AS perf_24h
-                -- if you don't have p.source, use: argMax(p.metric_value, p.updated_at)
                 FROM performance p
                 WHERE p.network='mainnet'
                 AND p.metric_type='24h'
@@ -157,11 +158,11 @@ class ClickHouseStorage:
                 AND p.updated_at >= updated_after
                 GROUP BY p.network, p.operator_id
             ),
+
             pm30 AS (
                 SELECT
                 p.network,
                 p.operator_id,
-                any(p.metric_date) AS metric_date_30d,
                 argMax(p.metric_value, (p.updated_at, p.source)) AS perf_30d
                 FROM performance p
                 WHERE p.network='mainnet'
@@ -170,6 +171,7 @@ class ClickHouseStorage:
                 AND p.updated_at >= updated_after
                 GROUP BY p.network, p.operator_id
             )
+
             SELECT
             o.operator_id,
             o.operator_name,
@@ -177,9 +179,7 @@ class ClickHouseStorage:
             o.is_private,
             lc.validator_count,     -- latest fresh validator count
             o.address,
-            pm24.metric_date_24h,
             pm24.perf_24h,
-            pm30.metric_date_30d,
             pm30.perf_30d
             FROM operators o
             LEFT JOIN latest_counts lc
@@ -189,7 +189,7 @@ class ClickHouseStorage:
             LEFT JOIN pm30
             ON pm30.network=o.network AND pm30.operator_id=o.operator_id
             WHERE o.network='mainnet'
-            AND o.updated_at >= updated_after               -- original gate: fresh operators only
+            AND o.updated_at >= updated_after            -- “fresh operators only” gate
             ORDER BY o.operator_id;
         """
 
