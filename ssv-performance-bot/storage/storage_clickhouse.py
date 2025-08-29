@@ -177,8 +177,8 @@ class ClickHouseStorage:
             o.operator_name,
             o.is_vo,
             o.is_private,
-            lc.validator_count,     -- latest fresh validator count
             o.address,
+            lc.validator_count,     -- latest fresh validator count
             pm24.perf_24h,
             pm30.perf_30d
             FROM operators o
