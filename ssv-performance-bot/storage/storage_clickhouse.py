@@ -227,59 +227,48 @@ class ClickHouseStorage:
     def get_performance_by_opids(self, network, op_ids, max_age_days: int | None = None):
         query = """
             WITH
-            %(date_from)s AS date_from,           -- Date: e.g. date.today() - timedelta(days=X)
-            today()        AS date_to
-
-            , ops_in_scope AS (  -- active OR (inactive with fresh counts>0), restricted to your operator_ids
+            toDate(%(date_from)s)   AS date_from,     -- cast to Date
+            today()                 AS date_to,
+            toDateTime(%(updated_after)s) AS fresh_cutoff
+            , ops_in_scope AS (
             SELECT o.network, o.operator_id, o.operator_name, o.is_vo, o.is_private
             FROM operators o
             LEFT JOIN (
                 SELECT network, operator_id
                 FROM validator_counts_latest
                 WHERE network = %(network)s
-                AND counts_latest_at >= %(updated_after)s     -- freshness gate
+                AND counts_latest_at >= fresh_cutoff
                 AND validator_count > 0
                 AND operator_id IN %(operator_ids)s
             ) lc_fresh
                 ON lc_fresh.network = o.network AND lc_fresh.operator_id = o.operator_id
             WHERE o.network = %(network)s
                 AND o.operator_id IN %(operator_ids)s
-                AND (
-                    o.updated_at >= %(updated_after)s          -- active operators
-                    OR lc_fresh.operator_id IS NOT NULL        -- inactive with fresh active validators
-                )
+                AND (o.updated_at >= fresh_cutoff OR lc_fresh.operator_id IS NOT NULL)
             )
-
-            , dates AS (  -- date spine: every day in [date_from, date_to]
+            , dates AS (
             SELECT addDays(date_from, step) AS metric_date
             FROM (SELECT arrayJoin(range(toUInt32(dateDiff('day', date_from, date_to)) + 1)) AS step)
             )
-
-            , p24 AS (  -- 24h values in window
+            , p24 AS (
             SELECT network, operator_id, metric_date, metric_value AS perf_24h
             FROM performance_daily
-            WHERE network = %(network)s
-                AND metric_type = '24h'
+            WHERE network = %(network)s AND metric_type = '24h'
                 AND metric_date BETWEEN date_from AND date_to
                 AND operator_id IN %(operator_ids)s
             )
-
-            , p30 AS (  -- 30d values in window
+            , p30 AS (
             SELECT network, operator_id, metric_date, metric_value AS perf_30d
             FROM performance_daily
-            WHERE network = %(network)s
-                AND metric_type = '30d'
+            WHERE network = %(network)s AND metric_type = '30d'
                 AND metric_date BETWEEN date_from AND date_to
                 AND operator_id IN %(operator_ids)s
             )
-
-            , lc_any AS (  -- latest validator count for display (not freshness-filtered)
+            , lc_any AS (
             SELECT network, operator_id, validator_count
             FROM validator_counts_latest
-            WHERE network = %(network)s
-                AND operator_id IN %(operator_ids)s
+            WHERE network = %(network)s AND operator_id IN %(operator_ids)s
             )
-
             SELECT
             o.network,
             o.operator_id,
@@ -292,19 +281,16 @@ class ClickHouseStorage:
             p30.perf_30d
             FROM ops_in_scope o
             CROSS JOIN dates d
-            LEFT JOIN p24
-            ON p24.network = o.network AND p24.operator_id = o.operator_id AND p24.metric_date = d.metric_date
-            LEFT JOIN p30
-            ON p30.network = o.network AND p30.operator_id = o.operator_id AND p30.metric_date = d.metric_date
-            LEFT JOIN lc_any
-            ON lc_any.network = o.network AND lc_any.operator_id = o.operator_id
+            LEFT JOIN p24  ON p24.network = o.network AND p24.operator_id = o.operator_id AND p24.metric_date = d.metric_date
+            LEFT JOIN p30  ON p30.network = o.network AND p30.operator_id = o.operator_id AND p30.metric_date = d.metric_date
+            LEFT JOIN lc_any ON lc_any.network = o.network AND lc_any.operator_id = o.operator_id
             ORDER BY o.operator_id, d.metric_date
             SETTINGS join_use_nulls = 1
         """
 
         params = {
             "network": network,                         # e.g., 'mainnet'
-            "operator_ids": tuple(op_ids),              # tuple of ints from user input
+            "operator_ids": tuple(op_ids) if op_ids else (0,),  # avoid IN ()
             "date_from": (date.today() - timedelta(days=7)).isoformat(),  # X-day window start
             "updated_after": (datetime.now(timezone.utc) - timedelta(hours=36)).strftime("%Y-%m-%d %H:%M:%S"),
         }
