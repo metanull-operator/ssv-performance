@@ -143,10 +143,9 @@ class ClickHouseStorage:
             ),
 
             latest_counts AS (
-                SELECT network, operator_id, argMax(validator_count, updated_at) AS validator_count
-                FROM validator_counts
-                WHERE network='mainnet' AND updated_at >= updated_after
-                GROUP BY network, operator_id
+                SELECT network, operator_id, validator_count, counts_latest_at
+                FROM validator_counts_latest
+                WHERE network='mainnet' AND counts_latest_at >= updated_after
             ),
 
             pm24 AS (
