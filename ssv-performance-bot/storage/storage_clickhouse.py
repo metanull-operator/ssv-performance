@@ -270,7 +270,6 @@ class ClickHouseStorage:
             WHERE network = %(network)s AND operator_id IN %(operator_ids)s
             )
             SELECT
-            o.network,
             o.operator_id,
             o.operator_name,
             o.is_vo,
