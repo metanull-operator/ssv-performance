@@ -287,7 +287,7 @@ class ClickHouseStorage:
         params = {
             "network": network,                         # e.g., 'mainnet'
             "operator_ids": tuple(op_ids),              # tuple of ints from user input
-            "date_from": (date.today() - timedelta(days=X)).isoformat(),  # X-day window start
+            "date_from": (date.today() - timedelta(days=7)).isoformat(),  # X-day window start
             "updated_after": (datetime.now(timezone.utc) - timedelta(hours=36)).strftime("%Y-%m-%d %H:%M:%S"),
         }
 
