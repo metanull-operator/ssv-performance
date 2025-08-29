@@ -333,19 +333,16 @@ class ClickHouseStorage:
                     FIELD_IS_PRIVATE: row[3],
                     FIELD_VALIDATOR_COUNT: row[4],
 #                    FIELD_ADDRESS: row[5],
-                    FIELD_PERFORMANCE_DATE: row[6],
+                    FIELD_PERFORMANCE_DATE: row[5],
                     FIELD_PERF_DATA_24H: {},
                     FIELD_PERF_DATA_30D: {},
 #                    FIELD_OPERATOR_FEE: row[9]
                 }
-            metric_type = row[8]
-            date_str = row[6].strftime('%Y-%m-%d')
-            if metric_type == '24h':
-                if row[7] is not None:
-                    perf_data[operator_id][FIELD_PERF_DATA_24H][date_str] = float(row[7])
-            elif metric_type == '30d':
-                if row[7] is not None:
-                    perf_data[operator_id][FIELD_PERF_DATA_30D][date_str] = float(row[7])
+            date_str = row[5].strftime('%Y-%m-%d')
+            if row[6] is not None:
+                perf_data[operator_id][FIELD_PERF_DATA_24H][date_str] = float(row[6])
+            if row[7] is not None:
+                perf_data[operator_id][FIELD_PERF_DATA_30D][date_str] = float(row[7])
 
         return perf_data
 
