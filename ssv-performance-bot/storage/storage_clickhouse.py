@@ -119,10 +119,8 @@ class ClickHouseStorage:
                     FIELD_OPERATOR_NAME: row[1],
                     FIELD_IS_VO: row[2],
                     FIELD_IS_PRIVATE: row[3],
-                    FIELD_VALIDATOR_COUNT: row[4],
-                    FIELD_ADDRESS: row[5],
-                    FIELD_OPERATOR_FEE: row[6],
-                    FIELD_OPERATOR_FEE_DATE: row[7]
+                    FIELD_OPERATOR_FEE: row[4],
+                    FIELD_VALIDATOR_COUNT: row[5],
                 }
 
         return fee_data
