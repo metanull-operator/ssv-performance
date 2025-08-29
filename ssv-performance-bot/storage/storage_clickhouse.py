@@ -281,7 +281,37 @@ class ClickHouseStorage:
             WHERE network = %(network)s
                 AND counts_latest_at >= %(updated_after)s
                 AND validator_count > 0
-                AND operator_id IN %(operator_id
+                AND operator_id IN %(operator_ids)s
+            )
+
+            SELECT
+            o.network,
+            o.operator_id,
+            o.operator_name,
+            o.is_vo,
+            o.is_private,
+            lc_any.validator_count,
+            du.metric_date,
+            p24.perf_24h,
+            p30.perf_30d
+            FROM du
+            JOIN operators o
+            ON o.network = du.network AND o.operator_id = du.operator_id
+            LEFT JOIN p24
+            ON p24.network = du.network AND p24.operator_id = du.operator_id AND p24.metric_date = du.metric_date
+            LEFT JOIN p30
+            ON p30.network = du.network AND p30.operator_id = du.operator_id AND p30.metric_date = du.metric_date
+            LEFT JOIN lc_any
+            ON lc_any.network = du.network AND lc_any.operator_id = du.operator_id
+            LEFT JOIN lc_fresh
+            ON lc_fresh.network = du.network AND lc_fresh.operator_id = du.operator_id
+            WHERE o.network = %(network)s
+            AND (
+                    o.updated_at >= %(updated_after)s           -- active operators
+                OR lc_fresh.operator_id IS NOT NULL            -- inactive with fresh active validators
+                )
+            ORDER BY o.operator_id, du.metric_date
+            SETTINGS join_use_nulls = 1
         """
 
         params = {
