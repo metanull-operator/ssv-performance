@@ -282,7 +282,7 @@ def count_active_from_status_map(operator_validators: dict[int, set[str]], statu
     }
 
 
-def insert_clickhouse_performance_data(client, network, clickhouse_table_operators, clickhouse_table_performance, operators, target_date, source):
+def insert_clickhouse_performance_data(client, network, operators, target_date, source):
     performance_rows = []
     operator_rows = []
     validator_counts_rows = []
@@ -331,11 +331,11 @@ def insert_clickhouse_performance_data(client, network, clickhouse_table_operato
     logging.info("CLICKHOUSE: inserting %d operators, %d perf rows, %d validator count rows, %d fee rows",
                  len(operator_rows), len(performance_rows), len(validator_counts_rows), len(operator_fees_rows))
 
-    client.insert(clickhouse_table_operators, operator_rows, column_names=[
+    client.insert('operators', operator_rows, column_names=[
         'network', 'operator_id', 'operator_name', 'is_vo', 'is_private', 'validator_count', 'operator_fee', 'address', 'updated_at'
     ])
 
-    client.insert(clickhouse_table_performance, performance_rows, column_names=[
+    client.insert('performance', performance_rows, column_names=[
         'network', 'operator_id', 'metric_type', 'metric_date', 'metric_value', 'source', 'updated_at'
     ])
 
@@ -407,11 +407,14 @@ def main():
     final_active_counts: dict[int, int] = {}
     beacon_statuses: dict[str, str] = {}
     if BEACON_API_URL:
-        logging.info("Getting BEACON_API validator statuses")
         beacon_statuses = fetch_beacon_statuses(all_pubkeys)
-        final_active_counts = count_active_from_status_map(operator_validators, beacon_statuses)
+        if beacon_statuses:
+            logging.info("Using BEACON_API validator statuses")
+            final_active_counts = count_active_from_status_map(operator_validators, beacon_statuses)
+        else:
+            logging.warning("BEACON_API_URL set, but no beacon statuses received; falling back to SSV-based counts")
     else:
-        logging.info("No BEACON_API_URL set; using SSV-based active counts.")
+        logging.info("No BEACON_API_URL set; using SSV-based active counts")
         final_active_counts = count_active_from_status_map(operator_validators, all_pubkeys_status)
 
 
@@ -423,7 +426,7 @@ def main():
 
     client = get_clickhouse_client(clickhouse_password)
 
-    insert_clickhouse_performance_data(client, args.network, args.ch_operators_table, args.ch_performance_table, operators, target_date, IMPORT_SOURCE)
+    insert_clickhouse_performance_data(client, args.network, operators, target_date, IMPORT_SOURCE)
     insert_clickhouse_validator_count_data(client, args.network, final_active_counts, target_date, IMPORT_SOURCE)
 
     deduplicate_table(client, 'operators', args.network)
