@@ -407,6 +407,7 @@ def main():
     final_active_counts: dict[int, int] = {}
     beacon_statuses: dict[str, str] = {}
     if BEACON_API_URL:
+        beacon_statuses = fetch_beacon_statuses(all_pubkeys)
         if beacon_statuses:
             logging.info("Using BEACON_API validator statuses")
             final_active_counts = count_active_from_status_map(operator_validators, beacon_statuses)
