@@ -407,11 +407,13 @@ def main():
     final_active_counts: dict[int, int] = {}
     beacon_statuses: dict[str, str] = {}
     if BEACON_API_URL:
-        logging.info("Getting BEACON_API validator statuses")
-        beacon_statuses = fetch_beacon_statuses(all_pubkeys)
-        final_active_counts = count_active_from_status_map(operator_validators, beacon_statuses)
+        if beacon_statuses:
+            logging.info("Using BEACON_API validator statuses")
+            final_active_counts = count_active_from_status_map(operator_validators, beacon_statuses)
+        else:
+            logging.warning("BEACON_API_URL set, but no beacon statuses received; falling back to SSV-based counts")
     else:
-        logging.info("No BEACON_API_URL set; using SSV-based active counts.")
+        logging.info("No BEACON_API_URL set; using SSV-based active counts")
         final_active_counts = count_active_from_status_map(operator_validators, all_pubkeys_status)
 
 
