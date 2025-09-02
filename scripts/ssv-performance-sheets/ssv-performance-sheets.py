@@ -117,6 +117,7 @@ def get_operator_performance_data(network: str, days: int, metric_type: str,
                 FIELD_IS_VO: 1 if int(r["is_vo"] or 0) else 0,
                 FIELD_IS_PRIVATE: 1 if int(r["is_private"] or 0) else 0,
                 FIELD_ADDRESS: r["address"],
+                FIELD_VALIDATOR_COUNT: int(r["validator_count"] or 0),
                 metric_type: {}
             }
         mv = r["metric_value"]
