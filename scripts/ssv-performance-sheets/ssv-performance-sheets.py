@@ -88,17 +88,21 @@ def get_operator_performance_data(network: str, days: int, metric_type: str,
         o.address       AS address,
         p.metric_date   AS metric_date,
         p.metric_value  AS metric_value,
-        lc.validator_count AS validator_count      -- NEW: latest count
-        FROM performance_daily AS p
-        INNER JOIN operators AS o
-        ON o.network = p.network
-        AND o.operator_id = p.operator_id
-        LEFT JOIN validator_counts_latest AS lc
-        ON lc.network = p.network
-        AND lc.operator_id = p.operator_id
-        WHERE p.network = %(network)s
+        lc.validator_count AS validator_count           -- latest count (MV)
+        FROM operators AS o
+        LEFT JOIN performance_daily AS p
+        ON p.network = o.network
+        AND p.operator_id = o.operator_id
         AND p.metric_type = %(metric_type)s
-        AND p.metric_date BETWEEN %(date_from)s AND today()
+        AND p.metric_date BETWEEN toDate(%(date_from)s) AND today()
+        LEFT JOIN validator_counts_latest AS lc
+        ON lc.network = o.network
+        AND lc.operator_id = o.operator_id
+        WHERE o.network = %(network)s
+        AND (
+                p.metric_date IS NOT NULL                -- has perf in window
+            OR COALESCE(lc.validator_count, 0) > 0      -- or no perf, but active validators
+            )
         ORDER BY o.operator_id, p.metric_date
     """
     params = {"network": network, "metric_type": metric_type, "date_from": date_from}
