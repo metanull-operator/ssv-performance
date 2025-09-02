@@ -92,22 +92,22 @@ def get_operator_performance_data(network: str, days: int, metric_type: str,
         FROM operators AS o
         LEFT JOIN performance_daily AS p
         ON p.network = o.network
-        AND p.operator_id = o.operator_id
-        AND p.metric_type = %(metric_type)s
-        AND p.metric_date BETWEEN toDate(%(date_from)s) AND today()
-LEFT JOIN (
-  SELECT network, operator_id, validator_count
-  FROM validator_counts_latest
-  WHERE network = %(network)s
-    AND counts_latest_at >= toDateTime(%(updated_after)s)
-) AS lc
-  ON lc.network = o.network
- AND lc.operator_id = o.operator_id
+            AND p.operator_id = o.operator_id
+            AND p.metric_type = %(metric_type)s
+            AND p.metric_date BETWEEN toDate(%(date_from)s) AND today()
+        LEFT JOIN (
+        SELECT network, operator_id, validator_count
+        FROM validator_counts_latest
+        WHERE network = %(network)s
+            AND counts_latest_at >= toDateTime(%(date_from)s)   -- <<< changed from updated_after to date_from
+        ) AS lc
+        ON lc.network = o.network
+            AND lc.operator_id = o.operator_id
         WHERE o.network = %(network)s
-        AND (
-                p.metric_date IS NOT NULL                -- has perf in window
-            OR COALESCE(lc.validator_count, 0) > 0      -- or no perf, but active validators
-            )
+            AND (
+                    p.metric_date IS NOT NULL                -- has perf in window
+                OR COALESCE(lc.validator_count, 0) > 0      -- or no perf, but active validators
+                )
         ORDER BY o.operator_id, p.metric_date
     """
     params = {"network": network, "metric_type": metric_type, "date_from": date_from}
