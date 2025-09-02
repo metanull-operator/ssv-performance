@@ -95,9 +95,14 @@ def get_operator_performance_data(network: str, days: int, metric_type: str,
         AND p.operator_id = o.operator_id
         AND p.metric_type = %(metric_type)s
         AND p.metric_date BETWEEN toDate(%(date_from)s) AND today()
-        LEFT JOIN validator_counts_latest AS lc
-        ON lc.network = o.network
-        AND lc.operator_id = o.operator_id
+LEFT JOIN (
+  SELECT network, operator_id, validator_count
+  FROM validator_counts_latest
+  WHERE network = %(network)s
+    AND counts_latest_at >= toDateTime(%(updated_after)s)
+) AS lc
+  ON lc.network = o.network
+ AND lc.operator_id = o.operator_id
         WHERE o.network = %(network)s
         AND (
                 p.metric_date IS NOT NULL                -- has perf in window
