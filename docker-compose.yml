@@ -1,6 +1,7 @@
 services:
   ssv-performance-bot:
     image: ssv-performance-bot:${SSV_PERFORMANCE_BOT_VERSION:-latest}
+    restart: unless-stopped    
     hostname: ssv-performance-bot
     build:
       context: .
@@ -28,6 +29,7 @@ services:
 
   clickhouse:
     image: clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-latest}
+    restart: unless-stopped
     hostname: clickhouse
     environment:
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
