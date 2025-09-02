@@ -111,7 +111,7 @@ def get_operator_performance_data(network: str, days: int, metric_type: str,
                 )
         ORDER BY o.operator_id, p.metric_date
     """
-    params = {"network": network, "metric_type": metric_type, "date_from": date_from}
+    params = {"network": network, "metric_type": metric_type, "date_from": date_from, "date_from_vc": date_from_vc}
     res = client.query(sql, parameters=params)
     cols = list(res.column_names)
     rows = [dict(zip(cols, r)) for r in res.result_rows]
