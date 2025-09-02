@@ -78,6 +78,7 @@ def get_operator_performance_data(network: str, days: int, metric_type: str,
                                   clickhouse_password: str, max_age_days: int | None = None):
     client = get_clickhouse_client(clickhouse_password=clickhouse_password)
     date_from = (date.today() - timedelta(days=days)).isoformat()
+    date_from_vc = (date.today() - timedelta(hours=36)).isoformat()
 
     sql = """
         SELECT
@@ -99,7 +100,7 @@ def get_operator_performance_data(network: str, days: int, metric_type: str,
         SELECT network, operator_id, validator_count
         FROM validator_counts_latest
         WHERE network = %(network)s
-            AND counts_latest_at >= toDateTime(%(date_from)s)   -- <<< changed from updated_after to date_from
+            AND counts_latest_at >= toDateTime(%(date_from_vc)s)   -- <<< changed from updated_after to date_from
         ) AS lc
         ON lc.network = o.network
             AND lc.operator_id = o.operator_id
