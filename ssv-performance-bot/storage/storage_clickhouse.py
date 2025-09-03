@@ -459,23 +459,22 @@ class ClickHouseStorage:
         query = """
 WITH toDateTime(%(updated_after)s) AS updated_after
 SELECT
-  o.network,
-  o.operator_id,
-  o.operator_name,
-  o.is_vo,
-  o.is_private,
+  o.network        AS network,
+  o.operator_id    AS operator_id,
+  o.operator_name  AS operator_name,
+  o.is_vo          AS is_vo,
+  o.is_private     AS is_private,
   IF(lc.counts_latest_at >= updated_after, lc.validator_count, NULL) AS validator_count
-FROM operators AS o
-LEFT JOIN validator_counts_latest FINAL AS lc
+FROM operators o
+LEFT JOIN validator_counts_latest FINAL lc          -- no AS
   ON lc.network = o.network
  AND lc.operator_id = o.operator_id
 WHERE o.network = %(network)s
-  AND (
-        o.updated_at >= updated_after
-     OR coalesce(lc.counts_latest_at, toDateTime('1970-01-01')) >= updated_after
-      )
+  AND ( o.updated_at >= updated_after
+     OR coalesce(lc.counts_latest_at, toDateTime('1970-01-01')) >= updated_after )
 ORDER BY o.operator_id
-SETTINGS join_use_nulls = 1
+SETTINGS join_use_nulls = 1;
+
         """
         res = self.client.query(
             query,
