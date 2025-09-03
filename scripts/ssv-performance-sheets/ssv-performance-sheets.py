@@ -81,43 +81,52 @@ def get_operator_performance_data(network: str, days: int, metric_type: str,
     date_from_vc = (date.today() - timedelta(hours=36)).isoformat()
 
     sql = """
-        SELECT
-        o.operator_id   AS operator_id,
-        o.operator_name AS operator_name,
-        o.is_vo         AS is_vo,
-        o.is_private    AS is_private,
-        o.address       AS address,
-        p.metric_date   AS metric_date,
-        p.metric_value  AS metric_value,
-        lc.validator_count AS validator_count           -- latest count (MV)
-        FROM operators AS o
+SELECT
+  o.operator_id   AS operator_id,
+  o.operator_name AS operator_name,
+  o.is_vo         AS is_vo,
+  o.is_private    AS is_private,
+  o.address       AS address,
+  p.metric_date   AS metric_date,
+  p.metric_value  AS metric_value,
+  lc.validator_count AS validator_count
+FROM operators AS o
+
 LEFT JOIN (
-  SELECT network, operator_id, metric_date,
-         argMax(metric_value, last_row_at) AS metric_value
+  SELECT
+    network,
+    operator_id,
+    metric_date,
+    argMax(metric_value, last_row_at) AS metric_value
   FROM performance_daily
-  WHERE network='mainnet' AND metric_type='30d'
-    AND metric_date BETWEEN toDate('2025-08-01') AND today()
+  WHERE network = %(network)s
+    AND metric_type = %(metric_type)s
+    AND metric_date BETWEEN toDate(%(date_from)s) AND today()
   GROUP BY network, operator_id, metric_date
-) p        ON p.network = o.network
-            AND p.operator_id = o.operator_id
-            AND p.metric_type = %(metric_type)s
-            AND p.metric_date BETWEEN toDate(%(date_from)s) AND today()
+) AS p
+  ON p.network = o.network
+ AND p.operator_id = o.operator_id
+
 LEFT JOIN (
-  SELECT network, operator_id,
-         argMax(validator_count, counts_latest_at) AS validator_count
+  SELECT
+    network,
+    operator_id,
+    argMax(validator_count, counts_latest_at) AS validator_count
   FROM validator_counts_latest
-  WHERE network='mainnet'
-    AND counts_latest_at >= toDateTime('2025-09-01')
+  WHERE network = %(network)s
+    AND counts_latest_at >= toDateTime(%(fresh_cutoff)s)   -- or toDateTime(%(date_from)s) if you prefer
   GROUP BY network, operator_id
-) lc
-        ON lc.network = o.network
-            AND lc.operator_id = o.operator_id
-        WHERE o.network = %(network)s
-            AND (
-                    p.metric_date IS NOT NULL                -- has perf in window
-                OR COALESCE(lc.validator_count, 0) > 0      -- or no perf, but active validators
-                )
-        ORDER BY o.operator_id, p.metric_date
+) AS lc
+  ON lc.network = o.network
+ AND lc.operator_id = o.operator_id
+
+WHERE o.network = %(network)s
+  AND (
+        p.metric_date IS NOT NULL                 -- has perf in window
+     OR COALESCE(lc.validator_count, 0) > 0       -- or no perf but active validators
+      )
+ORDER BY o.operator_id, p.metric_date
+SETTINGS join_use_nulls = 1
     """
     params = {"network": network, "metric_type": metric_type, "date_from": date_from, "date_from_vc": date_from_vc}
     res = client.query(sql, parameters=params)
