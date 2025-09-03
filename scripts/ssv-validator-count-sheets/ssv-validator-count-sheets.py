@@ -99,7 +99,8 @@ def get_operator_validator_count_data(network: str, days: int, clickhouse_passwo
         SELECT
             network,
             operator_id,
-            validator_count
+            validator_count,
+            metric_date
         FROM validator_counts_daily
         WHERE network = %(network)s
         ) AS v
