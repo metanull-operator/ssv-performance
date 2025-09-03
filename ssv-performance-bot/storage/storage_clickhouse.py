@@ -466,14 +466,22 @@ SELECT
   o.is_private     AS is_private,
   IF(lc.counts_latest_at >= updated_after, lc.validator_count, NULL) AS validator_count
 FROM operators o
-LEFT JOIN validator_counts_latest FINAL lc          -- no AS
+LEFT JOIN
+(
+  SELECT network, operator_id, validator_count, counts_latest_at
+  FROM validator_counts_latest FINAL
+  WHERE network = %(network)s
+) lc
   ON lc.network = o.network
  AND lc.operator_id = o.operator_id
 WHERE o.network = %(network)s
-  AND ( o.updated_at >= updated_after
-     OR coalesce(lc.counts_latest_at, toDateTime('1970-01-01')) >= updated_after )
+  AND (
+        o.updated_at >= updated_after
+     OR coalesce(lc.counts_latest_at, toDateTime('1970-01-01')) >= updated_after
+      )
 ORDER BY o.operator_id
 SETTINGS join_use_nulls = 1
+
         """
         res = self.client.query(
             query,
