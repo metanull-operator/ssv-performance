@@ -123,14 +123,14 @@ def get_operator_performance_data(network: str, days: int, metric_type: str,
 
     sql = """
         SELECT
-        o.operator_id   AS operator_id,
-        o.operator_name AS operator_name,
-        o.is_vo         AS is_vo,
-        o.is_private    AS is_private,
-        o.address       AS address,
-        p.metric_date   AS metric_date,
-        p.metric_value  AS metric_value,
-        lc.validator_count AS validator_count
+            o.operator_id   AS operator_id,
+            o.operator_name AS operator_name,
+            o.is_vo         AS is_vo,
+            o.is_private    AS is_private,
+            o.address       AS address,
+            p.metric_date   AS metric_date,
+            p.metric_value  AS metric_value,
+            lc.validator_count AS validator_count
         FROM operators AS o
 
         LEFT JOIN (
@@ -155,7 +155,7 @@ def get_operator_performance_data(network: str, days: int, metric_type: str,
             argMax(validator_count, counts_latest_at) AS validator_count
         FROM validator_counts_latest
         WHERE network = %(network)s
-            AND counts_latest_at >= toDateTime(%(date_from_vc)s)   -- or toDateTime(%(date_from)s) if you prefer
+            AND counts_latest_at >= toDateTime(%(date_from_vc)s)
         GROUP BY network, operator_id
         ) AS lc
         ON lc.network = o.network
@@ -163,8 +163,8 @@ def get_operator_performance_data(network: str, days: int, metric_type: str,
 
         WHERE o.network = %(network)s
         AND (
-                p.metric_date IS NOT NULL                 -- has perf in window
-            OR COALESCE(lc.validator_count, 0) > 0       -- or no perf but active validators
+                coalesce(p.metric_value, 0) > 0
+                OR coalesce(lc.validator_count, 0) > 0
             )
         ORDER BY o.operator_id, p.metric_date
         SETTINGS join_use_nulls = 1
