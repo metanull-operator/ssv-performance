@@ -91,17 +91,25 @@ def get_operator_performance_data(network: str, days: int, metric_type: str,
         p.metric_value  AS metric_value,
         lc.validator_count AS validator_count           -- latest count (MV)
         FROM operators AS o
-        LEFT JOIN performance_daily AS p
-        ON p.network = o.network
+LEFT JOIN (
+  SELECT network, operator_id, metric_date,
+         argMax(metric_value, last_row_at) AS metric_value
+  FROM performance_daily
+  WHERE network='mainnet' AND metric_type='30d'
+    AND metric_date BETWEEN toDate('2025-08-01') AND today()
+  GROUP BY network, operator_id, metric_date
+) p        ON p.network = o.network
             AND p.operator_id = o.operator_id
             AND p.metric_type = %(metric_type)s
             AND p.metric_date BETWEEN toDate(%(date_from)s) AND today()
-        LEFT JOIN (
-        SELECT network, operator_id, validator_count
-        FROM validator_counts_latest
-        WHERE network = %(network)s
-            AND counts_latest_at >= toDateTime(%(date_from_vc)s)   -- <<< changed from updated_after to date_from
-        ) AS lc
+LEFT JOIN (
+  SELECT network, operator_id,
+         argMax(validator_count, counts_latest_at) AS validator_count
+  FROM validator_counts_latest
+  WHERE network='mainnet'
+    AND counts_latest_at >= toDateTime('2025-09-01')
+  GROUP BY network, operator_id
+) lc
         ON lc.network = o.network
             AND lc.operator_id = o.operator_id
         WHERE o.network = %(network)s
