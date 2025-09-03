@@ -64,28 +64,60 @@ def get_operator_validator_count_data(network: str, days: int, clickhouse_passwo
     client = get_clickhouse_client(clickhouse_password=clickhouse_password)
 
     date_from = (date.today() - timedelta(days=days)).isoformat()
+    date_from_vc = (date.today() - timedelta(hours=36)).isoformat()
+
+
+#         SELECT
+#             o.operator_id,
+#             o.operator_name,
+#             o.is_vo,
+#             o.is_private,
+#             o.address,
+#             v.metric_date,
+#             v.validator_count
+#         FROM validator_counts_daily AS v
+#         INNER JOIN operators AS o
+#             ON o.network = v.network
+#            AND o.operator_id = v.operator_id
+#         WHERE v.network = %(network)s
+#           AND v.metric_date BETWEEN %(date_from)s AND today()
+#         ORDER BY o.operator_id, v.metric_date
+# """
 
     query = """
         SELECT
-            o.operator_id,
-            o.operator_name,
-            o.is_vo,
-            o.is_private,
-            o.address,
-            v.metric_date,
-            v.validator_count
-        FROM validator_counts_daily AS v
-        INNER JOIN operators AS o
-            ON o.network = v.network
-           AND o.operator_id = v.operator_id
-        WHERE v.network = %(network)s
-          AND v.metric_date BETWEEN %(date_from)s AND today()
+            o.operator_id   AS operator_id,
+            o.operator_name AS operator_name,
+            o.is_vo         AS is_vo,
+            o.is_private    AS is_private,
+            o.address       AS address,
+            v.metric_date   AS metric_date,
+            v.validator_count AS validator_count
+        FROM operators AS o
+
+        LEFT JOIN (
+        SELECT
+            network,
+            operator_id,
+            argMax(validator_count, counts_latest_at) AS validator_count
+        FROM validator_counts_latest
+        WHERE network = %(network)s
+            AND counts_latest_at >= toDateTime(%(date_from_vc)s)
+        GROUP BY network, operator_id
+        ) AS v
+        ON v.network = o.network
+        AND v.operator_id = o.operator_id
+
+        WHERE o.network = %(network)s
+            AND coalesce(v.validator_count, 0) > 0
         ORDER BY o.operator_id, v.metric_date
+        SETTINGS join_use_nulls = 1
     """
 
     params = {
         'network': network,
         'date_from': date_from,
+        'date_from_vc': date_from_vc,
     }
     rows = client.query(query, parameters=params).result_rows
 
