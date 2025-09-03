@@ -102,7 +102,6 @@ def get_operator_validator_count_data(network: str, days: int, clickhouse_passwo
             validator_count
         FROM validator_counts_daily
         WHERE network = %(network)s
-        GROUP BY network, operator_id
         ) AS v
         ON v.network = o.network
         AND v.operator_id = o.operator_id
