@@ -473,7 +473,7 @@ class ClickHouseStorage:
             SELECT
                 network,
                 operator_id,
-                argMax(validator_count, last_row_at) AS validator_count,
+                argMax(validator_count, counts_latest_at) AS validator_count,
                 max(counts_latest_at) AS counts_latest_at
             FROM validator_counts_latest
             WHERE network = %(network)s
