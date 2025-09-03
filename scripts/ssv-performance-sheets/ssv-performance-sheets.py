@@ -136,7 +136,15 @@ SETTINGS join_use_nulls = 1
     result: dict[int, dict] = {}
     for r in rows:
         op_id = int(r["operator_id"])
-        d = r["metric_date"].strftime("%Y-%m-%d")
+        
+        md = r.get("metric_date")
+        if md is None:
+            d_str = None
+        else:
+            if isinstance(md, datetime):
+                md = md.date()
+            d_str = md.strftime("%Y-%m-%d")
+
         if op_id not in result:
             result[op_id] = {
                 FIELD_OPERATOR_ID: op_id,
@@ -147,8 +155,9 @@ SETTINGS join_use_nulls = 1
                 FIELD_VALIDATOR_COUNT: int(r["validator_count"] or 0),
                 metric_type: {}
             }
+            
         mv = r["metric_value"]
-        result[op_id][metric_type][d] = float(mv) if mv is not None else None
+        result[op_id][metric_type][d_str] = float(mv) if mv is not None else None
 
     return result
 
