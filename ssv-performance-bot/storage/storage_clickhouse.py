@@ -191,7 +191,6 @@ class ClickHouseStorage:
             LEFT JOIN pm30
             ON pm30.network=o.network AND pm30.operator_id=o.operator_id
             WHERE o.network='mainnet'
-            AND o.updated_at >= updated_after           
             ORDER BY o.operator_id
         """
 
