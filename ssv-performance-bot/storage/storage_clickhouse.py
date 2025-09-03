@@ -128,7 +128,7 @@ class ClickHouseStorage:
 
     def get_latest_performance_data(self, network, max_age_days: int | None = None):
         query = """
-            WITH now('UTC') - INTERVAL 36 HOUR AS updated_after
+            WITH toDateTime(now('UTC') - INTERVAL 36 HOUR) AS updated_after
 
             max24 AS (
                 SELECT max(metric_date) AS dt
