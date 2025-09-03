@@ -114,7 +114,7 @@ LEFT JOIN (
     argMax(validator_count, counts_latest_at) AS validator_count
   FROM validator_counts_latest
   WHERE network = %(network)s
-    AND counts_latest_at >= toDateTime(%(fresh_cutoff)s)   -- or toDateTime(%(date_from)s) if you prefer
+    AND counts_latest_at >= toDateTime(%(date_from_vc)s)   -- or toDateTime(%(date_from)s) if you prefer
   GROUP BY network, operator_id
 ) AS lc
   ON lc.network = o.network
