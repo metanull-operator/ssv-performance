@@ -81,10 +81,12 @@ def get_operator_validator_count_data(network: str, days: int, clickhouse_passwo
         SELECT
             network,
             operator_id,
-            validator_count,
-            metric_date
+            metric_date,
+            argMax(validator_count, last_row_at) AS validator_count
         FROM validator_counts_daily
         WHERE network = %(network)s
+            AND metric_date BETWEEN toDate(%(date_from)s) AND today()
+        GROUP BY network, operator_id, metric_date
         ) AS v
         ON v.network = o.network
         AND v.operator_id = o.operator_id
