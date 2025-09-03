@@ -64,28 +64,43 @@ def get_operator_validator_count_data(network: str, days: int, clickhouse_passwo
     client = get_clickhouse_client(clickhouse_password=clickhouse_password)
 
     date_from = (date.today() - timedelta(days=days)).isoformat()
+    date_from_vc = (date.today() - timedelta(hours=36)).isoformat()
 
     query = """
         SELECT
-            o.operator_id,
-            o.operator_name,
-            o.is_vo,
-            o.is_private,
-            o.address,
-            v.metric_date,
-            v.validator_count
-        FROM validator_counts_daily AS v
-        INNER JOIN operators AS o
-            ON o.network = v.network
-           AND o.operator_id = v.operator_id
-        WHERE v.network = %(network)s
-          AND v.metric_date BETWEEN %(date_from)s AND today()
+            o.operator_id   AS operator_id,
+            o.operator_name AS operator_name,
+            o.is_vo         AS is_vo,
+            o.is_private    AS is_private,
+            o.address       AS address,
+            v.metric_date   AS metric_date,
+            v.validator_count AS validator_count
+        FROM operators AS o
+
+        LEFT JOIN (
+        SELECT
+            network,
+            operator_id,
+            metric_date,
+            argMax(validator_count, last_row_at) AS validator_count
+        FROM validator_counts_daily
+        WHERE network = %(network)s
+            AND metric_date BETWEEN toDate(%(date_from)s) AND today()
+        GROUP BY network, operator_id, metric_date
+        ) AS v
+        ON v.network = o.network
+        AND v.operator_id = o.operator_id
+
+        WHERE o.network = %(network)s
+            AND coalesce(v.validator_count, 0) > 0
         ORDER BY o.operator_id, v.metric_date
+        SETTINGS join_use_nulls = 1
     """
 
     params = {
         'network': network,
         'date_from': date_from,
+        'date_from_vc': date_from_vc,
     }
     rows = client.query(query, parameters=params).result_rows
 
