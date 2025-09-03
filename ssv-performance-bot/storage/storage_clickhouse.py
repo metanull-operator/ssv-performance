@@ -473,8 +473,7 @@ WHERE o.network = %(network)s
   AND ( o.updated_at >= updated_after
      OR coalesce(lc.counts_latest_at, toDateTime('1970-01-01')) >= updated_after )
 ORDER BY o.operator_id
-SETTINGS join_use_nulls = 1;
-
+SETTINGS join_use_nulls = 1
         """
         res = self.client.query(
             query,
