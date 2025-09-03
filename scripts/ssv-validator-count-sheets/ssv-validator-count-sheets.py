@@ -66,24 +66,6 @@ def get_operator_validator_count_data(network: str, days: int, clickhouse_passwo
     date_from = (date.today() - timedelta(days=days)).isoformat()
     date_from_vc = (date.today() - timedelta(hours=36)).isoformat()
 
-
-#         SELECT
-#             o.operator_id,
-#             o.operator_name,
-#             o.is_vo,
-#             o.is_private,
-#             o.address,
-#             v.metric_date,
-#             v.validator_count
-#         FROM validator_counts_daily AS v
-#         INNER JOIN operators AS o
-#             ON o.network = v.network
-#            AND o.operator_id = v.operator_id
-#         WHERE v.network = %(network)s
-#           AND v.metric_date BETWEEN %(date_from)s AND today()
-#         ORDER BY o.operator_id, v.metric_date
-# """
-
     query = """
         SELECT
             o.operator_id   AS operator_id,
