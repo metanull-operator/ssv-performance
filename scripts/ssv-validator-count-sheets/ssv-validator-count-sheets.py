@@ -100,7 +100,7 @@ def get_operator_validator_count_data(network: str, days: int, clickhouse_passwo
             network,
             operator_id,
             argMax(validator_count, counts_latest_at) AS validator_count
-        FROM validator_counts_latest
+        FROM validator_counts_daily
         WHERE network = %(network)s
             AND counts_latest_at >= toDateTime(%(date_from_vc)s)
         GROUP BY network, operator_id
