@@ -26,9 +26,40 @@ SPREADSHEET_COLUMNS = [
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Creates a two-dimensional representation of the data to be populated into the Google Sheet
+from datetime import date, datetime
+
 def create_spreadsheet_data(data, performance_data_attribute):
-    dates = sorted({d for details in data.values() for d in details[performance_data_attribute]}, reverse=True)
-    sorted_entries = sorted(data.items(), key=lambda item: item[1].get(FIELD_OPERATOR_ID, 'Unknown'))
+    def _norm_day(d):
+        if d is None:
+            return None
+        if isinstance(d, datetime):
+            d = d.date()
+        if isinstance(d, date):
+            return d.isoformat()        # 'YYYY-MM-DD'
+        return str(d)
+
+    # Build header dates as ISO strings, exclude None
+    dates = sorted(
+        {
+            _norm_day(k)
+            for details in data.values()
+            for k in details.get(performance_data_attribute, {}).keys()
+            if _norm_day(k) is not None
+        },
+        reverse=True,
+    )
+
+    # Sort rows by numeric operator_id when possible
+    def _op_sort(item):
+        try:
+            return int(item[0])  # dict key is usually the op_id
+        except Exception:
+            try:
+                return int(item[1].get(FIELD_OPERATOR_ID, 10**12))
+            except Exception:
+                return 10**12
+
+    sorted_entries = sorted(data.items(), key=_op_sort)
 
     spreadsheet_data = [SPREADSHEET_COLUMNS + dates]
 
@@ -39,13 +70,23 @@ def create_spreadsheet_data(data, performance_data_attribute):
             1 if details.get(FIELD_IS_VO, 0) else 0,
             1 if details.get(FIELD_IS_PRIVATE, 0) else 0,
             details.get(FIELD_VALIDATOR_COUNT, None),
-            details.get(FIELD_ADDRESS, None)
+            details.get(FIELD_ADDRESS, None),
         ]
+
+        series = details.get(performance_data_attribute, {})
         for d in dates:
-            row.append(details[performance_data_attribute].get(d, None))
+            # Prefer exact string key; fall back to date-object key if present
+            val = series.get(d)
+            if val is None:
+                try:
+                    val = series.get(datetime.fromisoformat(d).date(), None)
+                except Exception:
+                    pass
+            row.append(val)
         spreadsheet_data.append(row)
 
     return spreadsheet_data
+
 
 
 def read_clickhouse_password_from_file(password_file_path):
@@ -81,52 +122,52 @@ def get_operator_performance_data(network: str, days: int, metric_type: str,
     date_from_vc = (date.today() - timedelta(hours=36)).isoformat()
 
     sql = """
-SELECT
-  o.operator_id   AS operator_id,
-  o.operator_name AS operator_name,
-  o.is_vo         AS is_vo,
-  o.is_private    AS is_private,
-  o.address       AS address,
-  p.metric_date   AS metric_date,
-  p.metric_value  AS metric_value,
-  lc.validator_count AS validator_count
-FROM operators AS o
+        SELECT
+        o.operator_id   AS operator_id,
+        o.operator_name AS operator_name,
+        o.is_vo         AS is_vo,
+        o.is_private    AS is_private,
+        o.address       AS address,
+        p.metric_date   AS metric_date,
+        p.metric_value  AS metric_value,
+        lc.validator_count AS validator_count
+        FROM operators AS o
 
-LEFT JOIN (
-  SELECT
-    network,
-    operator_id,
-    metric_date,
-    argMax(metric_value, last_row_at) AS metric_value
-  FROM performance_daily
-  WHERE network = %(network)s
-    AND metric_type = %(metric_type)s
-    AND metric_date BETWEEN toDate(%(date_from)s) AND today()
-  GROUP BY network, operator_id, metric_date
-) AS p
-  ON p.network = o.network
- AND p.operator_id = o.operator_id
+        LEFT JOIN (
+        SELECT
+            network,
+            operator_id,
+            metric_date,
+            argMax(metric_value, last_row_at) AS metric_value
+        FROM performance_daily
+        WHERE network = %(network)s
+            AND metric_type = %(metric_type)s
+            AND metric_date BETWEEN toDate(%(date_from)s) AND today()
+        GROUP BY network, operator_id, metric_date
+        ) AS p
+        ON p.network = o.network
+        AND p.operator_id = o.operator_id
 
-LEFT JOIN (
-  SELECT
-    network,
-    operator_id,
-    argMax(validator_count, counts_latest_at) AS validator_count
-  FROM validator_counts_latest
-  WHERE network = %(network)s
-    AND counts_latest_at >= toDateTime(%(date_from_vc)s)   -- or toDateTime(%(date_from)s) if you prefer
-  GROUP BY network, operator_id
-) AS lc
-  ON lc.network = o.network
- AND lc.operator_id = o.operator_id
+        LEFT JOIN (
+        SELECT
+            network,
+            operator_id,
+            argMax(validator_count, counts_latest_at) AS validator_count
+        FROM validator_counts_latest
+        WHERE network = %(network)s
+            AND counts_latest_at >= toDateTime(%(date_from_vc)s)   -- or toDateTime(%(date_from)s) if you prefer
+        GROUP BY network, operator_id
+        ) AS lc
+        ON lc.network = o.network
+        AND lc.operator_id = o.operator_id
 
-WHERE o.network = %(network)s
-  AND (
-        p.metric_date IS NOT NULL                 -- has perf in window
-     OR COALESCE(lc.validator_count, 0) > 0       -- or no perf but active validators
-      )
-ORDER BY o.operator_id, p.metric_date
-SETTINGS join_use_nulls = 1
+        WHERE o.network = %(network)s
+        AND (
+                p.metric_date IS NOT NULL                 -- has perf in window
+            OR COALESCE(lc.validator_count, 0) > 0       -- or no perf but active validators
+            )
+        ORDER BY o.operator_id, p.metric_date
+        SETTINGS join_use_nulls = 1
     """
     params = {"network": network, "metric_type": metric_type, "date_from": date_from, "date_from_vc": date_from_vc}
     res = client.query(sql, parameters=params)
@@ -155,7 +196,7 @@ SETTINGS join_use_nulls = 1
                 FIELD_VALIDATOR_COUNT: int(r["validator_count"] or 0),
                 metric_type: {}
             }
-            
+
         mv = r["metric_value"]
         result[op_id][metric_type][d_str] = float(mv) if mv is not None else None
 
