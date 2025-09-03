@@ -128,8 +128,7 @@ class ClickHouseStorage:
 
     def get_latest_performance_data(self, network, max_age_days: int | None = None):
         query = """
-            WITH
-            toDateTime('2025-08-20 00:00:00') AS updated_after,
+            WITH toDateTime(now('UTC') - INTERVAL 36 HOUR) AS updated_after,
 
             max24 AS (
                 SELECT max(metric_date) AS dt
@@ -181,7 +180,7 @@ class ClickHouseStorage:
             o.is_vo,
             o.is_private,
             o.address,
-            lc.validator_count,     -- latest fresh validator count
+            lc.validator_count,     
             pm24.perf_24h,
             pm30.perf_30d
             FROM operators o
@@ -192,7 +191,6 @@ class ClickHouseStorage:
             LEFT JOIN pm30
             ON pm30.network=o.network AND pm30.operator_id=o.operator_id
             WHERE o.network='mainnet'
-            AND o.updated_at >= updated_after            -- “fresh operators only” gate
             ORDER BY o.operator_id
         """
 
