@@ -99,7 +99,7 @@ def get_operator_validator_count_data(network: str, days: int, clickhouse_passwo
         SELECT
             network,
             operator_id,
-            argMax(validator_count, counts_latest_at) AS validator_count
+            validator_count
         FROM validator_counts_daily
         WHERE network = %(network)s
         GROUP BY network, operator_id
