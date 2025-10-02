@@ -212,10 +212,10 @@ def get_30d_trend_icon(operator):
         return ''
 
     if perf_24h > perf_30d:
-        return " ↗︎"  # green up arrow
+        return "↗︎ "  # green up arrow
     if perf_24h < perf_30d:
-        return " 🔴 _ _ ↘︎"  # red down arrow
-    return " →"  # steady indicator
+        return "↘︎ "  # red down arrow
+    return "→ "  # steady indicator
 
 
 def create_alerts_30d(perf_data):
@@ -253,7 +253,7 @@ def create_alerts_30d(perf_data):
                 else:
                     operator_ids.append(result[FIELD_OPERATOR_ID])
                     performance_str = "N/A" if result['Performance Data Point'] is None else f"{result['Performance Data Point']}"
-                    performance_display = f"{performance_str}{trend_icon}" if trend_icon else performance_str
+                    performance_display = f"{trend_icon}{performance_str}" if trend_icon else performance_str
                     alert = f"- {result[FIELD_OPERATOR_NAME]} - {performance_display}    (ID: {result[FIELD_OPERATOR_ID]}, Validators: {validator_count_int})"
                     alert_list.append(alert)
 
