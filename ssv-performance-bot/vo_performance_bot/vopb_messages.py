@@ -198,6 +198,26 @@ def create_alerts_24h(perf_data):
 
 
 
+def get_30d_trend_icon(operator):
+    perf_points = operator.get(FIELD_PERFORMANCE, {}) or {}
+    perf_24h = perf_points.get('24h')
+    perf_30d = perf_points.get('30d')
+
+    try:
+        if perf_24h is None or perf_30d is None:
+            return ''
+        perf_24h = float(perf_24h)
+        perf_30d = float(perf_30d)
+    except (TypeError, ValueError):
+        return ''
+
+    if perf_24h > perf_30d:
+        return " 🟢⬆️"  # green up arrow
+    if perf_24h < perf_30d:
+        return " 🔴⬇️"  # red down arrow
+    return " ⚪⏺️"  # steady indicator
+
+
 def create_alerts_30d(perf_data):
     thresholds_30d = sorted(ALERTS_THRESHOLDS_30D, reverse=True)
     alert_msgs_30d = {threshold: [] for threshold in thresholds_30d}
@@ -222,6 +242,7 @@ def create_alerts_30d(perf_data):
             continue
 
         is_removed = bool(operator.get(FIELD_OPERATOR_REMOVED))
+        trend_icon = get_30d_trend_icon(operator)
 
         for threshold in thresholds_30d:
             alert_list = alert_msgs_30d[threshold]
@@ -232,7 +253,8 @@ def create_alerts_30d(perf_data):
                 else:
                     operator_ids.append(result[FIELD_OPERATOR_ID])
                     performance_str = "N/A" if result['Performance Data Point'] is None else f"{result['Performance Data Point']}"
-                    alert = f"- {result[FIELD_OPERATOR_NAME]} - {performance_str}    (ID: {result[FIELD_OPERATOR_ID]}, Validators: {validator_count_int})"
+                    performance_display = f"{performance_str}{trend_icon}" if trend_icon else performance_str
+                    alert = f"- {result[FIELD_OPERATOR_NAME]} - {performance_display}    (ID: {result[FIELD_OPERATOR_ID]}, Validators: {validator_count_int})"
                     alert_list.append(alert)
 
     return operator_ids, alert_msgs_30d, removed_alerts
@@ -310,6 +332,7 @@ def compile_vo_threshold_messages(perf_data, extra_message=None, subscriptions=N
                 validator_display = validator_count
 
             perf_points = operator.get(FIELD_PERFORMANCE, {}) or {}
+            trend_icon = get_30d_trend_icon(operator)
             period_chunks = []
             for period in ('24h', '30d'):
                 thresholds = sorted(periods.get(period, set()), reverse=True)
@@ -325,8 +348,11 @@ def compile_vo_threshold_messages(perf_data, extra_message=None, subscriptions=N
                     except (TypeError, ValueError):
                         perf_str = "N/A"
 
+                indicator = trend_icon if period == '30d' and trend_icon else ''
+                performance_display = f"{perf_str}{indicator}" if indicator else perf_str
+
                 threshold_str = ', '.join(f"< {t:.0%}" for t in thresholds)
-                period_chunks.append(f"{period}: {perf_str} ({threshold_str})")
+                period_chunks.append(f"{period}: {performance_display} ({threshold_str})")
 
             if not period_chunks:
                 continue
