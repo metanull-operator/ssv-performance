@@ -304,9 +304,6 @@ Thresholds displayed are subject to change.
         try:
             storage = StorageFactory.get_storage('ssv_performance')
             perf_data = storage.get_latest_performance_data(network)
-#            perf_data_30d = storage.get_latest_performance_data(network, '30d')
-
- #           perf_data = merge_operator_performance(perf_data_24h, perf_data_30d)
 
             if not perf_data:
                 logging.error(f"alerts() perf_data empty")

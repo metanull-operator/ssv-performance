@@ -182,7 +182,8 @@ class ClickHouseStorage:
             o.address,
             lc.validator_count,     
             pm24.perf_24h,
-            pm30.perf_30d
+            pm30.perf_30d,
+                o.updated_at
             FROM operators o
             LEFT JOIN latest_counts lc
             ON lc.network=o.network AND lc.operator_id=o.operator_id
@@ -194,9 +195,11 @@ class ClickHouseStorage:
             ORDER BY o.operator_id
         """
 
+        fresh_cutoff = datetime.now(timezone.utc) - timedelta(hours=36)
+
         params = {
             'network': network,               # e.g., 'mainnet'
-            "fresh_cutoff": (datetime.now(timezone.utc) - timedelta(hours=36)).strftime("%Y-%m-%d %H:%M:%S"),
+            "fresh_cutoff": fresh_cutoff.strftime("%Y-%m-%d %H:%M:%S"),
         }
 
         rows = self.client.query(query, parameters=params).result_rows
@@ -205,6 +208,19 @@ class ClickHouseStorage:
         for row in rows:
             operator_id = row[0]
             if operator_id not in perf_data:
+                updated_at = row[8] if len(row) > 8 else None
+                if updated_at is not None and getattr(updated_at, "tzinfo", None) is None:
+                    updated_at = updated_at.replace(tzinfo=timezone.utc)
+
+                validator_count = row[5]
+                has_active_validators = False
+                try:
+                    has_active_validators = validator_count is not None and int(validator_count) > 0
+                except (TypeError, ValueError):
+                    has_active_validators = False
+
+                is_removed = has_active_validators and (updated_at is None or updated_at < fresh_cutoff)
+
                 perf_data[operator_id] = {
                     FIELD_OPERATOR_ID: row[0],
                     FIELD_OPERATOR_NAME: row[1],
@@ -215,7 +231,9 @@ class ClickHouseStorage:
                     FIELD_PERFORMANCE: {
                         '24h': row[6],
                         '30d': row[7]
-                    }
+                    },
+                    FIELD_OPERATOR_UPDATED_AT: updated_at,
+                    FIELD_OPERATOR_REMOVED: is_removed
                 }
 
         return perf_data
