@@ -212,10 +212,10 @@ def get_30d_trend_icon(operator):
         return ''
 
     if perf_24h > perf_30d:
-        return " 🟢⬆️"  # green up arrow
+        return " ↗︎"  # green up arrow
     if perf_24h < perf_30d:
-        return " 🔴⬇️"  # red down arrow
-    return " ⚪⏺️"  # steady indicator
+        return " ↘︎"  # red down arrow
+    return " →"  # steady indicator
 
 
 def create_alerts_30d(perf_data):
