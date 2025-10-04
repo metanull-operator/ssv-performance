@@ -13,6 +13,7 @@ from common.config import (
     FIELD_OPERATOR_ID,
     FIELD_VALIDATOR_COUNT,
 #    FIELD_PERFORMANCE,
+    FIELD_PERF_DATA_24H,
 )
 #import discord
 #import statistics
