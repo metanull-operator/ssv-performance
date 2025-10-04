@@ -24,7 +24,7 @@ import random
 import logging
 
 
-def summarize(label, items, num_buckets=10, iqr_multiplier=1.5, num_segments=20):
+def summarize(label, items, num_buckets=10, iqr_multiplier=1.5, num_segments=20, availability="all", verified="all"):
     if not items:
         return [f"No {label} operators found."]
 
@@ -127,39 +127,39 @@ def compile_operator_messages(operators_data, extra_message=None, availability="
         logging.debug(f"Filtered to all availability")
         if verified == "all":
             logging.debug(f"All items count: {len(all_items)}")
-            messages.extend(summarize("All", all_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
+            messages.extend(summarize("All", all_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments, availability=availability, verified=verified))
         if verified == "verified":
             logging.debug(f"Public VO items count: {len(verified_items)}")
-            messages.extend(summarize("All Verified", verified_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
+            messages.extend(summarize("All Verified", verified_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments, availability=availability, verified=verified))
         if verified == "unverified":
             logging.debug(f"Public non-VO items count: {len(public_non_vo_items)}")
-            messages.extend(summarize("All Unverified", unverified_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
+            messages.extend(summarize("All Unverified", unverified_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments, availability=availability, verified=verified))
 
     # Public breakdown
     if availability == "public":
         logging.debug(f"Filtered to public items")
         if verified == "all":
             logging.debug(f"Public items count: {len(public_items)}")
-            messages.extend(summarize("All Public", public_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
+            messages.extend(summarize("All Public", public_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments, availability=availability, verified=verified))
         if verified == "verified":
             logging.debug(f"Public VO items count: {len(public_vo_items)}")
-            messages.extend(summarize("Public Verified", public_vo_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
+            messages.extend(summarize("Public Verified", public_vo_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments, availability=availability, verified=verified))
         if verified == "unverified":
             logging.debug(f"Public non-VO items count: {len(public_non_vo_items)}")
-            messages.extend(summarize("Public Unverified", public_non_vo_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
+            messages.extend(summarize("Public Unverified", public_non_vo_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments, availability=availability, verified=verified))
 
     # Private breakdown
     if availability == "private":
         logging.debug(f"Filtered to private items")
         if verified == "all":
             logging.debug(f"Private items count: {len(private_items)}")
-            messages.extend(summarize("All Private", private_items, iqr_multiplier=2.5, num_buckets=5, num_segments=num_segments))
+            messages.extend(summarize("All Private", private_items, iqr_multiplier=2.5, num_buckets=5, num_segments=num_segments, availability=availability, verified=verified))
         if verified == "verified":
             logging.debug(f"Private VO items count: {len(private_vo_items)}")
-            messages.extend(summarize("Private Verified", private_vo_items, iqr_multiplier=2.5, num_buckets=5, num_segments=num_segments))
+            messages.extend(summarize("Private Verified", private_vo_items, iqr_multiplier=2.5, num_buckets=5, num_segments=num_segments, availability=availability, verified=verified))
         if verified == "unverified":
             logging.debug(f"Private non-VO items count: {len(private_non_vo_items)}")
-            messages.extend(summarize("Private Unverified", private_non_vo_items, iqr_multiplier=2.5, num_buckets=5, num_segments=num_segments))
+            messages.extend(summarize("Private Unverified", private_non_vo_items, iqr_multiplier=2.5, num_buckets=5, num_segments=num_segments, availability=availability, verified=verified))
 
     if extra_message:
         messages.append(extra_message)
