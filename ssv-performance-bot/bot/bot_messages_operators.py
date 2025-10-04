@@ -13,6 +13,8 @@ from common.config import (
     FIELD_OPERATOR_ID,
     FIELD_VALIDATOR_COUNT,
 #    FIELD_PERFORMANCE,
+    FIELD_IS_PRIVATE,
+    FIELD_IS_VO,
 )
 #import discord
 import statistics
