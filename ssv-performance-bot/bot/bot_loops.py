@@ -2,25 +2,9 @@ import logging
 from datetime import datetime, timedelta
 from discord.ext import tasks
 from storage.storage_factory import StorageFactory
-from vo_performance_bot.vopb_messages import send_daily_direct_messages, send_vo_threshold_messages
+from bot.bot_messages import send_daily_direct_messages, send_vo_threshold_messages
 import asyncio
 import copy
-
-
-def merge_operator_performance(dict1, dict2):
-    merged = {}
-
-    for k in set(dict1) | set(dict2):
-        merged[k] = copy.deepcopy(dict1.get(k, {}))
-
-        d2 = dict2.get(k, {})
-        for key, value in d2.items():
-            if isinstance(value, dict) and key in merged[k] and isinstance(merged[k][key], dict):
-                merged[k][key].update(value)
-            else:
-                merged[k][key] = value
-
-    return merged
 
 
 class LoopTasks:
@@ -36,53 +20,62 @@ class LoopTasks:
         self.mentions_30d = mentions_30d
 
 
+    ##
+    ## Start the loop tasks, scheduling the first run at the specified notification time
+    ##
     async def start_tasks(self):
-        now = datetime.now()
-        target = datetime.combine(now.date(), self.notification_time).replace(second=0, microsecond=0)
 
-        logging.debug(f"Current time: {now}, Target time: {target}")
-
+        # Log which tasks are already running
         if self.daily_notification_task.is_running():
             logging.warning("daily_notification_task is already running. Skipping start.")
         if self.performance_status_all_loop.is_running():
             logging.warning("performance_status_all_loop is already running. Skipping start.")
 
+        # If both tasks are already running, skip scheduling
         if self.daily_notification_task.is_running() and self.performance_status_all_loop.is_running():
             logging.info("All tasks already running. Skipping start_tasks().")
             return
 
-        if now >= target + timedelta(minutes=1):
-            logging.debug("Target time has passed. Scheduling for tomorrow.")
-            target += timedelta(days=1)
+        # Start time scheduling logic
+        now = datetime.now()
+        target_first_run = datetime.combine(now.date(), self.notification_time).replace(second=0, microsecond=0)
 
-        delay = (target - now).total_seconds()
-        logging.info(f"Delaying for {delay} seconds until first loop run at {target}...")
+        logging.debug(f"Current time: {now}, Target time: {target_first_run}")
+
+        # If the time is already a minute or more past the target time, schedule for the next day
+        if now >= target_first_run + timedelta(minutes=1):
+            logging.debug("Target time has passed. Scheduling for tomorrow.")
+            target_first_run += timedelta(days=1)
+
+        # Sleep until the target time
+        delay = (target_first_run - now).total_seconds()
+        logging.info(f"Delaying for {delay} seconds until first loop run at {target_first_run}...")
         await asyncio.sleep(delay)
 
+        # After waiting, check one last time if tasks are already running, then start if not
         if not self.daily_notification_task.is_running():
             self.daily_notification_task.start()
         if not self.performance_status_all_loop.is_running():
             self.performance_status_all_loop.start()
 
 
+    ##
+    ## 24-hour loop to send direct messages to subscribed users
+    ##
     @tasks.loop(hours=24)
     async def daily_notification_task(self):
-
         logging.info(f"Sending daily direct messages: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
         try:
-            sub_storage = StorageFactory.get_storage('ssv_performance')
-            subscriptions = sub_storage.get_subscriptions_by_type(self.network, 'daily')
+            storage = StorageFactory.get_storage('ssv_performance')
 
+            subscriptions = storage.get_subscriptions_by_type(self.network, 'daily')
             if not subscriptions:
                 logging.warning("Subscription data empty in daily_notification_task()")
                 return
 
             op_ids = list(subscriptions.keys())
-
-            perf_storage = StorageFactory.get_storage('ssv_performance')
-            perf_data = perf_storage.get_performance_by_opids(self.network, op_ids)
-
+            perf_data = storage.get_performance_by_opids(self.network, op_ids)
             if not perf_data:
                 logging.warning(f"Performance data empty for {op_ids} in daily_notification_task()")
                 return
@@ -93,23 +86,22 @@ class LoopTasks:
             logging.error(f"{type(e).__name__} exception in daily_notification_task(): {e}", exc_info=True)
 
 
+    ##
+    ## 24-hour loop to send alert messages to subscribed channel listing operators violating thresholds
+    ##
     @tasks.loop(hours=24)
     async def performance_status_all_loop(self):
         logging.info(f"Sending alert message to channel: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
         try:
             storage = StorageFactory.get_storage('ssv_performance')
-            perf_data_24h = storage.get_latest_performance_data(self.network, '24h')
-            perf_data_30d = storage.get_latest_performance_data(self.network, '30d')
 
-            perf_data = merge_operator_performance(perf_data_24h, perf_data_30d)
-
+            perf_data = storage.get_latest_performance_data(self.network)
             if not perf_data:
                 logging.warning("Performance data unavailable.")
                 return
 
             subscriptions = storage.get_subscriptions_by_type(self.network, 'alerts')
-
             if not subscriptions:
                 logging.warning("Subscription data unavailable.")
 

@@ -4,16 +4,18 @@ import asyncio
 import logging
 import os
 import discord
-import vo_performance_bot.vopb_commands as vopb_commands
+import bot.bot_commands as bot_commands
 from discord.ext import commands
 from storage.storage_factory import StorageFactory
-from vo_performance_bot.vopb_loops import LoopTasks
+from bot.bot_loops import LoopTasks
 from common.config import DEFAULT_NUMBER_OF_SEGMENTS
+
 
 loop_tasks = None
 
-# Configure logging with a default level
+# Initialize logging with a default level
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
 
 def parse_arguments():
 
@@ -43,13 +45,16 @@ def parse_arguments():
 
     return args.network, args.discord_token_file, args.channel_id, args.alert_time, args.extra_message, dm_recipients, args.log_level, args.mentions_30d, args.clickhouse_password_file
 
+
 def read_discord_token_from_file(token_file_path):
     with open(token_file_path, 'r') as file:
         return file.read().strip()
 
+
 def read_clickhouse_password_from_file(password_file_path):
     with open(password_file_path, 'r') as file:
         return file.read().strip()
+
 
 async def main():
     try:
@@ -59,7 +64,7 @@ async def main():
             logging.error("Argument parsing failed", exc_info=True)
         sys.exit(e.code)
 
-    # Set logging level dynamically
+    # Reset logging level dynamically
     logging.getLogger().setLevel(log_level.upper())
     logging.info(f"Logging level set to {log_level.upper()}")
 
@@ -112,7 +117,7 @@ async def main():
     num_segments = os.environ.get("NUMBER_OF_SEGMENTS", DEFAULT_NUMBER_OF_SEGMENTS)
 
     try:
-        await vopb_commands.setup(network, bot, channel_id, extra_message, num_segments=num_segments)
+        await bot_commands.setup(network, bot, channel_id, extra_message, num_segments=num_segments)
         logging.info("Commands setup successfully.")
     except Exception as e:
         logging.error(f"Error setting up commands: {e}", exc_info=True)

@@ -13,8 +13,6 @@ def operator_threshold_alert_24h(operator, threshold):
             logging.debug(f"Operator {operator[FIELD_OPERATOR_ID]}: No performance data available")
             return None
 
-        # Get the most recent data point for which we have data points for this operator
-#        most_recent_date = operator[FIELD_PERFORMANCE_DATE]
         data_point = operator[FIELD_PERFORMANCE]['24h']
 
         try:
@@ -34,7 +32,6 @@ def operator_threshold_alert_24h(operator, threshold):
                 FIELD_OPERATOR_ID: operator[FIELD_OPERATOR_ID],
                 FIELD_OPERATOR_NAME: operator[FIELD_OPERATOR_NAME],
                 FIELD_VALIDATOR_COUNT: operator[FIELD_VALIDATOR_COUNT],
-                #'Performance Period': most_recent_date,
                 'Performance Data Point': f"{data_point * 100:.2f}%"
             }
     except Exception as e:
@@ -50,8 +47,6 @@ def operator_threshold_alert_30d(operator, threshold):
         if FIELD_PERFORMANCE not in operator or not operator[FIELD_PERFORMANCE]:
             return None
 
-        # Get the most recent data point for which we have data points for this operator
-#        most_recent_date = operator[FIELD_PERFORMANCE_DATE]
         data_point = operator[FIELD_PERFORMANCE]['30d']
 
         try:
@@ -68,7 +63,6 @@ def operator_threshold_alert_30d(operator, threshold):
                 FIELD_OPERATOR_ID: operator[FIELD_OPERATOR_ID],
                 FIELD_OPERATOR_NAME: operator[FIELD_OPERATOR_NAME],
                 FIELD_VALIDATOR_COUNT: operator[FIELD_VALIDATOR_COUNT],
-                #'Performance Period': most_recent_date,
                 'Performance Data Point': f"{data_point * 100:.2f}%"
             }
     except Exception as e:

@@ -18,4 +18,3 @@ class StorageFactory:
         if storage_name not in StorageFactory._instances:
             raise Exception(f"{storage_name} storage has not been initialized")
         return StorageFactory._instances[storage_name]
-
