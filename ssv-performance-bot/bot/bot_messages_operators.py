@@ -14,16 +14,23 @@ from common.config import (
 )
 
 
-def summarize(label, items, num_buckets=10, iqr_multiplier=1.5, num_segments=20, availability="all", verified="all"):
+def generate_summary_text(label, items, num_buckets=10, iqr_multiplier=1.5, num_segments=20, availability="all", verified="all"):
     if not items:
         return [f"No {label} operators found."]
 
     values = [c for c, _ in items]
-    n_ops = len(values)
 
+    # Process counts for summary lines
+    n_ops = len(values)
+    public_count = sum(1 for _, op in items if not op.get(FIELD_IS_PRIVATE))
+    verified_count = sum(1 for _, op in items if op.get(FIELD_IS_VO))
+    public_verified_count = sum(1 for _, op in items if not op.get(FIELD_IS_PRIVATE) and op.get(FIELD_IS_VO))
+
+    # Process mean and median
     mean = statistics.mean(values)
     median = statistics.median(values)
 
+    # Process maximum
     hi = max(values)
     hi_ops = [op for c, op in items if c == hi]
     hi_example = random.choice(hi_ops)
@@ -34,6 +41,7 @@ def summarize(label, items, num_buckets=10, iqr_multiplier=1.5, num_segments=20,
         + (f" and {hi_others} other{'s' if hi_others != 1 else ''}" if hi_others > 0 else "")
     )
 
+    # Create data buckets
     buckets, bucket_ranges, zero_count, outliers = iqr_bucketize(
         items,
         value_fn=lambda it: it[0],        
@@ -41,6 +49,28 @@ def summarize(label, items, num_buckets=10, iqr_multiplier=1.5, num_segments=20,
         iqr_multiplier=iqr_multiplier,
         treat_zero_separately=True
     )
+
+    # Assemble beginning of message
+    lines = [
+        f"**{label} Operators**",
+        f"*{n_ops} operators*",                
+        f"- Operators w/ active validators: {n_ops - zero_count}",
+        f"- Mean active validators per operator: {mean:.2f}",
+        f"- Median active validators per operator: {int(median) if median == int(median) else round(median, 2)}",
+        highest_line,        
+    ]
+
+    # Be selective about which count lines to include
+    if availability == 'all':
+        lines.append(f"- Public operators: {public_count} ({(public_count / n_ops * 100):.2f}%)")
+    if verified == 'all':
+        lines.append(f"- Verified operators: {verified_count} ({(verified_count / n_ops * 100):.2f}%)")
+    if availability in ('all', 'public') and verified in ('verified'):
+        lines.append(f"- Public verified operators: {public_verified_count} ({(public_verified_count / n_ops * 100):.2f}%)")
+
+    lines.append(f"### {label} Active Validator Distribution Across Operators")
+
+    # Generate chart
     bucket_lines = render_bucket_lines_counts(
         buckets_with_ranges=[(b, lo, hi_) for b, (lo, hi_) in zip(buckets, bucket_ranges)],
         zero_count=zero_count,
@@ -51,38 +81,11 @@ def summarize(label, items, num_buckets=10, iqr_multiplier=1.5, num_segments=20,
         median=median
     )
 
-    public_count = sum(1 for _, op in items if not op.get(FIELD_IS_PRIVATE))
-    verified_count = sum(1 for _, op in items if op.get(FIELD_IS_VO))
-    public_verified_count = sum(1 for _, op in items if not op.get(FIELD_IS_PRIVATE) and op.get(FIELD_IS_VO))
-
-    lines = [
-        f"**{label} Operators**",
-        f"*{n_ops} operators*",                
-        f"- Operators w/ active validators: {n_ops - zero_count}",
-        f"- Mean active validators per operator: {mean:.2f}",
-        f"- Median active validators per operator: {int(median) if median == int(median) else round(median, 2)}",
-        highest_line,        
-    ]
-
-    if availability == 'all':
-        lines.append(f"- Public operators: {public_count} ({(public_count / n_ops * 100):.2f}%)")
-
-    if verified == 'all':
-        lines.append(f"- Verified operators: {verified_count} ({(verified_count / n_ops * 100):.2f}%)")
-
-    if availability in ('all', 'public') and verified in ('verified'):
-        lines.append(f"- Public verified operators: {public_verified_count} ({(public_verified_count / n_ops * 100):.2f}%)")
-
-    lines.append(f"### {label} Active Validator Distribution Across Operators")
-
     lines += bucket_lines
     return bundle_messages(lines)
 
 
 def compile_operator_messages(operators_data, extra_message=None, availability="all", verified="all", num_segments=20):
-    """
-    operator_data: dict[op_id] -> operator dict with FIELD_VALIDATOR_COUNT, FIELD_IS_PRIVATE, FIELD_IS_VO, etc.
-    """
     messages = []
 
     all_items = []
@@ -117,39 +120,39 @@ def compile_operator_messages(operators_data, extra_message=None, availability="
         logging.debug(f"Filtered to all availability")
         if verified == "all":
             logging.debug(f"All items count: {len(all_items)}")
-            messages.extend(summarize("All", all_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments, availability=availability, verified=verified))
+            messages.extend(generate_summary_text("All", all_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments, availability=availability, verified=verified))
         if verified == "verified":
             logging.debug(f"Public VO items count: {len(verified_items)}")
-            messages.extend(summarize("All Verified", verified_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments, availability=availability, verified=verified))
+            messages.extend(generate_summary_text("All Verified", verified_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments, availability=availability, verified=verified))
         if verified == "unverified":
             logging.debug(f"Public non-VO items count: {len(public_non_vo_items)}")
-            messages.extend(summarize("All Unverified", unverified_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments, availability=availability, verified=verified))
+            messages.extend(generate_summary_text("All Unverified", unverified_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments, availability=availability, verified=verified))
 
     # Public breakdown
     if availability == "public":
         logging.debug(f"Filtered to public items")
         if verified == "all":
             logging.debug(f"Public items count: {len(public_items)}")
-            messages.extend(summarize("All Public", public_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments, availability=availability, verified=verified))
+            messages.extend(generate_summary_text("All Public", public_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments, availability=availability, verified=verified))
         if verified == "verified":
             logging.debug(f"Public VO items count: {len(public_vo_items)}")
-            messages.extend(summarize("Public Verified", public_vo_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments, availability=availability, verified=verified))
+            messages.extend(generate_summary_text("Public Verified", public_vo_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments, availability=availability, verified=verified))
         if verified == "unverified":
             logging.debug(f"Public non-VO items count: {len(public_non_vo_items)}")
-            messages.extend(summarize("Public Unverified", public_non_vo_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments, availability=availability, verified=verified))
+            messages.extend(generate_summary_text("Public Unverified", public_non_vo_items, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments, availability=availability, verified=verified))
 
     # Private breakdown
     if availability == "private":
         logging.debug(f"Filtered to private items")
         if verified == "all":
             logging.debug(f"Private items count: {len(private_items)}")
-            messages.extend(summarize("All Private", private_items, iqr_multiplier=2.5, num_buckets=5, num_segments=num_segments, availability=availability, verified=verified))
+            messages.extend(generate_summary_text("All Private", private_items, iqr_multiplier=2.5, num_buckets=5, num_segments=num_segments, availability=availability, verified=verified))
         if verified == "verified":
             logging.debug(f"Private VO items count: {len(private_vo_items)}")
-            messages.extend(summarize("Private Verified", private_vo_items, iqr_multiplier=2.5, num_buckets=5, num_segments=num_segments, availability=availability, verified=verified))
+            messages.extend(generate_summary_text("Private Verified", private_vo_items, iqr_multiplier=2.5, num_buckets=5, num_segments=num_segments, availability=availability, verified=verified))
         if verified == "unverified":
             logging.debug(f"Private non-VO items count: {len(private_non_vo_items)}")
-            messages.extend(summarize("Private Unverified", private_non_vo_items, iqr_multiplier=2.5, num_buckets=5, num_segments=num_segments, availability=availability, verified=verified))
+            messages.extend(generate_summary_text("Private Unverified", private_non_vo_items, iqr_multiplier=2.5, num_buckets=5, num_segments=num_segments, availability=availability, verified=verified))
 
     if extra_message:
         messages.append(extra_message)
@@ -166,7 +169,6 @@ async def respond_operator_messages(ctx, operator_data, extra_message=None, avai
         )
         if messages:
             for message in messages:
-                # Note: assumes ctx.defer() already called by the command handler.
                 await ctx.followup.send(message.strip(), ephemeral=False)
         else:
             await ctx.followup.send("Validator data not found.", ephemeral=True)
