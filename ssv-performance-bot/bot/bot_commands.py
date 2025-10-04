@@ -4,14 +4,12 @@ from collections import defaultdict
 import copy
 from discord.commands import Option
 from storage.storage_factory import StorageFactory
-from bot.bot_messages import (
-    create_subscriptions_message,
-    send_operator_performance_messages,
-    respond_vo_threshold_messages,
-    send_direct_message_test,
-    respond_fee_messages,
-    respond_operator_messages
-)
+from bot.bot_messages_subscriptions import create_subscriptions_message
+from bot.bot_messages_operator import send_operator_performance_messages
+from bot.bot_messages_alerts import respond_vo_threshold_messages
+from bot.bot_messages_fees import respond_fee_messages
+from bot.bot_messages_operators import respond_operator_messages
+from bot.bot_messages import send_direct_message_test
 
 
 # Determine whether the Discord context is a channel or not. Could be DMs.
