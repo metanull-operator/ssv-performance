@@ -12,18 +12,19 @@ from bot.bot_messages_operators import respond_operator_messages
 from bot.bot_messages import send_direct_message_test
 
 
-# Determine whether the Discord context is a channel or not. Could be DMs.
-def is_channel(ctx):
-    return hasattr(ctx, 'guild') and ctx.guild
-
-
-# Determine permission to respond to commands in the current channel or DM
-# Allow only permitted channels. Allow DMs.
-def allowed_channel(ctx):
-    return not is_channel(ctx) or str(ctx.channel.id) == allowed_channel_id
-
-
 async def setup(network, bot, allowed_channel_id, extra_message, num_segments):
+
+
+    # Determine whether the Discord context is a channel or not. Could be DMs.
+    def is_channel(ctx):
+        return hasattr(ctx, 'guild') and ctx.guild
+
+
+    # Determine permission to respond to commands in the current channel or DM
+    # Allow only permitted channels. Allow DMs.
+    def allowed_channel(ctx):
+        return not is_channel(ctx) or str(ctx.channel.id) == allowed_channel_id
+
 
     ##
     ## Discord /help command
