@@ -19,6 +19,7 @@ from common.config import (
 #import discord
 import statistics
 import random
+import logging
 
 
 def summarize(label, items, num_buckets=10, iqr_multiplier=1.5, num_segments=20):
