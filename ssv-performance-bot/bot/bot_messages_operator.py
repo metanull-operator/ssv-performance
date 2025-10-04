@@ -1,5 +1,6 @@
-from bot.bot_messages import bundle_messages
 from datetime import datetime, timedelta
+
+from bot.bot_messages import bundle_messages
 from common.config import (
     OPERATOR_24H_HISTORY_COUNT,
     FIELD_OPERATOR_NAME,

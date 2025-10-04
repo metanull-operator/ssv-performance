@@ -1,7 +1,7 @@
-import traceback
 import logging
-from collections import defaultdict
+import traceback
 from discord.commands import Option
+
 from storage.storage_factory import StorageFactory
 from bot.bot_messages_subscriptions import create_subscriptions_message
 from bot.bot_messages_operator import send_operator_performance_messages
@@ -12,7 +12,6 @@ from bot.bot_messages import send_direct_message_test
 
 
 async def setup(network, bot, allowed_channel_id, extra_message, num_segments):
-
 
     # Determine whether the Discord context is a channel or not. Could be DMs.
     def is_channel(ctx):

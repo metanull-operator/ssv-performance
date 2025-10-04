@@ -1,3 +1,8 @@
+import statistics
+import random
+
+from bot.bot_visualizations import render_bucket_lines
+from bot.bot_data_processing import iqr_bucketize
 from bot.bot_messages import bundle_messages
 from common.config import (
     FIELD_OPERATOR_NAME,
@@ -7,10 +12,6 @@ from common.config import (
     FIELD_IS_PRIVATE,
     FIELD_IS_VO,
 )
-from bot.bot_visualizations import render_bucket_lines
-from bot.bot_data_processing import iqr_bucketize
-import statistics
-import random
 
 
 def summarize(label, fees, num_buckets=5, iqr_multiplier=1.5, num_segments=20):

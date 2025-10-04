@@ -1,8 +1,9 @@
+from collections import defaultdict
+from datetime import datetime
+
 from bot.bot_mentions import create_subscriber_mentions
 from bot.bot_messages import bundle_messages
 from bot.bot_operator_threshold_alerts import *
-from collections import defaultdict
-from datetime import datetime
 from common.config import (
     ALERTS_THRESHOLDS_30D,
     ALERTS_THRESHOLDS_24H,

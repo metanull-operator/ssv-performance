@@ -1,3 +1,5 @@
+import discord
+
 from bot.bot_operator_threshold_alerts import *
 from bot.bot_messages import bundle_messages
 from common.config import (
@@ -5,7 +7,6 @@ from common.config import (
     FIELD_OPERATOR_ID,
     FIELD_VALIDATOR_COUNT,
 )
-import discord
 
 
 # Creates a message bullet item for a single period performance data point
