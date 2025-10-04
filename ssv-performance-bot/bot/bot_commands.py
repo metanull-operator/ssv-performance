@@ -1,7 +1,6 @@
 import traceback
 import logging
 from collections import defaultdict
-import copy
 from discord.commands import Option
 from storage.storage_factory import StorageFactory
 from bot.bot_messages_subscriptions import create_subscriptions_message

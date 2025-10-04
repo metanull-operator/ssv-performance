@@ -1,20 +1,4 @@
-#from bot.bot_operator_threshold_alerts import *
-#from collections import defaultdict
-#from datetime import datetime, timedelta
-from common.config import (
-    MAX_DISCORD_MESSAGE_LENGTH
-#    OPERATOR_24H_HISTORY_COUNT,
-#    ALERTS_THRESHOLDS_30D,
-#    ALERTS_THRESHOLDS_24H,
-#    FIELD_OPERATOR_REMOVED,
-#    FIELD_OPERATOR_NAME,
-#    FIELD_OPERATOR_ID,
-#    FIELD_VALIDATOR_COUNT,
-#    FIELD_PERFORMANCE,
-)
-#import discord
-#import statistics
-#import random
+from common.config import MAX_DISCORD_MESSAGE_LENGTH
 
 
 # Break messages into < MAX_DISCORD_MESSAGE_LENGTH characters chunks, called bundles

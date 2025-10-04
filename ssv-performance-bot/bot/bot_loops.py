@@ -5,7 +5,6 @@ from storage.storage_factory import StorageFactory
 from bot.bot_messages_daily_operator import send_daily_direct_messages
 from bot.bot_messages_alerts import send_vo_threshold_messages
 import asyncio
-#import copy
 
 
 class LoopTasks:

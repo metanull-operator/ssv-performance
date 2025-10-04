@@ -1,20 +1,6 @@
-#from bot.bot_operator_threshold_alerts import *
-#from collections import defaultdict
-#from datetime import datetime, timedelta
 from bot.bot_messages import bundle_messages
-from common.config import (
-#    OPERATOR_24H_HISTORY_COUNT,
-#    ALERTS_THRESHOLDS_30D,
-#    ALERTS_THRESHOLDS_24H,
-#    FIELD_OPERATOR_REMOVED,
-#    FIELD_OPERATOR_NAME,
-#    FIELD_OPERATOR_ID,
-    FIELD_VALIDATOR_COUNT,
-#    FIELD_PERFORMANCE,
-)
-#import discord
-#import statistics
-#import random
+from common.config import FIELD_VALIDATOR_COUNT
+
 
 def render_bucket_lines(buckets_with_ranges, zero_count, outliers, fees, mean, median, max_segments=20):
 

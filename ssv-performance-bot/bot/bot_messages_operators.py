@@ -1,22 +1,11 @@
-#from bot.bot_mentions import create_subscriber_mentions
-#from bot.bot_subscriptions import get_user_subscriptions_by_type
-#from bot.bot_operator_threshold_alerts import *
-#from collections import defaultdict
-#from datetime import datetime, timedelta
 from bot.bot_messages import bundle_messages
 from common.config import (
-#    OPERATOR_24H_HISTORY_COUNT,
-#    ALERTS_THRESHOLDS_30D,
-#    ALERTS_THRESHOLDS_24H,
-#    FIELD_OPERATOR_REMOVED,
     FIELD_OPERATOR_NAME,
     FIELD_OPERATOR_ID,
     FIELD_VALIDATOR_COUNT,
-#    FIELD_PERFORMANCE,
     FIELD_IS_PRIVATE,
     FIELD_IS_VO,
 )
-#import discord
 from bot.bot_data_processing import iqr_bucketize
 from bot.bot_visualizations import render_bucket_lines_counts
 import statistics

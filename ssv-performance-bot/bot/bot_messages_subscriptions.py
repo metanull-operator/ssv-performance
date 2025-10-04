@@ -1,20 +1,4 @@
 from bot.bot_subscriptions import get_user_subscriptions_by_type
-#from bot.bot_operator_threshold_alerts import *
-#from collections import defaultdict
-#from datetime import datetime, timedelta
-#from common.config import (
-#    OPERATOR_24H_HISTORY_COUNT,
-#    ALERTS_THRESHOLDS_30D,
-#    ALERTS_THRESHOLDS_24H,
-#    FIELD_OPERATOR_REMOVED,
-#    FIELD_OPERATOR_NAME,
-#    FIELD_OPERATOR_ID,
-#    FIELD_VALIDATOR_COUNT,
-#    FIELD_PERFORMANCE,
-#)
-#import discord
-#import statistics
-#import random
 
 
 # Creates a message listing subscriptions for a particular user.
