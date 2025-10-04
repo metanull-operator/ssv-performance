@@ -13,6 +13,9 @@ from common.config import (
     FIELD_OPERATOR_ID,
     FIELD_VALIDATOR_COUNT,
 #    FIELD_PERFORMANCE,
+    FIELD_OPERATOR_FEE,
+    FIELD_IS_PRIVATE,
+    FIELD_IS_VO,
 )
 #import discord
 from bot.bot_visualizations import render_bucket_lines
