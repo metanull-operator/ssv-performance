@@ -1,5 +1,6 @@
 from bot.bot_mentions import create_subscriber_mentions
 #from bot.bot_subscriptions import get_user_subscriptions_by_type
+from bot.bot_messages import bundle_messages
 from bot.bot_operator_threshold_alerts import *
 from collections import defaultdict
 from datetime import datetime #, timedelta

@@ -2,6 +2,7 @@
 #from bot.bot_subscriptions import get_user_subscriptions_by_type
 #from bot.bot_operator_threshold_alerts import *
 #from collections import defaultdict
+from bot.bot_messages import bundle_messages
 from datetime import datetime, timedelta
 from common.config import (
     OPERATOR_24H_HISTORY_COUNT,
