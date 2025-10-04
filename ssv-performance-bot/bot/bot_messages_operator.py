@@ -14,6 +14,7 @@ from common.config import (
     FIELD_VALIDATOR_COUNT,
 #    FIELD_PERFORMANCE,
     FIELD_PERF_DATA_24H,
+    FIELD_PERF_DATA_30D,
 )
 #import discord
 #import statistics
