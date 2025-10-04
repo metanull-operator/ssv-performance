@@ -1,6 +1,7 @@
 #from bot.bot_operator_threshold_alerts import *
 #from collections import defaultdict
 #from datetime import datetime, timedelta
+from bot.bot_messages import bundle_messages
 from common.config import (
 #    OPERATOR_24H_HISTORY_COUNT,
 #    ALERTS_THRESHOLDS_30D,
