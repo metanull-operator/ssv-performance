@@ -1,11 +1,16 @@
 from bot.bot_messages import bundle_messages
-from common.config import FIELD_VALIDATOR_COUNT
+from common.config import *
 
 
+##
+## Renders a set of buckets with ranges, zero count, and outliers as a text-based bar chart.
+## Each bucket is represented as a line with a bar whose length is proportional to the number of
+## items in that bucket. The zero count and outliers are also represented as separate lines.
+## Mean and median values are indicated with arrows on the appropriate lines.
+##
+## Used for rendering distribution of operator fees
+##
 def render_bucket_lines(buckets_with_ranges, zero_count, outliers, fees, mean, median, max_segments=20):
-
-    def validator_sum(entries):
-        return sum(op.get(FIELD_VALIDATOR_COUNT, 0) for _, op in entries)
 
     max_count = max([len(b) for b, _, _ in buckets_with_ranges] + [zero_count, len(outliers)])
     lines = []
@@ -89,6 +94,14 @@ def render_bucket_lines(buckets_with_ranges, zero_count, outliers, fees, mean, m
     return bundle_messages(lines)
 
 
+##
+## Renders a set of buckets with ranges, zero count, and outliers as a text-based bar chart.
+## Each bucket is represented as a line with a bar whose length is proportional to the number of
+## items in that bucket. The zero count and outliers are also represented as separate lines.
+## Mean and median values are indicated with arrows on the appropriate lines.
+##
+## Used for rendering distribution of active validator counts across operators
+##
 def render_bucket_lines_counts(buckets_with_ranges, zero_count, outliers, items, mean, median, max_segments=20):
     """
     buckets_with_ranges: List[(bucket:list[(count, op)], lower:float, upper:float)]

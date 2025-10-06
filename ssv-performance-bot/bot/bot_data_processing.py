@@ -3,6 +3,11 @@ from typing import Callable, Iterable, List, Sequence, Tuple, TypeVar
 
 T = TypeVar("T")
 
+
+##
+## Computes the p-th percentile of a list of numbers using linear interpolation.
+## p is in the range [0, 1]
+##
 def _percentile_linear(xs: Sequence[float], p: float) -> float:
     """0<=p<=1, linear interpolation between order statistics."""
     if not xs:
@@ -19,6 +24,11 @@ def _percentile_linear(xs: Sequence[float], p: float) -> float:
     frac = r - lo
     return s[lo] * (1 - frac) + s[hi] * frac
 
+
+##
+## Splits a list of items into buckets based on their numeric values using the IQR method.
+## Also separates out zeros (if requested) and high outliers.
+##
 def iqr_bucketize(
     items: Iterable[T],
     value_fn: Callable[[T], float] = lambda x: x[0],   # works for (value, obj)

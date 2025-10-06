@@ -1,10 +1,12 @@
 import logging
-from common.config import MAX_DISCORD_MESSAGE_LENGTH
+from common.config import *
 
 
+##
 ## Take a list of messages and concatenate them into < MAX_DISCORD_MESSAGE_LENGTH
 ## character chunks. Return list of message chunks.
 ## Inputs already over MAX_DISCORD_MESSAGE_LENGTH are not modified.
+##
 def bundle_messages(messages, max_length=MAX_DISCORD_MESSAGE_LENGTH):
 
     bundles = []
@@ -25,9 +27,10 @@ def bundle_messages(messages, max_length=MAX_DISCORD_MESSAGE_LENGTH):
 
     return bundles
 
-
-# Attempts to send a direct message to a user.
-# Used to notify users of problems sending direct messages to them.
+##
+## Attempts to send a direct message to a user.
+## Used to notify users of problems sending direct messages to them.
+##
 async def send_direct_message_test(bot, user_id, message):
     try:
         member = await bot.fetch_user(user_id)

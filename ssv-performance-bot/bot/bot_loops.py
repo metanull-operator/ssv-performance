@@ -70,17 +70,20 @@ class LoopTasks:
         try:
             storage = StorageFactory.get_storage('ssv_performance')
 
+            # Get list of subscriptions for daily messages
             subscriptions = storage.get_subscriptions_by_type(self.network, 'daily')
             if not subscriptions:
                 logging.warning("Subscription data empty in daily_notification_task()")
                 return
 
+            # Query for performance data for all subscribed operator IDs
             op_ids = list(subscriptions.keys())
             perf_data = storage.get_performance_by_opids(self.network, op_ids)
             if not perf_data:
                 logging.warning(f"Performance data empty for {op_ids} in daily_notification_task()")
                 return
 
+            # Send out the daily direct messages to subscribed users
             await send_daily_direct_messages(self.bot, perf_data, subscriptions, self.dm_recipients)
 
         except Exception as e:
@@ -97,17 +100,21 @@ class LoopTasks:
         try:
             storage = StorageFactory.get_storage('ssv_performance')
 
+            # Get latest performance data for all operators
             perf_data = storage.get_latest_performance_data(self.network)
             if not perf_data:
                 logging.warning("Performance data unavailable.")
                 return
 
+            # Get list of subscriptions for alert messages so we can mention users
             subscriptions = storage.get_subscriptions_by_type(self.network, 'alerts')
             if not subscriptions:
                 logging.warning("Subscription data unavailable.")
 
+            # Set periods for which users will be mentioned based on configuration
             mention_periods = ['24h', '30d'] if self.mentions_30d else ['24h']
 
+            # Send alerts messages and mentions to the channel
             await send_vo_threshold_messages(self.channel, perf_data, extra_message=self.extra_message,
                                              subscriptions=subscriptions, mention_periods=mention_periods)
         except Exception as e:

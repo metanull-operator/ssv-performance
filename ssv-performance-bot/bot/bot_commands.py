@@ -1,5 +1,6 @@
 import logging
 import traceback
+
 from discord.commands import Option
 
 from storage.storage_factory import StorageFactory
@@ -11,15 +12,24 @@ from bot.bot_messages_operators import respond_operator_messages
 from bot.bot_messages import send_direct_message_test
 
 
+##
+## Sets up all bot commands for the provided bot instance.
+## Bot commands are defined within this function to allow
+## access to configuration parameters.
+##
 async def setup(network, bot, allowed_channel_id, extra_message, num_segments):
 
-    # Determine whether the Discord context is a channel or not. Could be DMs.
+    ##
+    ## Determine whether the Discord context is a channel or not. Could be DMs.
+    ##
     def is_channel(ctx):
         return hasattr(ctx, 'guild') and ctx.guild
 
 
-    # Determine permission to respond to commands in the current channel or DM
-    # Allow only permitted channels. Allow DMs.
+    ##
+    ## Determine permission to respond to commands in the current channel or DM
+    ## Allow only permitted channels. Allow DMs.
+    ##
     def allowed_channel(ctx):
         return not is_channel(ctx) or str(ctx.channel.id) == allowed_channel_id
 

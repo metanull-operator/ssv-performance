@@ -1,14 +1,7 @@
 from datetime import datetime, timedelta
 
 from bot.bot_messages import bundle_messages
-from common.config import (
-    OPERATOR_24H_HISTORY_COUNT,
-    FIELD_OPERATOR_NAME,
-    FIELD_OPERATOR_ID,
-    FIELD_VALIDATOR_COUNT,
-    FIELD_PERF_DATA_24H,
-    FIELD_PERF_DATA_30D,
-)
+from common.config import *
 
 
 # Create message reporting a single operator's recent performance. Overall assumption in this

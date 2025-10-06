@@ -1,12 +1,16 @@
 import time
 import os
 import logging
-from common.config import *
 from datetime import datetime, timezone, date, timedelta
 from clickhouse_connect import create_client
 from clickhouse_connect.driver.exceptions import ClickHouseError
 
+from common.config import *
 
+
+##
+## ClickHouse storage class containing methods to interact with ClickHouse database
+##
 class ClickHouseStorage:
 
 
@@ -49,7 +53,7 @@ class ClickHouseStorage:
 
 
     def get_latest_fee_data(self, network, max_age_days: int | None = None):
-        
+
         query = """
             SELECT
                 o.operator_id,

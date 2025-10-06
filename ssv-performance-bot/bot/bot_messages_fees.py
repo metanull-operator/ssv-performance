@@ -4,16 +4,16 @@ import random
 from bot.bot_visualizations import render_bucket_lines
 from bot.bot_data_processing import iqr_bucketize
 from bot.bot_messages import bundle_messages
-from common.config import (
-    FIELD_OPERATOR_NAME,
-    FIELD_OPERATOR_ID,
-    FIELD_VALIDATOR_COUNT,
-    FIELD_OPERATOR_FEE,
-    FIELD_IS_PRIVATE,
-    FIELD_IS_VO,
-)
+from common.config import *
 
 
+##
+## Generate summary text for a set of operator fees.
+##  - num_buckets: Number of buckets to create for the IQR bucketization.
+##  - iqr_multiplier: Multiplier to apply to the IQR to determine outlier thresholds.
+##  - num_segments: Maximum number of segments to use in the bar chart rendering. More
+##    segments means the chart will be wider on screen.
+##
 def generate_summary_text(label, fees, num_buckets=5, iqr_multiplier=1.5, num_segments=20):
     if not fees:
         return [f"No {label} operators found."]
@@ -40,6 +40,8 @@ def generate_summary_text(label, fees, num_buckets=5, iqr_multiplier=1.5, num_se
         iqr_multiplier=iqr_multiplier,
         treat_zero_separately=True
     )
+
+    # Begin rendering text
 
     lines = [
         f"**{label} Operators (SSV/year)**",
@@ -78,6 +80,9 @@ def generate_summary_text(label, fees, num_buckets=5, iqr_multiplier=1.5, num_se
     return bundle_messages(lines)
 
 
+##
+## Compile multiple messages to display fee details for operators.
+##
 def compile_fee_messages(fee_data, extra_message=None, availability="public", verified="all", num_segments=20):
     messages = []
 
@@ -91,6 +96,7 @@ def compile_fee_messages(fee_data, extra_message=None, availability="public", ve
 
     all_fees = []
 
+    # Collect fees into appropriate lists by public/private and VO status
     for operator in fee_data.values():
         fee = operator.get(FIELD_OPERATOR_FEE)
         is_private = operator.get(FIELD_IS_PRIVATE)
@@ -115,10 +121,13 @@ def compile_fee_messages(fee_data, extra_message=None, availability="public", ve
             else:
                 public_non_vo_fees.append(item)
 
+    # Summary of all operators
     if availability == "all" and verified == "all":
         messages.extend(generate_summary_text("All", all_fees, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
 
     # Public breakdown
+    # Note: Specifying "all" will print "all public" summary as well as verified/unverified breakdowns
+    # Remove "all" from "in" checks to avoid additional summaries
     if availability in ("public"):
         if verified == "all":
             messages.extend(generate_summary_text("All Public", public_fees, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
@@ -128,6 +137,8 @@ def compile_fee_messages(fee_data, extra_message=None, availability="public", ve
             messages.extend(generate_summary_text("Public Unverified", public_non_vo_fees, iqr_multiplier=1.5, num_buckets=10, num_segments=num_segments))
  
     # Private breakdown
+    # Note: Specifying "all" will print "all private" summary as well as verified/unverified breakdowns
+    # Remove "all" from "in" checks to avoid additional summaries
     if availability in ("private"):
         if verified == "all":
             messages.extend(generate_summary_text("All Private", private_fees, iqr_multiplier=2.5, num_buckets=5, num_segments=num_segments))
@@ -142,6 +153,9 @@ def compile_fee_messages(fee_data, extra_message=None, availability="public", ve
     return bundle_messages(messages)
 
 
+##
+## Send fee messages in response to a slash command.
+##
 async def respond_fee_messages(ctx, fee_data, extra_message=None, availability="public", verified="all", num_segments=20):
     try:
         messages = compile_fee_messages(fee_data, extra_message=extra_message, availability=availability, verified=verified, num_segments=num_segments)

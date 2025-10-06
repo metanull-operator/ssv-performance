@@ -4,17 +4,15 @@ from datetime import datetime
 from bot.bot_mentions import create_subscriber_mentions
 from bot.bot_messages import bundle_messages
 from bot.bot_operator_threshold_alerts import *
-from common.config import (
-    ALERTS_THRESHOLDS_30D,
-    ALERTS_THRESHOLDS_24H,
-    FIELD_OPERATOR_REMOVED,
-    FIELD_OPERATOR_NAME,
-    FIELD_OPERATOR_ID,
-    FIELD_VALIDATOR_COUNT,
-    FIELD_PERFORMANCE,
-)
+from common.config import *
 
 
+##
+## Compare operator performance against one or more 24h thresholds and return
+## a list of affected operators and formatted alert messages. Also returns
+## a dict of apparently removed operators with active validators that 
+## also triggered alerts. Removed operators are displayed separately.
+##
 def create_alerts_24h(perf_data):
     thresholds_24h = sorted(ALERTS_THRESHOLDS_24H, reverse=True)
     alert_msgs_24h = {threshold: [] for threshold in thresholds_24h}
@@ -47,7 +45,6 @@ def create_alerts_24h(perf_data):
 
         for threshold in thresholds_24h:
             alert_list = alert_msgs_24h[threshold]
-            logging.debug(f"Checking operator {op_id} against threshold {threshold}")
             result = operator_threshold_alert_24h(operator, threshold)
             if result and validator_count_int > 0:
                 if is_removed:
@@ -61,6 +58,10 @@ def create_alerts_24h(perf_data):
     return operator_ids, alert_msgs_24h, removed_alerts
 
 
+##
+## Get an icon representing whether 30d performance is trending up, down or flat
+## based on 24h performance vs 30d performance.
+##
 def get_30d_trend_icon(operator):
     perf_points = operator.get(FIELD_PERFORMANCE, {}) or {}
     perf_24h = perf_points.get('24h')
@@ -75,12 +76,18 @@ def get_30d_trend_icon(operator):
         return ''
 
     if perf_24h > perf_30d:
-        return " ↗︎"  # green up arrow
+        return " ↗︎"  
     if perf_24h < perf_30d:
-        return " ↘︎"  # red down arrow
-    return " →"  # steady indicator
+        return " ↘︎"  
+    return " →" 
 
 
+##
+## Compare operator performance against one or more 30d thresholds and return
+## a list of affected operators and formatted alert messages. Also returns
+## a dict of apparently removed operators with active validators that 
+## also triggered alerts. Removed operators are displayed separately.
+##
 def create_alerts_30d(perf_data):
     thresholds_30d = sorted(ALERTS_THRESHOLDS_30D, reverse=True)
     alert_msgs_30d = {threshold: [] for threshold in thresholds_30d}
@@ -124,6 +131,10 @@ def create_alerts_30d(perf_data):
     return operator_ids, alert_msgs_30d, removed_alerts
 
 
+##
+## Compile alert messages grouped by threshold to minimize number of messages.
+## Each group of messages is prefixed with a title indicating the threshold.
+##
 def compile_alert_threshold_groups(alerts, period_label):
     messages = []
 
@@ -137,13 +148,84 @@ def compile_alert_threshold_groups(alerts, period_label):
     return messages
 
 
-# Compile alerts, mentions and any extra message into a single set of separate messages to be sent to Discord.
-# This attempts to push everything into as few messages as possible to not bomb Discord with excessive messages.
+##
+## Safely convert a value to int, returning None if conversion fails.
+##
+def _as_int(value):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+##
+## Build messages for removed operators that triggered alerts and bundle them.
+##
+def build_removed_operator_messages(removed_combined: dict, perf_data: dict) -> list[str]:
+
+    if not removed_combined:
+        return []
+
+    # Sort by validator count desc, then op_id
+    sorted_removed = sorted(
+        removed_combined.items(),
+        key=lambda item: (
+            -(_as_int(perf_data.get(item[0], {}).get(FIELD_VALIDATOR_COUNT)) or 0),
+            item[0]
+        ),
+    )
+
+    removed_lines = []
+    for op_id, periods in sorted_removed:
+        operator = perf_data.get(op_id)
+        if not operator:
+            continue
+
+        validator_count = operator.get(FIELD_VALIDATOR_COUNT)
+        validator_count_int = as_int(validator_value)
+        validator_display = validator_count if validator_count_int is None else validator_count_int
+
+        perf_points = operator.get(FIELD_PERFORMANCE, {}) or {}
+
+        period_chunks = []
+        for period in ("24h", "30d"):
+            thresholds = sorted(periods.get(period, set()), reverse=True)
+            if not thresholds:
+                continue
+
+            perf_value = perf_points.get(period)
+            try:
+                perf_str = f"{float(perf_value) * 100:.2f}%" if perf_value is not None else "N/A"
+            except (TypeError, ValueError):
+                perf_str = "N/A"
+
+            threshold_str = ", ".join(f"< {t:.0%}" for t in thresholds)
+            period_chunks.append(f"{period}: {performance_str} ({threshold_str})")
+
+        if period_chunks:
+            removed_lines.append(
+                f"- {operator[FIELD_OPERATOR_NAME]} "
+                f"(ID: {op_id}, Validators: {validator_display}) - {'; '.join(period_chunks)}"
+            )
+
+    if not removed_lines:
+        return []
+
+    removed_section = ["\n**__Removed Operators with Active Validators__**"] + removed_lines
+    return bundle_messages(removed_section)
+
+
+##
+## Compile alerts, mentions and any extra message into a single set of separate messages to be sent to Discord.
+## This attempts to push everything into as few messages as possible to not bomb Discord with excessive messages.
+##
 def compile_vo_threshold_messages(perf_data, extra_message=None, subscriptions=None, guild=None, dm_recipients=[], mention_periods=[]):
 
+    # Get list of operators and alert messages for each period.
     operator_ids_24h, alerts_24h, removed_24h = create_alerts_24h(perf_data)
     operator_ids_30d, alerts_30d, removed_30d = create_alerts_30d(perf_data)
 
+    # Combine removed operators from both periods into a single dict
     removed_combined = defaultdict(lambda: defaultdict(set))
     for source in (removed_24h, removed_30d):
         for op_id, periods in source.items():
@@ -152,84 +234,26 @@ def compile_vo_threshold_messages(perf_data, extra_message=None, subscriptions=N
 
     messages = []
 
-    mentions_24h = []
+    # Create message groups for 24h period and get mentions for that period
     messages.extend(compile_alert_threshold_groups(alerts_24h, "24h"))
+    mentions_24h = []
     if subscriptions and guild and '24h' in mention_periods:
         mentions_24h = create_subscriber_mentions(guild, subscriptions, operator_ids_24h, 'alerts', dm_recipients)
 
-    mentions_30d = []
+    # Create message groups for 30d period and get mentions for that period
     messages.extend(compile_alert_threshold_groups(alerts_30d, "30d"))
+    mentions_30d = []
     if subscriptions and guild and '30d' in mention_periods:
         mentions_30d = create_subscriber_mentions(guild, subscriptions, operator_ids_30d, 'alerts', dm_recipients)
 
-    def build_removed_operator_messages():
-        if not removed_combined:
-            return []
-
-        def as_int(value):
-            try:
-                return int(value)
-            except (TypeError, ValueError):
-                return None
-
-        # Sort primarily by validator count to highlight operators affecting most validators
-        sorted_removed = sorted(
-            removed_combined.items(),
-            key=lambda item: (
-                -(as_int(perf_data.get(item[0], {}).get(FIELD_VALIDATOR_COUNT)) or 0),
-                item[0]
-            )
-        )
-
-        removed_lines = []
-        for op_id, periods in sorted_removed:
-            operator = perf_data.get(op_id)
-            if not operator:
-                continue
-
-            validator_value = operator.get(FIELD_VALIDATOR_COUNT)
-            validator_count = as_int(validator_value)
-            if validator_count is None:
-                validator_display = validator_value if validator_value is not None else "N/A"
-            else:
-                validator_display = validator_count
-
-            perf_points = operator.get(FIELD_PERFORMANCE, {}) or {}
-            trend_icon = get_30d_trend_icon(operator)
-            period_chunks = []
-            for period in ('24h', '30d'):
-                thresholds = sorted(periods.get(period, set()), reverse=True)
-                if not thresholds:
-                    continue
-
-                perf_value = perf_points.get(period)
-                if perf_value is None:
-                    perf_str = "N/A"
-                else:
-                    try:
-                        perf_str = f"{float(perf_value) * 100:.2f}%"
-                    except (TypeError, ValueError):
-                        perf_str = "N/A"
-
-                indicator = trend_icon if period == '30d' and trend_icon else ''
-                performance_display = f"{perf_str}{indicator}" if indicator else perf_str
-
-                threshold_str = ', '.join(f"< {t:.0%}" for t in thresholds)
-                period_chunks.append(f"{period}: {performance_display} ({threshold_str})")
-
-            if not period_chunks:
-                continue
-
-            line = f"- {operator[FIELD_OPERATOR_NAME]} (ID: {op_id}, Validators: {validator_display}) - {'; '.join(period_chunks)}"
-            removed_lines.append(line)
-
-        if not removed_lines:
-            return []
-
-        removed_section = ["\n**__Removed Operators with Active Validators__**"] + removed_lines
-        return bundle_messages(removed_section)
-
-    messages.extend(build_removed_operator_messages())
+    # Create messages for removed operators that triggered alerts
+    removed_bundles = build_removed_operator_messages(
+        removed_combined,
+        perf_data,
+        get_trend_icon=get_30d_trend_icon,
+        bundle_messages_fn=bundle_messages,
+    )
+    messages.extend(removed_bundles)
 
     mentions = list(dict.fromkeys(mentions_24h + mentions_30d))
     messages.extend(mentions)
@@ -247,6 +271,11 @@ def compile_vo_threshold_messages(perf_data, extra_message=None, subscriptions=N
     return(bundles)
 
 
+##
+## Send VO threshold alert messages to a channel, optionally mentioning
+## users subscribed to operators that triggered alerts. Used for the 
+## periodic alert messages sent to a channel by the bot loop.
+##
 async def send_vo_threshold_messages(channel, perf_data, extra_message=None, subscriptions=None, dm_recipients=[], mention_periods=[]):
 
     try:
@@ -266,6 +295,11 @@ async def send_vo_threshold_messages(channel, perf_data, extra_message=None, sub
         logging.error(f"Failed to send VO threshold messages: {e}", exc_info=True)
 
 
+##
+## Send VO threshold alert messages in response to a slash command.
+## Assumption is that ctx.defer() was previously called to allow time
+## for processing.
+##
 async def respond_vo_threshold_messages(ctx, perf_data, extra_message=None):
 
     try:

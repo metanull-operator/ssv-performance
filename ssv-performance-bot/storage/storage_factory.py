@@ -2,6 +2,9 @@ from .storage_clickhouse import ClickHouseStorage
 from typing import Dict, Any
 
 
+##
+## Factory class to manage storage instances
+##
 class StorageFactory:
     _instances: Dict[str, Any] = {}
 

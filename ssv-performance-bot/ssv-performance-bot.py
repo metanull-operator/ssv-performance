@@ -17,6 +17,9 @@ loop_tasks = None
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
+##
+## Parse command-line arguments and environment variables
+##
 def parse_arguments():
 
     raw_dm_env = os.environ.get("BOT_DM_RECIPIENTS", "")
@@ -46,17 +49,28 @@ def parse_arguments():
     return args.network, args.discord_token_file, args.channel_id, args.alert_time, args.extra_message, dm_recipients, args.log_level, args.mentions_30d, args.clickhouse_password_file
 
 
+##
+## Read Discord token from file
+##
 def read_discord_token_from_file(token_file_path):
     with open(token_file_path, 'r') as file:
         return file.read().strip()
 
 
+##
+## Read ClickHouse password from file
+##
 def read_clickhouse_password_from_file(password_file_path):
     with open(password_file_path, 'r') as file:
         return file.read().strip()
 
 
+##
+## Main async function to run the bot
+##
 async def main():
+
+    # Parse arguments and environment variables
     try:
         network, discord_token_file, channel_id, alert_time, extra_message, dm_recipients, log_level, mentions_30d, clickhouse_password_file = parse_arguments()
     except SystemExit as e:
@@ -64,18 +78,23 @@ async def main():
             logging.error("Argument parsing failed", exc_info=True)
         sys.exit(e.code)
 
+    # Get number of segments for charts from environment variable or use default
+    num_segments = os.environ.get("NUMBER_OF_SEGMENTS", DEFAULT_NUMBER_OF_SEGMENTS)
+
     # Reset logging level dynamically
     logging.getLogger().setLevel(log_level.upper())
     logging.info(f"Logging level set to {log_level.upper()}")
 
     logging.info(f"Daily alert time: {alert_time}")
 
+    # Get ClickHouse password from file or environment variable
     try:
         clickhouse_password = read_clickhouse_password_from_file(clickhouse_password_file)
     except Exception as e:
         logging.info("Unable to retrieve ClickHouse password from file, trying environment variable instead.")
         clickhouse_password = os.environ.get("CLICKHOUSE_PASSWORD")
 
+    # Initialize storage
     try:
         StorageFactory.initialize('ssv_performance', 'ClickHouse', password=clickhouse_password)
         logging.info("Storage initialized successfully.")
@@ -83,12 +102,14 @@ async def main():
         logging.error(f"Error initializing storage: {e}", exc_info=True)
         sys.exit(1)
 
+    # Set up Discord bot
     intents = discord.Intents.default()
     intents.members = True
     intents.message_content = True
 
     bot = commands.Bot(command_prefix='!', intents=intents, help_command=None)
 
+    ## Define on_ready event to start loops and sync commands
     @bot.event
     async def on_ready():
         global loop_tasks
@@ -114,8 +135,7 @@ async def main():
             logging.error(f"Error in on_ready event: {e}", exc_info=True)
             sys.exit(1)
 
-    num_segments = os.environ.get("NUMBER_OF_SEGMENTS", DEFAULT_NUMBER_OF_SEGMENTS)
-
+    # Initialize bot commands
     try:
         await bot_commands.setup(network, bot, channel_id, extra_message, num_segments=num_segments)
         logging.info("Commands setup successfully.")
@@ -123,12 +143,14 @@ async def main():
         logging.error(f"Error setting up commands: {e}", exc_info=True)
         sys.exit(1)
 
+    # Read Discord token from file or environment variable
     try:
         discord_token = read_discord_token_from_file(discord_token_file)
     except Exception as e:
         logging.info("Unable to retrieve Discord token from file, trying environment variable instead.")
         discord_token = os.environ.get("DISCORD_TOKEN")
 
+    # Start the bot
     try:    
         await bot.start(discord_token)
     except Exception as e:

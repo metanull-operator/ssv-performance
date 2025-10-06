@@ -2,7 +2,9 @@ import logging
 from common.config import *
 
 
-# Looks for the most recent 24h data point and returns operator details if that data point violates the threshold
+##
+## Looks for the most recent 24h data point and returns operator details if that data point violates the threshold
+##
 def operator_threshold_alert_24h(operator, threshold):
 
     logging.debug(f"Operator {operator[FIELD_OPERATOR_ID]}: Checking 24h data point against threshold {threshold}")
@@ -40,7 +42,9 @@ def operator_threshold_alert_24h(operator, threshold):
     return None
 
 
-# Looks for the most recent 30d data point and returns operator details if that data point violates the threshold
+##
+## Looks for the most recent 30d data point and returns operator details if that data point violates the threshold
+##
 def operator_threshold_alert_30d(operator, threshold):
     try:
         # If we have no data points, then there are no alerts

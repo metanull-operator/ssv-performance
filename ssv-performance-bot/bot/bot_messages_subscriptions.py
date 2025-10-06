@@ -1,7 +1,9 @@
 from bot.bot_subscriptions import get_user_subscriptions_by_type
 
 
-# Creates a message listing subscriptions for a particular user.
+##
+## Creates a message listing subscriptions for a particular user.
+##
 def create_subscriptions_message(user_data, subscriber):
 
     sub_daily = get_user_subscriptions_by_type(user_data, subscriber.id, 'daily')

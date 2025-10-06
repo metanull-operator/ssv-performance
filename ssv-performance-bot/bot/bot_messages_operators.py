@@ -5,15 +5,16 @@ import logging
 from bot.bot_data_processing import iqr_bucketize
 from bot.bot_visualizations import render_bucket_lines_counts
 from bot.bot_messages import bundle_messages
-from common.config import (
-    FIELD_OPERATOR_NAME,
-    FIELD_OPERATOR_ID,
-    FIELD_VALIDATOR_COUNT,
-    FIELD_IS_PRIVATE,
-    FIELD_IS_VO,
-)
+from common.config import *
 
 
+##
+## Generate summary text for a set of operators based on their active validator counts.
+##  - num_buckets: Number of buckets to create for the IQR bucketization.  
+##  - iqr_multiplier: Multiplier to apply to the IQR to determine outlier thresholds.
+##  - num_segments: Maximum number of segments to use in the bar chart rendering. More
+##    segments means the chart will be wider on screen.
+##
 def generate_summary_text(label, items, num_buckets=10, iqr_multiplier=1.5, num_segments=20, availability="all", verified="all"):
     if not items:
         return [f"No {label} operators found."]
@@ -50,7 +51,8 @@ def generate_summary_text(label, items, num_buckets=10, iqr_multiplier=1.5, num_
         treat_zero_separately=True
     )
 
-    # Assemble beginning of message
+    # Begin rendering text
+
     lines = [
         f"**{label} Operators**",
         f"*{n_ops} operators*",                
@@ -60,7 +62,7 @@ def generate_summary_text(label, items, num_buckets=10, iqr_multiplier=1.5, num_
         highest_line,        
     ]
 
-    # Be selective about which count lines to include
+    # Selecting additional summary lines based on filters
     if availability == 'all':
         lines.append(f"- Public operators: {public_count} ({(public_count / n_ops * 100):.2f}%)")
     if verified == 'all':
@@ -85,6 +87,9 @@ def generate_summary_text(label, items, num_buckets=10, iqr_multiplier=1.5, num_
     return bundle_messages(lines)
 
 
+##
+## Compile multiple messages to display operator details.
+##
 def compile_operator_messages(operators_data, extra_message=None, availability="all", verified="all", num_segments=20):
     messages = []
 
@@ -94,10 +99,11 @@ def compile_operator_messages(operators_data, extra_message=None, availability="
     public_vo_items, public_non_vo_items = [], []
     private_vo_items, private_non_vo_items = [], []
 
+    # Collect counts into appropriate lists by public/private and VO status
     for op in operators_data.values():
         count = op.get(FIELD_VALIDATOR_COUNT)
         if count is None:
-            continue  # skip unknowns
+            continue
         item = (int(count), op)
         all_items.append(item)
 
@@ -116,6 +122,9 @@ def compile_operator_messages(operators_data, extra_message=None, availability="
             public_items.append(item)
             (public_vo_items if is_vo else public_non_vo_items).append(item)
 
+    # Generating summaries based on filters
+
+    # Overall breakdown
     if availability == "all":
         logging.debug(f"Filtered to all availability")
         if verified == "all":
@@ -160,6 +169,9 @@ def compile_operator_messages(operators_data, extra_message=None, availability="
     return bundle_messages(messages)
 
 
+##
+## Send operator messages in response to a slash command.
+##
 async def respond_operator_messages(ctx, operator_data, extra_message=None, availability="all", verified="all", num_segments=20):
     try:
         messages = compile_operator_messages(

@@ -1,5 +1,7 @@
-# Returns list of operator IDs to which the provided user ID is subscribed
-# Used primarily to determine which operators to send daily DMs for
+##
+## Returns list of operator IDs to which the provided user ID is subscribed
+## Used primarily to determine which operators to send daily DMs for
+##
 def get_user_subscriptions_by_type(subscriptions, user_id, sub_type):
 
     subscribed_operator_ids = []
@@ -13,8 +15,10 @@ def get_user_subscriptions_by_type(subscriptions, user_id, sub_type):
     return subscribed_operator_ids
 
 
-# Returns list of user IDs subscribed to any of the operator IDs provided
-# Used to find list of users to tag in alerts message based on all operators for which there are alerts
+##
+## Returns list of user IDs subscribed to any of the operator IDs provided
+## Used to find list of users to tag in alerts message based on all operators for which there are alerts
+##
 def get_operator_subscriptions_by_type(subscriptions, operator_ids, sub_type):
 
     operator_ids = list(set(operator_ids))

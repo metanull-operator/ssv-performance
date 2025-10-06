@@ -1,4 +1,10 @@
 #!/bin/bash
+
+# Healthcheck script for ClickHouse
+# This script checks if ClickHouse is reachable and responsive
+# Used in Docker healthcheck
+
+# Exit immediately if a command exits with a non-zero status
 set -e
 
 echo "[healthcheck] Running ClickHouse healthcheck at $(date)"

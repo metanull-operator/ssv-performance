@@ -1,4 +1,4 @@
-from common.config import MAX_DISCORD_MESSAGE_LENGTH
+from common.config import *
 from bot.bot_subscriptions import get_operator_subscriptions_by_type
 
 
@@ -24,7 +24,10 @@ def create_subscriber_mentions(guild, subscriptions, operator_ids, notification_
     mention_msg = "\n"
     for user_id in user_ids:
 
-        # If dm_recipients is provided, only include those users. For QA/testing.
+        # If dm_recipients is provided, only include those users. For QA/testing,
+        # to filter out users that may have been added to subscriptions as a test,
+        # or when production databases have been migrated back to development/staging
+        # environments.
         if dm_recipients and user_id not in dm_recipients:
             continue
 
