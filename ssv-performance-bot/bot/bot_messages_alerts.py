@@ -247,12 +247,7 @@ def compile_vo_threshold_messages(perf_data, extra_message=None, subscriptions=N
         mentions_30d = create_subscriber_mentions(guild, subscriptions, operator_ids_30d, 'alerts', dm_recipients)
 
     # Create messages for removed operators that triggered alerts
-    removed_bundles = build_removed_operator_messages(
-        removed_combined,
-        perf_data,
-        get_trend_icon=get_30d_trend_icon,
-        bundle_messages_fn=bundle_messages,
-    )
+    removed_bundles = build_removed_operator_messages(removed_combined, perf_data)
     messages.extend(removed_bundles)
 
     mentions = list(dict.fromkeys(mentions_24h + mentions_30d))
