@@ -162,7 +162,6 @@ def _as_int(value):
 ## Build messages for removed operators that triggered alerts and bundle them.
 ##
 def build_removed_operator_messages(removed_combined: dict, perf_data: dict) -> list[str]:
-
     if not removed_combined:
         return []
 
@@ -171,7 +170,7 @@ def build_removed_operator_messages(removed_combined: dict, perf_data: dict) -> 
         removed_combined.items(),
         key=lambda item: (
             -(_as_int(perf_data.get(item[0], {}).get(FIELD_VALIDATOR_COUNT)) or 0),
-            item[0]
+            item[0],
         ),
     )
 
@@ -182,12 +181,12 @@ def build_removed_operator_messages(removed_combined: dict, perf_data: dict) -> 
             continue
 
         validator_count = operator.get(FIELD_VALIDATOR_COUNT)
-        validator_count_int = as_int(validator_value)
+        validator_count_int = _as_int(validator_count)
         validator_display = validator_count if validator_count_int is None else validator_count_int
-
         perf_points = operator.get(FIELD_PERFORMANCE, {}) or {}
 
-        period_chunks = []
+        # Build indented performance lines for each period
+        period_lines = []
         for period in ("24h", "30d"):
             thresholds = sorted(periods.get(period, set()), reverse=True)
             if not thresholds:
@@ -200,12 +199,13 @@ def build_removed_operator_messages(removed_combined: dict, perf_data: dict) -> 
                 perf_str = "N/A"
 
             threshold_str = ", ".join(f"< {t:.0%}" for t in thresholds)
-            period_chunks.append(f"{period}: {perf_str} ({threshold_str})")
+            period_lines.append(f"    {period}: {perf_str} ({threshold_str})")
 
-        if period_chunks:
+        if period_lines:
             removed_lines.append(
                 f"- {operator[FIELD_OPERATOR_NAME]} "
-                f"(ID: {op_id}, Validators: {validator_display}) - {'; '.join(period_chunks)}"
+                f"(ID: {op_id}, Validators: {validator_display})\n"
+                + "\n".join(period_lines)
             )
 
     if not removed_lines:
