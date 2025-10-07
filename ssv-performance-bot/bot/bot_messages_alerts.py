@@ -200,7 +200,7 @@ def build_removed_operator_messages(removed_combined: dict, perf_data: dict) -> 
                 perf_str = "N/A"
 
             threshold_str = ", ".join(f"< {t:.0%}" for t in thresholds)
-            period_chunks.append(f"{period}: {performance_str} ({threshold_str})")
+            period_chunks.append(f"{period}: {perf_str} ({threshold_str})")
 
         if period_chunks:
             removed_lines.append(
