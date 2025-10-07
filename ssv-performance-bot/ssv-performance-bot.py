@@ -130,6 +130,10 @@ async def main():
                 loop_tasks = LoopTasks(network, bot, channel, alert_time, extra_message, dm_recipients, mentions_30d)
                 bot.loop.create_task(loop_tasks.start_tasks())
                 logging.info("Loop tasks started successfully.")
+
+                if instant_alerts:
+                    logging.info("Instant alerts enabled, sending initial alert message.")
+                    bot.loop.create_task(loop_tasks.performance_status_all_loop())              
             else:
                 logging.info("Loop tasks already initialized, skipping restart.")
         except Exception as e:
@@ -150,13 +154,6 @@ async def main():
     except Exception as e:
         logging.info("Unable to retrieve Discord token from file, trying environment variable instead.")
         discord_token = os.environ.get("DISCORD_TOKEN")
-
-    if instant_alerts:
-        logging.info("Instant alerts enabled, sending initial alert message.")
-        try:
-            await loop_tasks.performance_status_all_loop()
-        except Exception as e:
-            logging.error(f"Error sending instant alerts: {e}", exc_info=True)
 
     # Start the bot
     try:    
