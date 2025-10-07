@@ -185,27 +185,21 @@ def build_removed_operator_messages(removed_combined: dict, perf_data: dict) -> 
         validator_display = validator_count if validator_count_int is None else validator_count_int
         perf_points = operator.get(FIELD_PERFORMANCE, {}) or {}
 
-        # Build indented performance lines for each period
-        period_lines = []
+        # Get perf values (without thresholds) for both periods
+        perf_parts = []
         for period in ("24h", "30d"):
-            thresholds = sorted(periods.get(period, set()), reverse=True)
-            if not thresholds:
-                continue
-
             perf_value = perf_points.get(period)
             try:
                 perf_str = f"{float(perf_value) * 100:.2f}%" if perf_value is not None else "N/A"
             except (TypeError, ValueError):
                 perf_str = "N/A"
+            perf_parts.append(f"{period}: {perf_str}")
 
-            threshold_str = ", ".join(f"< {t:.0%}" for t in thresholds)
-            period_lines.append(f"    {period}: {perf_str} ({threshold_str})")
-
-        if period_lines:
+        if any(perf_parts):
             removed_lines.append(
                 f"- {operator[FIELD_OPERATOR_NAME]} "
                 f"(ID: {op_id}, Validators: {validator_display})\n"
-                + "\n".join(period_lines)
+                f"    {'; '.join(perf_parts)}"
             )
 
     if not removed_lines:
