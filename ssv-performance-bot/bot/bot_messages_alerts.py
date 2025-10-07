@@ -199,7 +199,7 @@ def build_removed_operator_messages(removed_combined: dict, perf_data: dict) -> 
             removed_lines.append(
                 f"- {operator[FIELD_OPERATOR_NAME]} "
                 f"(ID: {op_id}, Validators: {validator_display})\n"
-                f"    {'; '.join(perf_parts)}"
+                f"  - {'; '.join(perf_parts)}"
             )
 
     if not removed_lines:
