@@ -35,6 +35,7 @@ def parse_arguments():
     parser.add_argument("--channel_id", default=os.environ.get("BOT_DISCORD_CHANNEL_ID"))
     parser.add_argument("--extra_message", default=os.environ.get("BOT_EXTRA_MESSAGE"))
     parser.add_argument("--dm_recipients", nargs="*", default=default_dm_list)
+    parser.add_argument("--instant_alerts", action='store_true')
     parser.add_argument("--log_level", default=os.environ.get("BOT_LOG_LEVEL", "INFO"),
                         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
                         help="Set the logging level")
@@ -46,7 +47,7 @@ def parse_arguments():
     except ValueError:
         raise ValueError(f"Invalid ID(s) in --dm_recipients: {args.dm_recipients}")
 
-    return args.network, args.discord_token_file, args.channel_id, args.alert_time, args.extra_message, dm_recipients, args.log_level, args.mentions_30d, args.clickhouse_password_file
+    return args.network, args.discord_token_file, args.channel_id, args.alert_time, args.extra_message, dm_recipients, args.log_level, args.mentions_30d, args.clickhouse_password_file, args.instant_alerts
 
 
 ##
@@ -72,7 +73,7 @@ async def main():
 
     # Parse arguments and environment variables
     try:
-        network, discord_token_file, channel_id, alert_time, extra_message, dm_recipients, log_level, mentions_30d, clickhouse_password_file = parse_arguments()
+        network, discord_token_file, channel_id, alert_time, extra_message, dm_recipients, log_level, mentions_30d, clickhouse_password_file, instant_alerts = parse_arguments()
     except SystemExit as e:
         if e.code != 0:
             logging.error("Argument parsing failed", exc_info=True)
@@ -156,6 +157,13 @@ async def main():
     except Exception as e:
         logging.error(f"Error starting bot: {e}", exc_info=True)
         sys.exit(1)
+
+    if instant_alerts:
+        logging.info("Instant alerts enabled, sending initial alert message.")
+        try:
+            await loop_tasks.performance_status_all_loop()
+        except Exception as e:
+            logging.error(f"Error sending instant alerts: {e}", exc_info=True)
 
 if __name__ == "__main__":
     asyncio.run(main())
