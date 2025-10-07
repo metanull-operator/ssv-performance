@@ -151,19 +151,19 @@ async def main():
         logging.info("Unable to retrieve Discord token from file, trying environment variable instead.")
         discord_token = os.environ.get("DISCORD_TOKEN")
 
-    # Start the bot
-    try:    
-        await bot.start(discord_token)
-    except Exception as e:
-        logging.error(f"Error starting bot: {e}", exc_info=True)
-        sys.exit(1)
-
     if instant_alerts:
         logging.info("Instant alerts enabled, sending initial alert message.")
         try:
             await loop_tasks.performance_status_all_loop()
         except Exception as e:
             logging.error(f"Error sending instant alerts: {e}", exc_info=True)
+
+    # Start the bot
+    try:    
+        await bot.start(discord_token)
+    except Exception as e:
+        logging.error(f"Error starting bot: {e}", exc_info=True)
+        sys.exit(1)
 
 if __name__ == "__main__":
     asyncio.run(main())
