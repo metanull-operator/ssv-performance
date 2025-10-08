@@ -199,7 +199,7 @@ def build_removed_operator_messages(removed_combined: dict, perf_data: dict) -> 
             removed_lines.append(
                 f"- {operator[FIELD_OPERATOR_NAME]} "
                 f"(ID: {op_id}, Validators: {validator_display})\n"
-                f"  - {'; '.join(perf_parts)}"
+                f"  - {'; '.join(perf_parts)}\n"
             )
 
     if not removed_lines:
@@ -276,6 +276,7 @@ async def send_vo_threshold_messages(channel, perf_data, extra_message=None, sub
 
         if messages:
             for message in messages:
+                logging.debug(f"Sending VO threshold message to channel {channel.id}:\n{message.strip()}")
                 await channel.send(message.strip())
         else:
             current_date = datetime.now().strftime("%Y-%m-%d")
