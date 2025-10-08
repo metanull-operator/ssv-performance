@@ -1,28 +1,45 @@
-import traceback
 import logging
-from collections import defaultdict
-import copy
+import traceback
+
 from discord.commands import Option
+
 from storage.storage_factory import StorageFactory
-from vo_performance_bot.vopb_messages import (
-    create_subscriptions_message,
-    send_operator_performance_messages,
-    respond_vo_threshold_messages,
-    send_direct_message_test,
-    respond_fee_messages,
-    respond_operator_messages
-)
+from bot.bot_messages_subscriptions import create_subscriptions_message
+from bot.bot_messages_operator import send_operator_performance_messages
+from bot.bot_messages_alerts import respond_vo_threshold_messages
+from bot.bot_messages_fees import respond_fee_messages
+from bot.bot_messages_operators import respond_operator_messages
+from bot.bot_messages import send_direct_message_test
 
 
-# Determine whether the Discord context is a channel or not. Could be DMs.
-def is_channel(ctx):
-    return hasattr(ctx, 'guild') and ctx.guild
-
-
+##
+## Sets up all bot commands for the provided bot instance.
+## Bot commands are defined within this function to allow
+## access to configuration parameters.
+##
 async def setup(network, bot, allowed_channel_id, extra_message, num_segments):
 
+    ##
+    ## Determine whether the Discord context is a channel or not. Could be DMs.
+    ##
+    def is_channel(ctx):
+        return hasattr(ctx, 'guild') and ctx.guild
+
+
+    ##
+    ## Determine permission to respond to commands in the current channel or DM
+    ## Allow only permitted channels. Allow DMs.
+    ##
+    def allowed_channel(ctx):
+        return not is_channel(ctx) or str(ctx.channel.id) == allowed_channel_id
+
+
+    ##
+    ## Discord /help command
+    ##
     @bot.slash_command(name="help", description="Shows help information")
     async def help(ctx):
+        logging.info("/help called")
 
         if not allowed_channel(ctx):
             await ctx.respond("VO Performance Bot commands are not allowed in this channel.", ephemeral=True)
@@ -58,6 +75,9 @@ Thresholds displayed are subject to change.
         await ctx.respond(help_text)
 
 
+    ##
+    ## Send list of subscriptions. Used in response to /subscriptions, /subscribe, /unsubscribe commands
+    ##
     async def send_user_subscriptions(ctx, ephemeral, followup):
         try:
             storage = StorageFactory.get_storage('ssv_performance')
@@ -74,24 +94,27 @@ Thresholds displayed are subject to change.
             traceback.print_exc()
 
 
-    def allowed_channel(ctx):
-        # Messages will be allowed if the channel is an allowed channel, or if we aren't even on a channel (DMs)
-        return not is_channel(ctx) or str(ctx.channel.id) == allowed_channel_id
-
-
+    ##
+    ## Discord /subscriptions command
+    ##
     @bot.slash_command(name='subscriptions', description='List all operator IDs subscribed for daily performance direct messages or threshold alert @mentions')
     async def subscriptions(ctx):
         logging.info("/subscriptions called")
+
         if not allowed_channel(ctx):
             await ctx.respond("VO Performance Bot commands are not allowed in this channel.", ephemeral=True)
             return
+        
         await send_user_subscriptions(ctx, ephemeral=is_channel(ctx), followup=False)
 
 
+    ##
+    ## Discord /subscribe command
+    ##
     @bot.slash_command(name='subscribe', description='Subscribe to daily operator performance direct messages or threshold alert @mentions')
     async def subscribe(ctx, notification_type: Option(str, "Choose notification type", choices=['daily', 'alerts']),
-                        operator_ids: Option(str, "Enter operator IDs separated by spaces")):
-
+                        operator_ids: Option(str, "Enter operator IDs separated by spaces")
+    ):
         logging.info("/subscribe called")
 
         if not allowed_channel(ctx):
@@ -107,7 +130,7 @@ Thresholds displayed are subject to change.
         # Track responded so we know whether future messages are follow-ups
         responded = False
 
-        # Attempt a DM to user. Immediately let user know if DMs failed.
+        # Test DMs to user. Immediately let user know if DMs failed.
         test_msg = "You have requested to receive direct message alerts regarding SSV operator performance. This message confirms that you can receive direct messages from the VO Performance Bot."
         if not await send_direct_message_test(bot, ctx.author.id, test_msg.strip()):
             await ctx.respond(
@@ -143,9 +166,13 @@ Thresholds displayed are subject to change.
                 await ctx.send_followup("An error occurred while updating your subscriptions.", ephemeral=True)
 
 
+    ##
+    ## Discord /unsubscribe command
+    ##
     @bot.slash_command(name='unsubscribe', description='Unsubscribe from daily operator performance direct messages or threshold alert @mentions')
     async def unsubscribe(ctx, notification_type: Option(str, "Choose notification type", choices=['daily', 'alerts']),
-                          operator_ids: Option(str, "Enter operator IDs separated by spaces")):
+                          operator_ids: Option(str, "Enter operator IDs separated by spaces")
+    ):
 
         logging.info("/unsubscribe called")
 
@@ -183,9 +210,11 @@ Thresholds displayed are subject to change.
                 await ctx.send_followup("An error occurred while updating your subscriptions.", ephemeral=True)
 
 
+    ##
+    ## Discord /operator command
+    ##  
     @bot.slash_command(name='operator', description='Show recent operator performance for listed operator IDs')
     async def operator(ctx, operator_ids: Option(str, "Enter operator IDs separated by spaces")):
-
         logging.info("/operator called")
 
         if not allowed_channel(ctx):
@@ -213,13 +242,15 @@ Thresholds displayed are subject to change.
             await ctx.respond("An error occurred while fetching operator performance data.", ephemeral=True)
 
 
+    ##
+    ## Discord /fees command
+    ##
     @bot.slash_command(name='fees', description='Show current fee information')
     async def fees(
         ctx,
             availability: Option(str, "Which operators to include", choices=["public", "private", "all"], default="public"),
             verified: Option(str, "Which operators to include", choices=["verified", "unverified", "all"], default="verified")
     ):
-
         logging.info(f"/fees called with availability={availability}")
 
         if not allowed_channel(ctx):
@@ -244,12 +275,14 @@ Thresholds displayed are subject to change.
             await ctx.followup.send("An error occurred while fetching fee data.", ephemeral=True)
 
 
+    ##
+    ## Discord /operators command
+    ##
     @bot.slash_command(name='operators', description='Show current operator set information')
     async def operators(ctx,
             availability: Option(str, "Which operators to include", choices=["public", "private", "all"], default="all"),
             verified: Option(str, "Which operators to include", choices=["verified", "unverified", "all"], default="all")
     ):
-
         logging.info(f"/operators called")
 
         if not allowed_channel(ctx):
@@ -274,25 +307,11 @@ Thresholds displayed are subject to change.
             await ctx.followup.send("An error occurred while fetching operator data.", ephemeral=True)
 
 
-    def merge_operator_performance(dict1, dict2):
-        merged = {}
-
-        for k in set(dict1) | set(dict2):
-            merged[k] = copy.deepcopy(dict1.get(k, {}))
-
-            d2 = dict2.get(k, {})
-            for key, value in d2.items():
-                if isinstance(value, dict) and key in merged[k] and isinstance(merged[k][key], dict):
-                    merged[k][key].update(value)
-                else:
-                    merged[k][key] = value
-
-        return merged
-
-
+    ##
+    ## Discord /alerts command
+    ##
     @bot.slash_command(name='alerts', description='List all operators whose recent performance is below various alert thresholds')
     async def alerts(ctx):
-
         logging.info("/alerts called")
 
         if not allowed_channel(ctx):
@@ -304,9 +323,6 @@ Thresholds displayed are subject to change.
         try:
             storage = StorageFactory.get_storage('ssv_performance')
             perf_data = storage.get_latest_performance_data(network)
-#            perf_data_30d = storage.get_latest_performance_data(network, '30d')
-
- #           perf_data = merge_operator_performance(perf_data_24h, perf_data_30d)
 
             if not perf_data:
                 logging.error(f"alerts() perf_data empty")
@@ -320,9 +336,11 @@ Thresholds displayed are subject to change.
             await ctx.followup.send("An error occurred while fetching alerts.", ephemeral=True)
 
 
+    ##
+    ## Discord /info command
+    ##
     @bot.slash_command(name='info', description='Display bot information')
     async def info(ctx):
-
         logging.info("/info called")
 
         if not allowed_channel(ctx):
@@ -351,13 +369,15 @@ Thresholds displayed are subject to change.
             await ctx.followup.send("An error occurred while fetching bot data.", ephemeral=True)
 
 
+    ##
+    ## Fallback command handler if command is not found
+    ##
     @bot.event
     async def on_command_error(ctx, error):
-
+        # If the command is not found, do nothing
         if isinstance(error, commands.CommandNotFound):
-            # If the command is not found, do nothing
             return
 
-        # Handle other errors as you see fit
+        # Unknown error, log it and notify user
         logging.error(f"Error in command {ctx.command}: {error}")
         await ctx.respond(f"An error occurred: {error}", ephemeral=True)

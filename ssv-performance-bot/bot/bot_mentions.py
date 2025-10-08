@@ -1,8 +1,10 @@
-from common.config import MAX_DISCORD_MESSAGE_LENGTH
-from vo_performance_bot.vopb_subscriptions import get_operator_subscriptions_by_type
+from common.config import *
+from bot.bot_subscriptions import get_operator_subscriptions_by_type
 
 
-# Query for guild member by user_id and return mention text
+##
+## Query for guild member by user_id and return mention text
+##
 def mention_member(guild, user_id):
     member = guild.get_member(int(user_id))
     if member:
@@ -11,22 +13,24 @@ def mention_member(guild, user_id):
     return ''
 
 
-# Create a one or more messages containing mentions for Discord users
-# that have subscribed to a particular notification type for the given
-# operator IDs
+## 
+## Create mention messages for users subscribed to any of the provided operator IDs
+##
 def create_subscriber_mentions(guild, subscriptions, operator_ids, notification_type, dm_recipients=[]):
     messages = []
 
     user_ids = get_operator_subscriptions_by_type(subscriptions, operator_ids, notification_type)
 
     mention_msg = "\n"
-    for user_id in user_ids:  # Loop through unique, sorted Discord usernames
+    for user_id in user_ids:
 
-        # For QA purposes, skip users_ids not in allow list
+        # If dm_recipients is provided, only include those users. For QA/testing,
+        # to filter out users that may have been added to subscriptions as a test,
+        # or when production databases have been migrated back to development/staging
+        # environments.
         if dm_recipients and user_id not in dm_recipients:
             continue
 
-        # Get mention text for member
         mention = mention_member(guild, user_id)
 
         if mention:

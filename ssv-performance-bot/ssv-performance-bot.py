@@ -4,17 +4,22 @@ import asyncio
 import logging
 import os
 import discord
-import vo_performance_bot.vopb_commands as vopb_commands
+import bot.bot_commands as bot_commands
 from discord.ext import commands
 from storage.storage_factory import StorageFactory
-from vo_performance_bot.vopb_loops import LoopTasks
+from bot.bot_loops import LoopTasks
 from common.config import DEFAULT_NUMBER_OF_SEGMENTS
+
 
 loop_tasks = None
 
-# Configure logging with a default level
+# Initialize logging with a default level
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+
+##
+## Parse command-line arguments and environment variables
+##
 def parse_arguments():
 
     raw_dm_env = os.environ.get("BOT_DM_RECIPIENTS", "")
@@ -30,6 +35,7 @@ def parse_arguments():
     parser.add_argument("--channel_id", default=os.environ.get("BOT_DISCORD_CHANNEL_ID"))
     parser.add_argument("--extra_message", default=os.environ.get("BOT_EXTRA_MESSAGE"))
     parser.add_argument("--dm_recipients", nargs="*", default=default_dm_list)
+    parser.add_argument("--instant_alerts", action='store_true')
     parser.add_argument("--log_level", default=os.environ.get("BOT_LOG_LEVEL", "INFO"),
                         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
                         help="Set the logging level")
@@ -41,36 +47,55 @@ def parse_arguments():
     except ValueError:
         raise ValueError(f"Invalid ID(s) in --dm_recipients: {args.dm_recipients}")
 
-    return args.network, args.discord_token_file, args.channel_id, args.alert_time, args.extra_message, dm_recipients, args.log_level, args.mentions_30d, args.clickhouse_password_file
+    return args.network, args.discord_token_file, args.channel_id, args.alert_time, args.extra_message, dm_recipients, args.log_level, args.mentions_30d, args.clickhouse_password_file, args.instant_alerts
 
+
+##
+## Read Discord token from file
+##
 def read_discord_token_from_file(token_file_path):
     with open(token_file_path, 'r') as file:
         return file.read().strip()
 
+
+##
+## Read ClickHouse password from file
+##
 def read_clickhouse_password_from_file(password_file_path):
     with open(password_file_path, 'r') as file:
         return file.read().strip()
 
+
+##
+## Main async function to run the bot
+##
 async def main():
+
+    # Parse arguments and environment variables
     try:
-        network, discord_token_file, channel_id, alert_time, extra_message, dm_recipients, log_level, mentions_30d, clickhouse_password_file = parse_arguments()
+        network, discord_token_file, channel_id, alert_time, extra_message, dm_recipients, log_level, mentions_30d, clickhouse_password_file, instant_alerts = parse_arguments()
     except SystemExit as e:
         if e.code != 0:
             logging.error("Argument parsing failed", exc_info=True)
         sys.exit(e.code)
 
-    # Set logging level dynamically
+    # Get number of segments for charts from environment variable or use default
+    num_segments = os.environ.get("NUMBER_OF_SEGMENTS", DEFAULT_NUMBER_OF_SEGMENTS)
+
+    # Reset logging level dynamically
     logging.getLogger().setLevel(log_level.upper())
     logging.info(f"Logging level set to {log_level.upper()}")
 
     logging.info(f"Daily alert time: {alert_time}")
 
+    # Get ClickHouse password from file or environment variable
     try:
         clickhouse_password = read_clickhouse_password_from_file(clickhouse_password_file)
     except Exception as e:
         logging.info("Unable to retrieve ClickHouse password from file, trying environment variable instead.")
         clickhouse_password = os.environ.get("CLICKHOUSE_PASSWORD")
 
+    # Initialize storage
     try:
         StorageFactory.initialize('ssv_performance', 'ClickHouse', password=clickhouse_password)
         logging.info("Storage initialized successfully.")
@@ -78,12 +103,14 @@ async def main():
         logging.error(f"Error initializing storage: {e}", exc_info=True)
         sys.exit(1)
 
+    # Set up Discord bot
     intents = discord.Intents.default()
     intents.members = True
     intents.message_content = True
 
     bot = commands.Bot(command_prefix='!', intents=intents, help_command=None)
 
+    ## Define on_ready event to start loops and sync commands
     @bot.event
     async def on_ready():
         global loop_tasks
@@ -103,27 +130,32 @@ async def main():
                 loop_tasks = LoopTasks(network, bot, channel, alert_time, extra_message, dm_recipients, mentions_30d)
                 bot.loop.create_task(loop_tasks.start_tasks())
                 logging.info("Loop tasks started successfully.")
+
+                if instant_alerts:
+                    logging.info("Instant alerts enabled, sending initial alert message.")
+                    bot.loop.create_task(loop_tasks.performance_status_all_loop())              
             else:
                 logging.info("Loop tasks already initialized, skipping restart.")
         except Exception as e:
             logging.error(f"Error in on_ready event: {e}", exc_info=True)
             sys.exit(1)
 
-    num_segments = os.environ.get("NUMBER_OF_SEGMENTS", DEFAULT_NUMBER_OF_SEGMENTS)
-
+    # Initialize bot commands
     try:
-        await vopb_commands.setup(network, bot, channel_id, extra_message, num_segments=num_segments)
+        await bot_commands.setup(network, bot, channel_id, extra_message, num_segments=num_segments)
         logging.info("Commands setup successfully.")
     except Exception as e:
         logging.error(f"Error setting up commands: {e}", exc_info=True)
         sys.exit(1)
 
+    # Read Discord token from file or environment variable
     try:
         discord_token = read_discord_token_from_file(discord_token_file)
     except Exception as e:
         logging.info("Unable to retrieve Discord token from file, trying environment variable instead.")
         discord_token = os.environ.get("DISCORD_TOKEN")
 
+    # Start the bot
     try:    
         await bot.start(discord_token)
     except Exception as e:

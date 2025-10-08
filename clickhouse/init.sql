@@ -13,7 +13,6 @@ ENGINE = ReplacingMergeTree(updated_at)
 PARTITION BY network
 ORDER BY (network, operator_id);
 
-
 CREATE TABLE IF NOT EXISTS default.performance (
     network String,
     operator_id UInt32,
@@ -68,11 +67,6 @@ CREATE TABLE IF NOT EXISTS default.import_state (
 ENGINE = ReplacingMergeTree(updated_at)
 ORDER BY network;
 
--- base tables: keep names
---   operators
---   validator_counts  (raw time series)
-
--- precomputed targets must have different names than the source:
 CREATE TABLE IF NOT EXISTS validator_counts_latest
 (
   network LowCardinality(String),
@@ -115,7 +109,6 @@ SELECT
 FROM validator_counts
 GROUP BY network, operator_id, metric_date;
 
--- Latest per metric (tiny table)
 CREATE TABLE IF NOT EXISTS performance_latest
 (
   network       LowCardinality(String),
@@ -127,7 +120,6 @@ CREATE TABLE IF NOT EXISTS performance_latest
 ENGINE = ReplacingMergeTree(latest_at)
 ORDER BY (network, metric_type, operator_id);
 
--- Daily last value per metric
 CREATE TABLE IF NOT EXISTS performance_daily
 (
   network       LowCardinality(String),
@@ -141,7 +133,6 @@ ENGINE = ReplacingMergeTree(last_row_at)
 PARTITION BY toYYYYMM(metric_date)
 ORDER BY (network, metric_type, operator_id, metric_date);
 
--- Latest per operator+metric (across all time)
 CREATE MATERIALIZED VIEW IF NOT EXISTS performance_latest_mv
 TO performance_latest AS
 SELECT
@@ -153,7 +144,6 @@ SELECT
 FROM performance
 GROUP BY network, operator_id, metric_type;
 
--- Daily last value (per operator+metric+day)
 CREATE MATERIALIZED VIEW IF NOT EXISTS performance_daily_mv
 TO performance_daily AS
 SELECT
