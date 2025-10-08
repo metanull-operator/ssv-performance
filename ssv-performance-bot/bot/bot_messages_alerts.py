@@ -297,6 +297,7 @@ async def respond_vo_threshold_messages(ctx, perf_data, extra_message=None):
 
         if messages:
             for message in messages:
+                logging.debug(f"Sending VO threshold message to channel {channel.id}:\n{message.strip()}")
                 # Note assumption that defer() was previously called.
                 await ctx.followup.send(message.strip(), ephemeral=False)
         else:
