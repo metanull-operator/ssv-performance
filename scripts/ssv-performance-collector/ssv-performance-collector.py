@@ -16,7 +16,6 @@ BLOCKS_PER_YEAR = BLOCKS_PER_DAY * DAYS_PER_YEAR
 IMPORT_SOURCE = os.environ.get("IMPORT_SOURCE", 'api.ssv.network')
 SSV_API_BASE = "https://api.ssv.network/api/v4"
 
-BEACON_API_URL     = os.environ.get("BEACON_API_URL")
 STATUS_RPM         = int(os.environ.get("VALIDATOR_STATUS_RPM", 60))
 STATUS_BATCH_SIZE  = int(os.environ.get("VALIDATOR_STATUS_BATCH", 1000))
 STATUS_DELAY       = 60 / max(1, STATUS_RPM)
@@ -167,9 +166,12 @@ def fetch_validators_maps(network: str, per_page: int = 1000):
                 logging.warning(f"SSV_API: Validator with missing/empty pubkey (id={vid_raw}); skipping.")
                 continue
             
-            # Make sure all pubkeys are 0x-prefixed
-            if isinstance(pubkey, str) and not pubkey.startswith("0x"):
-                pubkey = "0x" + pubkey.strip()
+            # Make sure all pubkeys are 0x-prefixed and normalized lower case
+            if isinstance(pubkey, str):
+                pubkey = pubkey.strip()
+                if not pubkey.startswith("0x"):
+                    pubkey = "0x" + pubkey
+                pubkey = pubkey.lower()    
 
             # Add to lists of all validators and active validators
             all_pubkeys.add(pubkey)
@@ -222,12 +224,12 @@ def fetch_validators_maps(network: str, per_page: int = 1000):
     return operator_validators, all_pubkeys, all_pubkeys_status
 
 
-def fetch_beacon_statuses(pubkeys: set[str]) -> dict[str, str]:
+def fetch_beacon_statuses(beacon_api_url, pubkeys: set[str]) -> dict[str, str]:
     """
     Fetch statuses from Beacon once per pubkey (batches).
     Returns {pubkey: status_lower}.
     """
-    if not BEACON_API_URL:
+    if not beacon_api_url:
         return {}
 
     headers = {"Accept": "application/json"}
@@ -238,7 +240,7 @@ def fetch_beacon_statuses(pubkeys: set[str]) -> dict[str, str]:
     for i in range(0, len(pubkey_list), STATUS_BATCH_SIZE):
         batch = pubkey_list[i:i + STATUS_BATCH_SIZE]
         ids = ",".join(batch)
-        url = f"{BEACON_API_URL}/eth/v1/beacon/states/head/validators?id={ids}"
+        url = f"{beacon_api_url}/eth/v1/beacon/states/head/validators?id={ids}"
         try:
             resp = requests.get(url, headers=headers, timeout=20)
             resp.raise_for_status()
@@ -277,7 +279,7 @@ def count_active_from_status_map(operator_validators: dict[int, set[str]], statu
                 logging.debug("  Validator %s status: %s", pk, st)
 
     return {
-        op_id: sum(1 for pk in pubkeys if status_map.get(pk, "") in ACTIVE_STATUSES)
+        op_id: sum(1 for pk in pubkeys if status_map.get(pk.lower(), "") in ACTIVE_STATUSES)
         for op_id, pubkeys in operator_validators.items()
     }
 
@@ -383,7 +385,12 @@ def main():
     parser.add_argument('--local_time', action='store_true')
     parser.add_argument("--log_level", default=os.environ.get("COLLECTOR_LOG_LEVEL", "INFO"),
                         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"])
+    parser.add_argument('--beacon-api-url', type=str, default=os.environ.get("BEACON_API_URL"),
+                        help='Base URL for Beacon API. Overrides BEACON_API_URL env var if provided.')    
     args = parser.parse_args()
+
+    if args.beacon_api_url:
+        args.beacon_api_url = args.beacon_api_url.rstrip("/")
 
     # Set logging level dynamically
     logging.getLogger().setLevel(args.log_level.upper())
@@ -406,15 +413,15 @@ def main():
     # Step 3: If BEACON_API_URL set, fetch statuses and use those counts instead of SSV-based
     final_active_counts: dict[int, int] = {}
     beacon_statuses: dict[str, str] = {}
-    if BEACON_API_URL:
-        beacon_statuses = fetch_beacon_statuses(all_pubkeys)
+    if args.beacon_api_url:
+        beacon_statuses = fetch_beacon_statuses(args.beacon_api_url, all_pubkeys)
         if beacon_statuses:
             logging.info("Using BEACON_API validator statuses")
             final_active_counts = count_active_from_status_map(operator_validators, beacon_statuses)
         else:
-            logging.warning("BEACON_API_URL set, but no beacon statuses received; falling back to SSV-based counts")
+            logging.warning("Beacon API URL set, but no beacon statuses received; falling back to SSV-based counts")
     else:
-        logging.info("No BEACON_API_URL set; using SSV-based active counts")
+        logging.info("No beacon API URL set; using SSV-based active counts")
         final_active_counts = count_active_from_status_map(operator_validators, all_pubkeys_status)
 
 

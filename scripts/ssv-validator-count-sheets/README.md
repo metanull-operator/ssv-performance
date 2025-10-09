@@ -45,17 +45,6 @@ Set the value of `--network` appropriately for the data you wish to upload.
 docker run --rm -v "./credentials/clickhouse-password.txt:/clickhouse-password.txt:ro" -v "./credentials/google-credentials.json:/google-credentials.json:ro" --network ssv-performance_ssv-performance-network ssv-validator-count-sheets -d '<GOOGLE_SHEETS_DOCUMENT_NAME>' -w '<GOOGLE_SHEETS_WORKSHEET_NAME>' --network mainnet
 ```
 
-### Create cronjobs
-
-Create cronjobs to run the command daily for each network. These cronjobs should run after the `ssv-performance-collector` cronjobs to ensure that the Google Sheets have the latest data. Use absolute paths to mount the `clickhouse-password.txt` file and use the Docker network found above.
-
-Here are some example crontab entries to upload validator count data daily for Mainnet and Hoodi. 
-
-```
-30 0 * * * /usr/bin/docker run --rm -v "/opt/ssv-performance/credentials/google-credentials.json:/google-credentials.json:ro" -v "/opt/ssv-performance/credentials/clickhouse-password.txt:/clickhouse-password.txt:ro" --network ssv-performance_ssv-performance-network ssv-validator-count-sheets -d 'SSV Performance Data' -w 'Mainnet Validator Counts' --network mainnet
-35 0 * * * /usr/bin/docker run --rm -v "/opt/ssv-performance/credentials/google-credentials.json:/google-credentials.json:ro" -v "/opt/ssv-performance/credentials/clickhouse-password.txt:/clickhouse-password.txt:ro" --network ssv-performance_ssv-performance-network ssv-validator-count-sheets -d 'SSV Performance Data' -w 'Hoodi Validator Counts' --network hoodi
-```
-
 ## Standalone
 
 ### Install Required Python Packages
@@ -80,3 +69,27 @@ python3 scripts/ssv-validator-count-sheets/ssv-validator-count-sheets.py -d '<GO
 ```
 
 The script assumes that the ClickHouse database is accessible at port 8123 on the localhost. The environment variables `CLICKHOUSE_PORT` and `CLICKHOUSE_HOST` may be used to specify a different port or host at which to access the ClickHouse database.
+
+## Create cronjobs
+
+Create cronjobs to run the command daily for each network. These cronjobs should run after the `ssv-performance-collector` cronjobs to ensure that the Google Sheets have the latest data.
+
+Use absolute paths to mount the `clickhouse-password.txt` file.
+
+Here are some example crontab entries to upload validator count data daily for Mainnet and Hoodi. 
+
+### Docker
+
+ Use the Docker network found above.
+
+```
+30 0 * * * /usr/bin/docker run --rm -v "/opt/ssv-performance/credentials/google-credentials.json:/google-credentials.json:ro" -v "/opt/ssv-performance/credentials/clickhouse-password.txt:/clickhouse-password.txt:ro" --network ssv-performance_ssv-performance-network ssv-validator-count-sheets -d 'SSV Performance Data' -w 'Mainnet Validator Counts' --network mainnet
+35 0 * * * /usr/bin/docker run --rm -v "/opt/ssv-performance/credentials/google-credentials.json:/google-credentials.json:ro" -v "/opt/ssv-performance/credentials/clickhouse-password.txt:/clickhouse-password.txt:ro" --network ssv-performance_ssv-performance-network ssv-validator-count-sheets -d 'SSV Performance Data' -w 'Hoodi Validator Counts' --network hoodi
+```
+
+### Standalone
+
+```
+30 0 * * * /usr/bin/python3 /opt/ssv-performance/scripts/ssv-validator-count-sheets/ssv-validator-count-sheets.py -d 'VOC Performance Data' -w 'Mainnet Validator Counts' --network mainnet -c /opt/ssv-performance/credentials/google-credentials.json -p /opt/ssv-performance/credentials/clickhouse-password.txt
+35 0 * * * /usr/bin/python3 /opt/ssv-performance/scripts/ssv-validator-count-sheets/ssv-validator-count-sheets.py -d 'VOC Performance Data' -w 'Hoodi Validator Counts' --network hoodi -c /opt/ssv-performance/credentials/google-credentials.json -p /opt/ssv-performance/credentials/clickhouse-password.txt
+```
