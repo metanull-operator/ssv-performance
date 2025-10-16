@@ -26,18 +26,33 @@ def parse_arguments():
     default_dm_list = [r for r in raw_dm_env.split(",") if r.strip()]
 
     parser = argparse.ArgumentParser(description="SSV Verified Operator Committee Discord bot")
-
-    parser.add_argument('--mentions_30d', action='store_true')
-    parser.add_argument("--network", default=os.environ.get("NETWORK", "mainnet"))
-    parser.add_argument("--clickhouse_password_file", default=os.environ.get("CLICKHOUSE_PASSWORD_FILE", ""))
-    parser.add_argument("--discord_token_file", default=os.environ.get("DISCORD_TOKEN_FILE", ""))
-    parser.add_argument("--alert_time", default=os.environ.get("BOT_DAILY_MESSAGE_TIME", "14:00"))
-    parser.add_argument("--channel_id", default=os.environ.get("BOT_DISCORD_CHANNEL_ID"))
-    parser.add_argument("--extra_message", default=os.environ.get("BOT_EXTRA_MESSAGE"))
-    parser.add_argument("--dm_recipients", nargs="*", default=default_dm_list)
-    parser.add_argument("--instant_alerts", action='store_true')
-    parser.add_argument("--log_level", default=os.environ.get("BOT_LOG_LEVEL", "INFO"),
-                        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+    parser.add_argument('--mentions-30d', action='store_true',
+                        help='Include 30-day performance mentions in daily messages')
+    parser.add_argument("--network",
+                        default=os.environ.get("NETWORK", "mainnet"),
+                        help="Network to query (default: mainnet)")
+    parser.add_argument("--clickhouse-password-file",
+                        default=os.environ.get("CLICKHOUSE_PASSWORD_FILE", ""),
+                        help="Path to ClickHouse password file")
+    parser.add_argument("--discord-token-file",
+                        default=os.environ.get("DISCORD_TOKEN_FILE", ""),
+                        help="Path to Discord bot token file")
+    parser.add_argument("--alert-time",
+                        default=os.environ.get("BOT_DAILY_MESSAGE_TIME", "14:00"),
+                        help="Time of day to send daily performance message (UTC), in HH:MM format (default: 14:00)")
+    parser.add_argument("--channel-id",
+                        default=os.environ.get("BOT_DISCORD_CHANNEL_ID"),
+                        help="Allowed Discord channel ID for bot messages and commands")
+    parser.add_argument("--extra-message",
+                        default=os.environ.get("BOT_EXTRA_MESSAGE"),
+                        help="Extra message to append to daily performance messages")
+    parser.add_argument("--dm-recipients", nargs="*",
+                        default=default_dm_list,
+                        help="List of Discord user IDs to which direct messages may be sent")
+    parser.add_argument("--instant-alerts", action='store_true',
+                        help="Send an initial performance alert message when the bot starts")
+    parser.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+                        default=os.environ.get("BOT_LOG_LEVEL", "INFO"),
                         help="Set the logging level")
 
     args = parser.parse_args() 

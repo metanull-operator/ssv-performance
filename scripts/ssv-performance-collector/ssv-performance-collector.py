@@ -377,16 +377,26 @@ def read_clickhouse_password_from_file(password_file_path):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Fetch/update operator data via operators + validators; optional Beacon cross-check.')
-    parser.add_argument('-n', '--network', type=str, choices=['mainnet', 'holesky', 'hoodi'], default='mainnet')
-    parser.add_argument('-p', '--clickhouse_password_file', type=str, default=os.environ.get('CLICKHOUSE_PASSWORD_FILE'))
-    parser.add_argument('--ops-page-size', type=int, default=100, help='perPage for /operators')
-    parser.add_argument('--val-page-size', type=int, default=1000, help='perPage for /validators (lastId cursor)')
-    parser.add_argument('--local_time', action='store_true')
-    parser.add_argument("--log_level", default=os.environ.get("COLLECTOR_LOG_LEVEL", "INFO"),
-                        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"])
+    parser = argparse.ArgumentParser(description='Fetch/update operator data and validator data')
+    parser.add_argument('-n', '--network', type=str, choices=['mainnet', 'holesky', 'hoodi'],
+                        default='mainnet',
+                        help='Network to fetch (default: mainnet)')
+    parser.add_argument('-p', '--clickhouse-password-file', type=str,
+                        default=os.environ.get('CLICKHOUSE_PASSWORD_FILE'),
+                        help='Path to ClickHouse password file')
+    parser.add_argument('--ops-page-size', type=int,
+                        default=100,
+                        help='perPage for /operators', help='perPage for /operators queries')
+    parser.add_argument('--val-page-size', type=int,
+                        default=1000,
+                        help='perPage for /validators (lastId cursor)', help='perPage for /validators queries')
+    parser.add_argument('--local-time', action='store_true',
+                        help='Use local time instead of UTC for target_date')
+    parser.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+                        default=os.environ.get("COLLECTOR_LOG_LEVEL", "INFO"),
+                        help='Set the logging level')
     parser.add_argument('--beacon-api-url', type=str, default=os.environ.get("BEACON_API_URL"),
-                        help='Base URL for Beacon API. Overrides BEACON_API_URL env var if provided.')    
+                        help='Base URL for Beacon API')    
     args = parser.parse_args()
 
     if args.beacon_api_url:
