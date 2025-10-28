@@ -26,29 +26,18 @@ Run the collector once for each Ethereum network for which you want to collect p
 docker run --rm -v "./credentials/clickhouse-password.txt:/clickhouse-password.txt" --network ssv-performance_ssv-performance-network ssv-performance-collector --network mainnet
 ```
 
-### Create cronjobs
-
-Create separate cronjobs to run the command daily for each network. Use absolute paths to mount the `clickhouse-password.txt` file and use the Docker network found above.
-
-Here are some example crontab entries to run the collector daily for Mainnet and Hoodi. 
-
-```
-0 0 * * * /usr/bin/docker run --rm -v "/opt/ssv-performance/credentials/clickhouse-password.txt:/clickhouse-password.txt" --network ssv-performance_ssv-performance-network ssv-performance-collector --network mainnet
-5 0 * * * /usr/bin/docker run --rm -v "/opt/ssv-performance/credentials/clickhouse-password.txt:/clickhouse-password.txt" --network ssv-performance_ssv-performance-network ssv-performance-collector --network hoodi
-```
-
 ### Optional Consensus API Validator Status
 
-Validator statuses are required in order to get an accurate count of the number of active validators. The SSV API from which operator data is drawn should provide both validator public key and status information for every validator associated with an operator. You may optionally provide a consensus client URL to the script to have validator statuses pulled directly from the consensus layer.
+For the most accurate active validator count, a consensus client connection is required. The validator count from the SSV API does not correctly account for removed validators and may not provide the most accurate "active" statuses. Optionally provide a consensus client URL to the script to have validator statuses pulled directly from the consensus layer.
 
-Include the environment variable `BEACON_API_URL` to specify the URL to a consensus client API. If present, the script will contact the API for the latest validator status information.
+Include the environment variable `BEACON_API_URL` or the command-line parameter `--beacon-api-url` to specify the URL to a consensus client API. If present, the script will contact the API for the latest validator status information.
 
 On the command line:
 ```
--e "BEACON_API_URL=http://<CONSENSUS_ADDR>:<CONSENSUS_PORT>/"
+--beacon-api-url=http://<CONSENSUS_ADDR>:<CONSENSUS_PORT>/
 ```
 
-If `BEACON_API_URL` is not specified, the status from the SSV API will be used instead.
+If a beacon API URL is not specified, the status from the SSV API will be used instead.
 
 ## Standalone
 
@@ -61,7 +50,29 @@ pip3 install clickhouse_connect requests
 ### Run ssv-performance-collector
 
 ```bash
-BEACON_API_URL=http://<CONSENSUS_ADDR>:<CONSENSUS_PORT>/ python3 scripts/ssv-performance-collector/ssv-performance-collector.py --network mainnet -p credentials/clickhouse-password.txt
+python3 scripts/ssv-performance-collector/ssv-performance-collector.py --network mainnet -p credentials/clickhouse-password.txt --beacon-api-url=http://<CONSENSUS_ADDR>:<CONSENSUS_PORT>/
 ```
 
 The script assumes that the ClickHouse database is accessible at port 8123 on the localhost. The environment variables `CLICKHOUSE_PORT` and `CLICKHOUSE_HOST` may be used to specify a different port or host at which to access the ClickHouse database.
+
+## Create cronjobs
+
+Create separate cronjobs to run the command daily for each network. Use absolute paths to mount the `clickhouse-password.txt` file.
+
+Here are some example crontab entries to run the collector daily for Mainnet and Hoodi. 
+
+## Docker
+
+Use the Docker network found above.
+
+```
+0 0 * * * /usr/bin/docker run --rm -v "/opt/ssv-performance/credentials/clickhouse-password.txt:/clickhouse-password.txt" --network ssv-performance_ssv-performance-network ssv-performance-collector --network mainnet
+5 0 * * * /usr/bin/docker run --rm -v "/opt/ssv-performance/credentials/clickhouse-password.txt:/clickhouse-password.txt" --network ssv-performance_ssv-performance-network ssv-performance-collector --network hoodi
+```
+
+## Standalone
+
+```
+0 0 * * * /usr/bin/python3 /opt/ssv-performance/scripts/ssv-performance-collector/ssv-performance-collector.py --network mainnet -p /opt/ssv-performance/credentials/clickhouse-password.txt --beacon-api-url=http://localhost:3500/
+5 0 * * * /usr/bin/python3 /opt/ssv-performance/scripts/ssv-performance-collector/ssv-performance-collector.py --network hoodi -p /opt/ssv-performance/credentials/clickhouse-password.txt --beacon-api-url=http://localhost:3500/
+```

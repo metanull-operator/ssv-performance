@@ -130,15 +130,27 @@ def authorize_google_sheets(credentials_file):
 
 def main():
     parser = argparse.ArgumentParser(description="Export SSV validator count data to Google Sheets")
-    parser.add_argument('-c', '--google_credentials_file', type=str, default=os.environ.get('GOOGLE_CREDENTIALS_FILE'))
-    parser.add_argument('-p', '--clickhouse_password_file', type=str, default=os.environ.get('CLICKHOUSE_PASSWORD_FILE'))
-    parser.add_argument('--max_age_days', type=int, default=os.environ.get('MAX_AGE_DAYS', 7), help='Max age in days for data freshness filtering (0 or None means no limit)')
-    parser.add_argument('-d', '--document', type=str, required=True)
-    parser.add_argument('-w', '--worksheet', type=str, required=True)
-    parser.add_argument('-n', '--network', type=str, default=os.environ.get('NETWORK', 'mainnet'))
-    parser.add_argument('--days', type=int, default=os.environ.get('NUMBER_OF_DAYS_TO_UPLOAD', 180), help='How many days of data to include')
-    parser.add_argument("--log_level", default=os.environ.get("SHEETS_LOG_LEVEL", "INFO"),
-                        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+    parser.add_argument('-c', '--google-credentials-file', type=str,
+                        default=os.environ.get('GOOGLE_CREDENTIALS_FILE'),
+                        help='Path to Google service account credentials JSON file')
+    parser.add_argument('-p', '--clickhouse-password-file', type=str,
+                        default=os.environ.get('CLICKHOUSE_PASSWORD_FILE'),
+                        help='Path to ClickHouse password file')
+    parser.add_argument('--max-age-days', type=int,
+                        default=os.environ.get('MAX_AGE_DAYS', 7),
+                        help='Max age in days for data freshness filtering (0 or None means no limit)')
+    parser.add_argument('-d', '--document', type=str, required=True,
+                        help='Name of the Google Sheets document')
+    parser.add_argument('-w', '--worksheet', type=str, required=True,
+                        help='Name of the worksheet within the Google Sheets document')
+    parser.add_argument('-n', '--network', type=str,
+                        default=os.environ.get('NETWORK', 'mainnet'),
+                        help='Network to query (default: mainnet)')
+    parser.add_argument('--days', type=int,
+                        default=os.environ.get('NUMBER_OF_DAYS_TO_UPLOAD', 180),
+                        help='How many days of data to include')
+    parser.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+                        default=os.environ.get("SHEETS_LOG_LEVEL", "INFO"),
                         help="Set the logging level")
     args = parser.parse_args()
 

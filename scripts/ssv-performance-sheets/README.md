@@ -44,19 +44,6 @@ Set the values of `--metric` and `--network` appropriately for the data you wish
 docker run --rm -v "./credentials/clickhouse-password.txt:/clickhouse-password.txt" -v "./credentials/google-credentials.json:/google-credentials.json:ro" --network ssv-performance_ssv-performance-network ssv-performance-sheets -d '<GOOGLE_SHEETS_DOCUMENT_NAME>' -w '<GOOGLE_SHEETS_WORKSHEET_NAME>' --metric 30d --network mainnet
 ```
 
-### Create cronjobs
-
-Create cronjobs to run the command daily for each network and performance period. These cronjobs should run after the `ssv-performance-collector` cronjobs to ensure that the Google Sheets have the latest data. Use absolute paths to mount the `clickhouse-password.txt` file and use the Docker network found above.
-
-Here are some example crontab entries to run the collector daily for Mainnet and Hoodi. 
-
-```
-10 0 * * * /usr/bin/docker run --rm -v "/opt/ssv-performance/credentials/clickhouse-password.txt:/clickhouse-password.txt" -v "/opt/ssv-performance/credentials/google-credentials.json:/google-credentials.json:ro" --network ssv-performance_ssv-performance-network ssv-performance-sheets -d 'SSV Performance Data' -w 'Mainnet 30d' --metric 30d --network mainnet
-15 0 * * * /usr/bin/docker run --rm -v "/opt/ssv-performance/credentials/clickhouse-password.txt:/clickhouse-password.txt" -v "/opt/ssv-performance/credentials/google-credentials.json:/google-credentials.json:ro" --network ssv-performance_ssv-performance-network ssv-performance-sheets -d 'SSV Performance Data' -w 'Mainnet 24h' --metric 24h --network mainnet
-20 0 * * * /usr/bin/docker run --rm -v "/opt/ssv-performance/credentials/clickhouse-password.txt:/clickhouse-password.txt" -v "/opt/ssv-performance/credentials/google-credentials.json:/google-credentials.json:ro" --network ssv-performance_ssv-performance-network ssv-performance-sheets -d 'SSV Performance Data' -w 'Hoodi 30d' --metric 30d --network hoodi
-25 0 * * * /usr/bin/docker run --rm -v "/opt/ssv-performance/credentials/clickhouse-password.txt:/clickhouse-password.txt" -v "/opt/ssv-performance/credentials/google-credentials.json:/google-credentials.json:ro" --network ssv-performance_ssv-performance-network ssv-performance-sheets -d 'SSV Performance Data' -w 'Hoodi 24h' --metric 24h --network hoodi
-```
-
 ## Standalone
 
 ### Install Required Python Packages
@@ -80,3 +67,31 @@ python3 scripts/ssv-performance-sheets/ssv-performance-sheets.py -d '<GOOGLE_SHE
 ```
 
 The script assumes that the ClickHouse database is accessible at port 8123 on the localhost. The environment variables `CLICKHOUSE_PORT` and `CLICKHOUSE_HOST` may be used to specify a different port or host at which to access the ClickHouse database.
+
+## Create cronjobs
+
+Create cronjobs to run the command daily for each network and performance period. These cronjobs should run after the `ssv-performance-collector` cronjobs to ensure that the Google Sheets have the latest data.
+
+Use absolute paths to mount the `clickhouse-password.txt` file.
+
+Here are some example crontab entries to run the collector daily for Mainnet and Hoodi. 
+
+## Docker
+
+ Use the Docker network found above.
+
+```
+10 0 * * * /usr/bin/docker run --rm -v "/opt/ssv-performance/credentials/clickhouse-password.txt:/clickhouse-password.txt" -v "/opt/ssv-performance/credentials/google-credentials.json:/google-credentials.json:ro" --network ssv-performance_ssv-performance-network ssv-performance-sheets -d 'SSV Performance Data' -w 'Mainnet 30d' --metric 30d --network mainnet
+15 0 * * * /usr/bin/docker run --rm -v "/opt/ssv-performance/credentials/clickhouse-password.txt:/clickhouse-password.txt" -v "/opt/ssv-performance/credentials/google-credentials.json:/google-credentials.json:ro" --network ssv-performance_ssv-performance-network ssv-performance-sheets -d 'SSV Performance Data' -w 'Mainnet 24h' --metric 24h --network mainnet
+20 0 * * * /usr/bin/docker run --rm -v "/opt/ssv-performance/credentials/clickhouse-password.txt:/clickhouse-password.txt" -v "/opt/ssv-performance/credentials/google-credentials.json:/google-credentials.json:ro" --network ssv-performance_ssv-performance-network ssv-performance-sheets -d 'SSV Performance Data' -w 'Hoodi 30d' --metric 30d --network hoodi
+25 0 * * * /usr/bin/docker run --rm -v "/opt/ssv-performance/credentials/clickhouse-password.txt:/clickhouse-password.txt" -v "/opt/ssv-performance/credentials/google-credentials.json:/google-credentials.json:ro" --network ssv-performance_ssv-performance-network ssv-performance-sheets -d 'SSV Performance Data' -w 'Hoodi 24h' --metric 24h --network hoodi
+```
+
+## Standalone
+
+```
+10 0 * * * /usr/bin/python3 /opt/ssv-performance/scripts/ssv-performance-sheets/ssv-performance-sheets.py -d 'SSV Performance Data' -w 'Mainnet 30d' --metric 30d --network mainnet -c /opt/ssv-performance/credentials/google-credentials.json -p /opt/ssv-performance/credentials/clickhouse-password.txt
+15 0 * * * /usr/bin/python3 /opt/ssv-performance/scripts/ssv-performance-sheets/ssv-performance-sheets.py -d 'SSV Performance Data' -w 'Mainnet 24h' --metric 24h --network mainnet -c /opt/ssv-performance/credentials/google-credentials.json -p /opt/ssv-performance/credentials/clickhouse-password.txt
+20 0 * * * /usr/bin/python3 /opt/ssv-performance/scripts/ssv-performance-sheets/ssv-performance-sheets.py -d 'SSV Performance Data' -w 'Hoodi 30d' --metric 30d --network hoodi -c /opt/ssv-performance/credentials/google-credentials.json -p /opt/ssv-performance/credentials/clickhouse-password.txt
+25 0 * * * /usr/bin/python3 /opt/ssv-performance/scripts/ssv-performance-sheets/ssv-performance-sheets.py -d 'SSV Performance Data' -w 'Hoodi 24h' --metric 24h --network hoodi -c /opt/ssv-performance/credentials/google-credentials.json -p /opt/ssv-performance/credentials/clickhouse-password.txt
+```
