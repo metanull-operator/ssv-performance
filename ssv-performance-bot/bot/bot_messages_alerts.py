@@ -17,13 +17,10 @@ def create_alerts_24h(perf_data):
     thresholds_24h = sorted(ALERTS_THRESHOLDS_24H, reverse=True)
     alert_msgs_24h = {threshold: [] for threshold in thresholds_24h}
     operator_ids = []
-    removed_alerts = defaultdict(lambda: defaultdict(set))
 
     logging.debug(f"Creating 24h alerts for {len(perf_data)} operators")
 
     for op_id, operator in perf_data.items():
-
-        logging.debug(f"Creating 24h alerts for operator {op_id}")
 
         if not operator[FIELD_IS_VO]:
             continue
@@ -41,21 +38,19 @@ def create_alerts_24h(perf_data):
         if validator_count_int <= 0:
             continue
 
-        is_removed = bool(operator.get(FIELD_OPERATOR_REMOVED))
+        if operator.get(FIELD_OPERATOR_REMOVED):
+            continue
 
         for threshold in thresholds_24h:
             alert_list = alert_msgs_24h[threshold]
             result = operator_threshold_alert_24h(operator, threshold)
             if result and validator_count_int > 0:
-                if is_removed:
-                    removed_alerts[result[FIELD_OPERATOR_ID]]['24h'].add(threshold)
-                else:
-                    operator_ids.append(result[FIELD_OPERATOR_ID])
-                    performance_str = "N/A" if result['Performance Data Point'] is None else f"{result['Performance Data Point']}"
-                    alert = f"- {result[FIELD_OPERATOR_NAME]} - {performance_str}    (ID: {result[FIELD_OPERATOR_ID]}, Validators: {validator_count_int})"
-                    alert_list.append(alert)
+                operator_ids.append(result[FIELD_OPERATOR_ID])
+                performance_str = "N/A" if result['Performance Data Point'] is None else f"{result['Performance Data Point']}"
+                alert = f"- {result[FIELD_OPERATOR_NAME]} - {performance_str}    (ID: {result[FIELD_OPERATOR_ID]}, Validators: {validator_count_int})"
+                alert_list.append(alert)
 
-    return operator_ids, alert_msgs_24h, removed_alerts
+    return operator_ids, alert_msgs_24h
 
 
 ##
@@ -92,7 +87,6 @@ def create_alerts_30d(perf_data):
     thresholds_30d = sorted(ALERTS_THRESHOLDS_30D, reverse=True)
     alert_msgs_30d = {threshold: [] for threshold in thresholds_30d}
     operator_ids = []
-    removed_alerts = defaultdict(lambda: defaultdict(set))
 
     for op_id, operator in perf_data.items():
 
@@ -112,23 +106,22 @@ def create_alerts_30d(perf_data):
         if validator_count_int <= 0:
             continue
 
-        is_removed = bool(operator.get(FIELD_OPERATOR_REMOVED))
+        if operator.get(FIELD_OPERATOR_REMOVED):
+            continue
+
         trend_icon = get_30d_trend_icon(operator)
 
         for threshold in thresholds_30d:
             alert_list = alert_msgs_30d[threshold]
             result = operator_threshold_alert_30d(operator, threshold)
             if result and validator_count_int > 0:
-                if is_removed:
-                    removed_alerts[result[FIELD_OPERATOR_ID]]['30d'].add(threshold)
-                else:
-                    operator_ids.append(result[FIELD_OPERATOR_ID])
-                    performance_str = "N/A" if result['Performance Data Point'] is None else f"{result['Performance Data Point']}"
-                    performance_display = f"{performance_str}{trend_icon}" if trend_icon else performance_str
-                    alert = f"- {result[FIELD_OPERATOR_NAME]} - {performance_display}    (ID: {result[FIELD_OPERATOR_ID]}, Validators: {validator_count_int})"
-                    alert_list.append(alert)
+                operator_ids.append(result[FIELD_OPERATOR_ID])
+                performance_str = "N/A" if result['Performance Data Point'] is None else f"{result['Performance Data Point']}"
+                performance_display = f"{performance_str}{trend_icon}" if trend_icon else performance_str
+                alert = f"- {result[FIELD_OPERATOR_NAME]} - {performance_display}    (ID: {result[FIELD_OPERATOR_ID]}, Validators: {validator_count_int})"
+                alert_list.append(alert)
 
-    return operator_ids, alert_msgs_30d, removed_alerts
+    return operator_ids, alert_msgs_30d
 
 
 ##
@@ -161,21 +154,15 @@ def _as_int(value):
 ##
 ## Build messages for removed operators that triggered alerts and bundle them.
 ##
-def build_removed_operator_messages(removed_combined: dict, perf_data: dict) -> list[str]:
-    if not removed_combined:
+def build_removed_operator_messages(removed_operator_ids, perf_data: dict) -> list[str]:
+    if not removed_operator_ids:
+        logging.debug("No removed operators triggered alerts.")
         return []
 
-    # Sort by validator count desc, then op_id
-    sorted_removed = sorted(
-        removed_combined.items(),
-        key=lambda item: (
-            -(_as_int(perf_data.get(item[0], {}).get(FIELD_VALIDATOR_COUNT)) or 0),
-            item[0],
-        ),
-    )
+    sorted_removed = sorted(removed_operator_ids)
 
     removed_lines = []
-    for op_id, periods in sorted_removed:
+    for op_id in sorted_removed:
         operator = perf_data.get(op_id)
         if not operator:
             continue
@@ -183,24 +170,7 @@ def build_removed_operator_messages(removed_combined: dict, perf_data: dict) -> 
         validator_count = operator.get(FIELD_VALIDATOR_COUNT)
         validator_count_int = _as_int(validator_count)
         validator_display = validator_count if validator_count_int is None else validator_count_int
-        perf_points = operator.get(FIELD_PERFORMANCE, {}) or {}
-
-        # Get perf values (without thresholds) for both periods
-        perf_parts = []
-        for period in ("24h", "30d"):
-            perf_value = perf_points.get(period)
-            try:
-                perf_str = f"{float(perf_value) * 100:.2f}%" if perf_value is not None else "N/A"
-            except (TypeError, ValueError):
-                perf_str = "N/A"
-            perf_parts.append(f"{period}: {perf_str}")
-
-        if any(perf_parts):
-            removed_lines.append(
-                f"- {operator[FIELD_OPERATOR_NAME]} "
-                f"(ID: {op_id}, Validators: {validator_display})\n"
-                f"  - {'; '.join(perf_parts)}"
-            )
+        removed_lines.append(f"- {operator[FIELD_OPERATOR_NAME]} (ID: {op_id}, Validators: {validator_display})")
 
     if not removed_lines:
         return []
@@ -216,15 +186,10 @@ def build_removed_operator_messages(removed_combined: dict, perf_data: dict) -> 
 def compile_vo_threshold_messages(perf_data, extra_message=None, subscriptions=None, guild=None, dm_recipients=[], mention_periods=[]):
 
     # Get list of operators and alert messages for each period.
-    operator_ids_24h, alerts_24h, removed_24h = create_alerts_24h(perf_data)
-    operator_ids_30d, alerts_30d, removed_30d = create_alerts_30d(perf_data)
+    operator_ids_24h, alerts_24h = create_alerts_24h(perf_data)
+    operator_ids_30d, alerts_30d = create_alerts_30d(perf_data)
 
-    # Combine removed operators from both periods into a single dict
-    removed_combined = defaultdict(lambda: defaultdict(set))
-    for source in (removed_24h, removed_30d):
-        for op_id, periods in source.items():
-            for period, thresholds in periods.items():
-                removed_combined[op_id][period].update(thresholds)
+    removed_operator_ids = [op_id for op_id, data in perf_data.items() if data.get(FIELD_OPERATOR_REMOVED)]
 
     messages = []
 
@@ -241,18 +206,19 @@ def compile_vo_threshold_messages(perf_data, extra_message=None, subscriptions=N
         mentions_30d = create_subscriber_mentions(guild, subscriptions, operator_ids_30d, 'alerts', dm_recipients)
 
     # Create messages for removed operators that triggered alerts
-    removed_bundles = build_removed_operator_messages(removed_combined, perf_data)
+    removed_bundles = build_removed_operator_messages(removed_operator_ids, perf_data)
     messages.extend(removed_bundles)
 
-    mentions = list(dict.fromkeys(mentions_24h + mentions_30d))
+    mentions_removed = []
+    if subscriptions and guild and 'removed' in mention_periods:
+        mentions_removed = create_subscriber_mentions(guild, subscriptions, removed_operator_ids, 'alerts', dm_recipients)
+
+    mentions = list(dict.fromkeys(mentions_24h + mentions_30d + mentions_removed))
     messages.extend(mentions)
 
     # Include an extra message, if configured
     if extra_message and len(extra_message) > 0:
-        if mentions:
-            messages.append("\n" + extra_message)
-        else:
-            messages.append(extra_message)
+        messages.append("\n" + extra_message)
 
     # Rebundle everything up again to reduce down to the fewest messages to post to Discord
     bundles = bundle_messages(messages)
@@ -276,6 +242,7 @@ async def send_vo_threshold_messages(channel, perf_data, extra_message=None, sub
 
         if messages:
             for message in messages:
+                logging.debug(f"VO threshold alert message to send:\n{message.strip()}")
                 await channel.send(message.strip())
         else:
             current_date = datetime.now().strftime("%Y-%m-%d")

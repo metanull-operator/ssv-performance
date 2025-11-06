@@ -269,34 +269,38 @@ def fetch_beacon_statuses(beacon_api_url, pubkeys: set[str]) -> dict[str, str]:
 
 
 def count_active_from_status_map(operator_validators: dict[int, set[str]], status_map: dict[str, str]) -> dict[int, int]:
-
-    for op_id, pubkeys in operator_validators.items():
-        if op_id == 14:
-            active_count = sum(1 for pk in pubkeys if status_map.get(pk, "") in ACTIVE_STATUSES)
-            logging.debug("Operator 14 has %d total validators and %d active validators", len(pubkeys), active_count)
-            for pk in pubkeys:
-                st = status_map.get(pk, "unknown")
-                logging.debug("  Validator %s status: %s", pk, st)
-
     return {
         op_id: sum(1 for pk in pubkeys if status_map.get(pk.lower(), "") in ACTIVE_STATUSES)
         for op_id, pubkeys in operator_validators.items()
     }
 
 
+def _chunks(seq, size):
+    for i in range(0, len(seq), size):
+        yield seq[i:i+size]
+        
+
+def upsert_daily_partition(client, table: str, network: str, source: str, target_date):
+    client.command(
+        f"ALTER TABLE {table} DELETE WHERE network=%(net)s AND source=%(src)s AND metric_date=%(dt)s",
+        parameters={'net': network, 'src': source, 'dt': target_date}
+    )
+
+
 def insert_clickhouse_performance_data(client, network, operators, target_date, source):
     performance_rows = []
     operator_rows = []
-    validator_counts_rows = []
+    operator_ids = []
     operator_fees_rows = []
 
     now = datetime.now(timezone.utc)
 
     for operator_id, operator in operators.items():
-        perf_24h = (operator.get("performance") or {}).get("24h", 0.0)
-        perf_30d = (operator.get("performance") or {}).get("30d", 0.0)
+        operator_ids.append(operator_id)
 
-        validator_count = operator.get("validators_count", None)  # Fallback to None, failsafe
+        perf_24h = (operator.get("performance") or {}).get("24h", None)
+        perf_30d = (operator.get("performance") or {}).get("30d", None)
+        validator_count = operator.get("validators_count", None)
 
         is_vo = 1 if operator.get("type", "") == "verified_operator" else 0
         is_private = 1 if operator.get("is_private", False) else 0
@@ -327,23 +331,37 @@ def insert_clickhouse_performance_data(client, network, operators, target_date, 
         if operator_fee is not None:
             operator_fees_rows.append((network, operator_id, target_date, operator_fee, source, now))
 
-        if validator_count is not None:
-            validator_counts_rows.append((network, operator_id, target_date, validator_count, source, now))
+    logging.info("CLICKHOUSE: upserting %d operators, %d perf rows, %d fee rows",
+                 len(operator_rows), len(performance_rows), len(operator_fees_rows))
 
-    logging.info("CLICKHOUSE: inserting %d operators, %d perf rows, %d validator count rows, %d fee rows",
-                 len(operator_rows), len(performance_rows), len(validator_counts_rows), len(operator_fees_rows))
+    # 1) Operators: per-ID delete-then-insert (keeps older operators not seen today)
+    client.command("SET mutations_sync = 2")
 
-    client.insert('operators', operator_rows, column_names=[
-        'network', 'operator_id', 'operator_name', 'is_vo', 'is_private', 'validator_count', 'operator_fee', 'address', 'updated_at'
-    ])
+    BATCH = 1000
+    for ids_chunk in _chunks(operator_ids, BATCH):
+        client.command(
+            "ALTER TABLE operators DELETE WHERE network=%(net)s AND operator_id IN %(ids)s",
+            parameters={"net": network, "ids": ids_chunk}
+        )
+    if operator_rows:
+        client.insert('operators', operator_rows, column_names=[
+            'network','operator_id','operator_name','is_vo','is_private',
+            'validator_count','operator_fee','address','updated_at'
+        ])
 
-    client.insert('performance', performance_rows, column_names=[
-        'network', 'operator_id', 'metric_type', 'metric_date', 'metric_value', 'source', 'updated_at'
-    ])
+    # 2) Performance (DAILY UPSERT): wipe this date, then insert today's rows
+    upsert_daily_partition(client, 'performance', network, source, target_date)
+    if performance_rows:
+        client.insert('performance', performance_rows, column_names=[
+            'network','operator_id','metric_type','metric_date','metric_value','source','updated_at'
+        ])
 
-    client.insert('operator_fees', operator_fees_rows, column_names=[
-        'network', 'operator_id', 'metric_date', 'operator_fee', 'source', 'updated_at'
-    ])
+    # 3) Operator fees (DAILY UPSERT): wipe this date, then insert today's rows
+    upsert_daily_partition(client, 'operator_fees', network, source, target_date)
+    if operator_fees_rows:
+        client.insert('operator_fees', operator_fees_rows, column_names=[
+            'network','operator_id','metric_date','operator_fee','source','updated_at'
+        ])
 
 
 def insert_clickhouse_validator_count_data(client, network, validator_counts, target_date, source):
@@ -357,18 +375,10 @@ def insert_clickhouse_validator_count_data(client, network, validator_counts, ta
 
     logging.info("CLICKHOUSE: inserting %d validator counts", len(validator_counts_rows))
 
+    upsert_daily_partition(client, 'validator_counts', network, source, target_date)
     client.insert('validator_counts', validator_counts_rows, column_names=[
         'network', 'operator_id', 'metric_date', 'validator_count', 'source', 'updated_at'
     ])
-
-
-def deduplicate_table(client, table_name: str, network: str):
-    try:
-        query = f"OPTIMIZE TABLE {table_name} PARTITION %(network)s FINAL"
-        client.command(query, {'network': network})
-        logging.info("Deduplicated partition '%s' in table '%s'", network, table_name)
-    except Exception as e:
-        logging.warning("Failed to deduplicate %s: %s", table_name, e)
 
 
 def read_clickhouse_password_from_file(password_file_path):
@@ -386,10 +396,10 @@ def main():
                         help='Path to ClickHouse password file')
     parser.add_argument('--ops-page-size', type=int,
                         default=100,
-                        help='perPage for /operators', help='perPage for /operators queries')
+                        help='perPage for /operators queries')
     parser.add_argument('--val-page-size', type=int,
                         default=1000,
-                        help='perPage for /validators (lastId cursor)', help='perPage for /validators queries')
+                        help='perPage for /validators queries')
     parser.add_argument('--local-time', action='store_true',
                         help='Use local time instead of UTC for target_date')
     parser.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
@@ -445,11 +455,6 @@ def main():
 
     insert_clickhouse_performance_data(client, args.network, operators, target_date, IMPORT_SOURCE)
     insert_clickhouse_validator_count_data(client, args.network, final_active_counts, target_date, IMPORT_SOURCE)
-
-    deduplicate_table(client, 'operators', args.network)
-    deduplicate_table(client, 'performance', args.network)
-    deduplicate_table(client, 'operator_fees', args.network)
-    deduplicate_table(client, 'validator_counts', args.network)
 
 
 if __name__ == "__main__":

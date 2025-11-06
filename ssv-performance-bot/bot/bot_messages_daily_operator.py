@@ -10,23 +10,23 @@ def get_latest_performance(period, operator, attribute):
 
     try:
         if not operator.get(attribute):
-            logging.error(f"{period} performance data attribute not present in get_latest_performance()")
-            return f"- {period}: {period} performance data is not available\n"
+            return f"- {period}: {period} performance data is not available"
 
         most_recent_date = max(operator[attribute].keys())
         most_recent_performance = operator[attribute][most_recent_date]
 
-        return f"- {period}: {most_recent_performance * 100:.2f}%\n" if most_recent_performance else f"- {period}: {period} performance data is not available\n"
+        return f"- {period}: {most_recent_performance * 100:.2f}%" if most_recent_performance else f"- {period}: {period} performance data is not available"
     except Exception as e:
         logging.error(f"Exception in get_latest_performance(): {e}", exc_info=True)
-        return f"- {period}: {period} performance data is not available\n"
+        return f"- {period}: {period} performance data is not available"
 
 
 # Create a performance message for a single operator
 def create_daily_operator_message(operator):
-    message = f"\n**__{operator[FIELD_OPERATOR_NAME]} (ID: {operator[FIELD_OPERATOR_ID]}, Validators: {operator[FIELD_VALIDATOR_COUNT]}):__**\n"
+    message = f"\n**__{operator[FIELD_OPERATOR_NAME]} (ID: {operator[FIELD_OPERATOR_ID]}, Validators: {operator[FIELD_VALIDATOR_COUNT]})__**\n"
 
     message += get_latest_performance("24h", operator, FIELD_PERF_DATA_24H)
+    message += "\n"
     message += get_latest_performance("30d", operator, FIELD_PERF_DATA_30D)
 
     return message

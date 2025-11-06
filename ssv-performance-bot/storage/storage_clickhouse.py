@@ -55,41 +55,74 @@ class ClickHouseStorage:
     def get_latest_fee_data(self, network, max_age_days: int | None = None):
 
         query = """
+            WITH toDateTime(now('UTC') - toIntervalHour(36)) AS metric_after,
+
+            o AS (
+                SELECT
+                    network,
+                    operator_id,
+                    operator_name,
+                    is_vo,
+                    is_private,
+                    updated_at
+                FROM operators
+                WHERE network = %(network)s
+            ),
+
+            lc_raw AS (
+                SELECT
+                    network,
+                    operator_id,
+                    argMax(validator_count, (metric_date, updated_at)) AS validator_count,
+                    argMax(metric_date, (metric_date, updated_at)) AS validator_count_metric_date
+                    FROM validator_counts
+                WHERE
+                    network = %(network)s
+                GROUP BY network, operator_id
+            ),
+
+            lc AS (
+                SELECT
+                    *,
+                    (validator_count_metric_date >= metric_after AND validator_count > 0) AS is_count_fresh
+                FROM lc_raw
+            ),
+
+            fee_fresh AS (
+                SELECT
+                    network,
+                    operator_id,
+                    argMax(operator_fee, (metric_date, updated_at)) AS operator_fee,
+                    argMax(metric_date, (metric_date, updated_at)) AS operator_fee_metric_date
+                FROM operator_fees
+                WHERE 
+                    network = %(network)s
+                    AND metric_date >= metric_after
+                GROUP BY network, operator_id
+            )
+
             SELECT
                 o.operator_id,
                 o.operator_name,
                 o.is_vo,
                 o.is_private,
-                o.operator_fee,
-                lc_any.validator_count AS validator_count
-            FROM operators AS o
-            LEFT JOIN (
-                    SELECT network, operator_id, validator_count, counts_latest_at
-                    FROM validator_counts_latest
-                    WHERE network = %(network)s
-                ) AS lc_any ON
-                    lc_any.network = o.network
-                    AND lc_any.operator_id = o.operator_id
-            LEFT JOIN (
-                    SELECT network, operator_id
-                    FROM validator_counts_latest
-                    WHERE network = %(network)s
-                        AND counts_latest_at >= %(fresh_cutoff)s
-                        AND validator_count > 0
-                ) AS lc_fresh ON
-                    lc_fresh.network = o.network
-                    AND lc_fresh.operator_id = o.operator_id
-            WHERE o.network = %(network)s
-            AND (
-                o.updated_at >= %(fresh_cutoff)s           -- active operators
-                OR lc_fresh.operator_id IS NOT NULL        -- inactive with fresh active validators
-            )
+                fee_fresh.operator_fee,
+                lc.validator_count,
+                lc.is_count_fresh,
+                fee_fresh.operator_fee_metric_date,
+            FROM o
+            INNER JOIN fee_fresh
+                ON fee_fresh.network = o.network
+                AND fee_fresh.operator_id = o.operator_id
+            LEFT JOIN lc
+                ON lc.network = o.network
+                AND lc.operator_id = o.operator_id
+            WHERE (o.updated_at >= metric_after) OR coalesce(lc.is_count_fresh, 0)
             ORDER BY o.operator_id
             SETTINGS join_use_nulls = 1
         """
         params = {
             'network': network,
-            "fresh_cutoff": (datetime.now(timezone.utc) - timedelta(hours=36)).strftime("%Y-%m-%d %H:%M:%S"),
         }
 
         rows = self.client.query(query, parameters=params).result_rows
@@ -112,49 +145,62 @@ class ClickHouseStorage:
 
     def get_latest_performance_data(self, network, max_age_days: int | None = None):
         query = """
-            WITH toDateTime(now('UTC') - INTERVAL 36 HOUR) AS updated_after,
+            WITH toDateTime(now('UTC') - toIntervalHour(36)) AS metric_after,
 
             max24 AS (
-                SELECT max(metric_date) AS dt
+                SELECT
+                    max(metric_date) AS dt
                 FROM performance
-                WHERE network='mainnet' AND metric_type='24h' AND updated_at >= updated_after
+                WHERE
+                    network = %(network)s
+                    AND metric_type = '24h'
+                    AND metric_date >= metric_after
             ),
 
             max30 AS (
-                SELECT max(metric_date) AS dt
+                SELECT
+                    max(metric_date) AS dt
                 FROM performance
-                WHERE network='mainnet' AND metric_type='30d' AND updated_at >= updated_after
+                WHERE
+                    network = %(network)s
+                    AND metric_type = '30d'
+                    AND metric_date >= metric_after
             ),
 
             latest_counts AS (
-                SELECT network, operator_id, validator_count, counts_latest_at
-                FROM validator_counts_latest
-                WHERE network='mainnet' AND counts_latest_at >= updated_after
+                SELECT
+                    network,
+                    operator_id,
+                    argMax(validator_count, (metric_date, updated_at)) AS validator_count,
+                    argMax(updated_at, (metric_date, updated_at)) AS counts_latest_at
+                FROM validator_counts
+                WHERE network = %(network)s
+                GROUP BY network, operator_id
             ),
 
             pm24 AS (
                 SELECT
-                p.network,
-                p.operator_id,
-                argMax(p.metric_value, (p.updated_at, p.source)) AS perf_24h
+                    p.network,
+                    p.operator_id,
+                    argMax(p.metric_value, p.updated_at) AS perf_24h
                 FROM performance p
-                WHERE p.network='mainnet'
-                AND p.metric_type='24h'
-                AND p.metric_date = (SELECT dt FROM max24)
-                AND p.updated_at >= updated_after
+                WHERE
+                    p.network = %(network)s
+                    AND p.metric_type = '24h'
+                    AND p.metric_date = (SELECT dt FROM max24)
                 GROUP BY p.network, p.operator_id
             ),
 
             pm30 AS (
                 SELECT
-                p.network,
-                p.operator_id,
-                argMax(p.metric_value, (p.updated_at, p.source)) AS perf_30d
+                    p.network,
+                    p.operator_id,
+                    argMax(p.metric_value, p.updated_at) AS perf_30d
                 FROM performance p
-                WHERE p.network='mainnet'
-                AND p.metric_type='30d'
-                AND p.metric_date = (SELECT dt FROM max30)
-                AND p.updated_at >= updated_after
+                WHERE
+                    p.network = %(network)s
+                    AND p.metric_type = '30d'
+                    AND p.metric_date = (SELECT dt FROM max30)
                 GROUP BY p.network, p.operator_id
             )
 
@@ -164,49 +210,57 @@ class ClickHouseStorage:
                 o.is_vo,
                 o.is_private,
                 o.address,
-                lc.validator_count,     
+                IF(lc.counts_latest_at >= metric_after, lc.validator_count, NULL) AS validator_count,
+                lc.counts_latest_at,
                 pm24.perf_24h,
                 pm30.perf_30d,
                 o.updated_at
-            FROM operators o
-            LEFT JOIN latest_counts lc ON
-                lc.network=o.network
-                AND lc.operator_id=o.operator_id
-            LEFT JOIN pm24 ON
-                pm24.network=o.network
-                AND pm24.operator_id=o.operator_id
-            LEFT JOIN pm30 ON
-                pm30.network=o.network
-                AND pm30.operator_id=o.operator_id
-            WHERE o.network='mainnet'
+            FROM operators AS o
+            LEFT JOIN latest_counts AS lc
+                ON lc.network = o.network
+                AND lc.operator_id = o.operator_id
+            LEFT JOIN pm24
+                ON pm24.network = o.network
+                AND pm24.operator_id = o.operator_id
+            LEFT JOIN pm30
+                ON pm30.network = o.network
+                AND pm30.operator_id = o.operator_id
+            WHERE o.network = %(network)s
             ORDER BY o.operator_id
+            SETTINGS join_use_nulls = 1
         """
 
-        fresh_cutoff = datetime.now(timezone.utc) - timedelta(hours=36)
-
         params = {
-            'network': network,               # e.g., 'mainnet'
-            "fresh_cutoff": fresh_cutoff.strftime("%Y-%m-%d %H:%M:%S"),
+            'network': network,
         }
 
         rows = self.client.query(query, parameters=params).result_rows
+
+        fresh_cutoff = datetime.now(timezone.utc) - timedelta(hours=36)
 
         perf_data = {}
         for row in rows:
             operator_id = row[0]
             if operator_id not in perf_data:
-                updated_at = row[8] if len(row) > 8 else None
+                updated_at = row[9]
                 if updated_at is not None and getattr(updated_at, "tzinfo", None) is None:
                     updated_at = updated_at.replace(tzinfo=timezone.utc)
 
-                validator_count = row[5]
-                has_active_validators = False
-                try:
-                    has_active_validators = validator_count is not None and int(validator_count) > 0
-                except (TypeError, ValueError):
-                    has_active_validators = False
+                validator_count     = row[5]
+                counts_latest_at    = row[6]     # ← now available
+                if counts_latest_at is not None and getattr(counts_latest_at, "tzinfo", None) is None:
+                    counts_latest_at = counts_latest_at.replace(tzinfo=timezone.utc)
 
-                is_removed = has_active_validators and (updated_at is None or updated_at < fresh_cutoff)
+                # fresh & active count?
+                has_fresh_active = (
+                    validator_count is not None
+                    and int(validator_count) > 0
+                    and counts_latest_at is not None
+                    and counts_latest_at >= fresh_cutoff
+                )
+
+                # “removed” = stale operator record, but fresh active validators
+                is_removed = (updated_at is None or updated_at < fresh_cutoff) and has_fresh_active
 
                 perf_data[operator_id] = {
                     FIELD_OPERATOR_ID: row[0],
@@ -214,73 +268,111 @@ class ClickHouseStorage:
                     FIELD_IS_VO: row[2],
                     FIELD_IS_PRIVATE: row[3],
                     FIELD_ADDRESS: row[4],
-                    FIELD_VALIDATOR_COUNT: row[5],
-                    FIELD_PERFORMANCE: {
-                        '24h': row[6],
-                        '30d': row[7]
-                    },
+                    FIELD_VALIDATOR_COUNT: row[5],           # already nulled if stale in SQL
+                    FIELD_VALIDATOR_COUNTS_LATEST_AT: counts_latest_at,
+                    FIELD_PERFORMANCE: {'24h': row[7], '30d': row[8]},
                     FIELD_OPERATOR_UPDATED_AT: updated_at,
-                    FIELD_OPERATOR_REMOVED: is_removed
+                    FIELD_OPERATOR_REMOVED: is_removed,
                 }
+
+                if (operator_id == 14):
+                    logging.debug(f"Debug: Operator ID 14 data: {perf_data[operator_id]}")
 
         return perf_data
 
 
     # Get performance data for specific operator IDs
     def get_performance_by_opids(self, network, op_ids, max_age_days: int | None = None):
+
+        op_ids = [int(x) for x in (op_ids or []) if x is not None]
+        if not op_ids:
+            op_ids = [0]
+
+        if max_age_days is None or max_age_days < 0:
+            max_age_days = 7
+        max_age_days = int(max_age_days)
+
         query = """
             WITH
-            toDate(%(date_from)s)   AS date_from,
-            today()                 AS date_to,
-            toDateTime(%(updated_after)s) AS fresh_cutoff,
+                toDate(now('UTC') - toIntervalDay(%(max_age)s)) AS date_from,
+                toDate(now('UTC'))                              AS date_to,
+                toDateTime(%(updated_after)s)                   AS metric_after,
+
+            lc_raw AS (
+                SELECT
+                    network,
+                    operator_id,
+                    argMax(validator_count, (metric_date, updated_at)) AS validator_count,
+                    argMax(metric_date, (metric_date, updated_at)) AS metric_date_chosen,
+                    argMax(updated_at, (metric_date, updated_at)) AS validator_count_updated_at
+                FROM validator_counts
+                WHERE
+                    network = %(network)s
+                    AND operator_id IN %(operator_ids)s
+                GROUP BY network, operator_id
+            ),
+
+            lc AS (
+                SELECT
+                    *,
+                    (metric_date_chosen >= metric_after AND validator_count > 0) AS is_count_fresh
+                FROM lc_raw
+            ),
 
             ops_in_scope AS (
-                SELECT 
+                SELECT
                     o.network,
                     o.operator_id,
                     o.operator_name,
                     o.is_vo,
-                    o.is_private
+                    o.is_private,
+                    lc.validator_count AS validator_count,
+                    lc.validator_count_updated_at AS validator_count_updated_at,
+                    (lc.metric_date_chosen >= metric_after AND validator_count > 0) AS validator_count_is_fresh
                 FROM operators o
-                LEFT JOIN (
-                    SELECT network, operator_id
-                    FROM validator_counts_latest
-                    WHERE network = %(network)s
-                    AND counts_latest_at >= fresh_cutoff
-                    AND validator_count > 0
-                    AND operator_id IN %(operator_ids)s
-                ) lc_fresh
-                    ON lc_fresh.network = o.network AND lc_fresh.operator_id = o.operator_id
-                WHERE o.network = %(network)s
+                LEFT JOIN lc
+                    ON lc.network = o.network
+                    AND lc.operator_id = o.operator_id
+                WHERE
+                    o.network = %(network)s
                     AND o.operator_id IN %(operator_ids)s
-                    AND (o.updated_at >= fresh_cutoff OR lc_fresh.operator_id IS NOT NULL)
+                    AND (o.updated_at >= metric_after OR coalesce(lc.is_count_fresh, 0))
             ),
 
             dates AS (
-                SELECT addDays(date_from, step) AS metric_date
-                FROM (SELECT arrayJoin(range(toUInt32(dateDiff('day', date_from, date_to)) + 1)) AS step)
+                WITH toUInt64(greatest(dateDiff('day', date_from, date_to), 0)) AS days_span
+                SELECT addDays(date_from, number) AS metric_date
+                FROM numbers(days_span + 1)
             ),
 
             p24 AS (
-                SELECT network, operator_id, metric_date, metric_value AS perf_24h
+                SELECT
+                    network,
+                    operator_id,
+                    metric_date,
+                    argMax(metric_value, last_row_at) AS perf_24h
                 FROM performance_daily
-                WHERE network = %(network)s AND metric_type = '24h'
+                WHERE
+                    network = %(network)s
+                    AND metric_type = '24h'
                     AND metric_date BETWEEN date_from AND date_to
                     AND operator_id IN %(operator_ids)s
+                GROUP BY network, operator_id, metric_date
             ),
 
             p30 AS (
-                SELECT network, operator_id, metric_date, metric_value AS perf_30d
+                SELECT 
+                    network,
+                    operator_id,
+                    metric_date,
+                    argMax(metric_value, last_row_at) AS perf_30d
                 FROM performance_daily
-                WHERE network = %(network)s AND metric_type = '30d'
+                WHERE
+                    network = %(network)s
+                    AND metric_type = '30d'
                     AND metric_date BETWEEN date_from AND date_to
                     AND operator_id IN %(operator_ids)s
-            ),
-            
-            lc_any AS (
-                SELECT network, operator_id, validator_count
-                FROM validator_counts_latest
-                WHERE network = %(network)s AND operator_id IN %(operator_ids)s
+                GROUP BY network, operator_id, metric_date
             )
 
             SELECT
@@ -288,36 +380,38 @@ class ClickHouseStorage:
                 o.operator_name,
                 o.is_vo,
                 o.is_private,
-                lc_any.validator_count,
+                o.validator_count,
+                o.validator_count_updated_at,
                 d.metric_date,
                 p24.perf_24h,
-                p30.perf_30d
+                p30.perf_30d,
+                o.validator_count_is_fresh
             FROM ops_in_scope o
             CROSS JOIN dates d
-            LEFT JOIN p24 ON
-                p24.network = o.network
+            LEFT JOIN p24
+                ON p24.network = o.network
                 AND p24.operator_id = o.operator_id
                 AND p24.metric_date = d.metric_date
-            LEFT JOIN p30 ON
-                p30.network = o.network
+            LEFT JOIN p30
+                ON p30.network = o.network
                 AND p30.operator_id = o.operator_id
                 AND p30.metric_date = d.metric_date
-            LEFT JOIN lc_any ON
-                lc_any.network = o.network
-                AND lc_any.operator_id = o.operator_id
-            ORDER BY
-                o.operator_id, d.metric_date
+            ORDER BY o.operator_id, d.metric_date
             SETTINGS join_use_nulls = 1
         """
 
         params = {
-            "network": network,                         # e.g., 'mainnet'
-            "operator_ids": tuple(op_ids) if op_ids else (0,),  # avoid IN ()
-            "date_from": (date.today() - timedelta(days=7)).isoformat(),  # X-day window start
-            "updated_after": (datetime.now(timezone.utc) - timedelta(hours=36)).strftime("%Y-%m-%d %H:%M:%S"),
+            'network': str(network),
+            'operator_ids': [int(x) for x in op_ids],  # ensure pure built-in ints
+            'max_age': max_age_days,
+            'updated_after': (datetime.now(timezone.utc) - timedelta(hours=36)).strftime('%Y-%m-%d %H:%M:%S'),
         }
 
+        logging.debug(f"Query params: {params}")
+
         rows = self.client.query(query, parameters=params).result_rows
+
+        logging.debug(f"Fetched {len(rows)} performance rows for operators: {op_ids}")
 
         perf_data = {}
         for row in rows:
@@ -329,17 +423,19 @@ class ClickHouseStorage:
                     FIELD_IS_VO: row[2],
                     FIELD_IS_PRIVATE: row[3],
                     FIELD_VALIDATOR_COUNT: row[4],
+                    FIELD_VALIDATOR_COUNTS_LATEST_AT: row[5],
 #                    FIELD_ADDRESS: row[5],
-                    FIELD_PERFORMANCE_DATE: row[5],
+                    FIELD_PERFORMANCE_DATE: row[6],
                     FIELD_PERF_DATA_24H: {},
                     FIELD_PERF_DATA_30D: {},
 #                    FIELD_OPERATOR_FEE: row[9]
                 }
-            date_str = row[5].strftime('%Y-%m-%d')
-            if row[6] is not None:
-                perf_data[operator_id][FIELD_PERF_DATA_24H][date_str] = float(row[6])
+
+            date_str = row[6].strftime('%Y-%m-%d')
             if row[7] is not None:
-                perf_data[operator_id][FIELD_PERF_DATA_30D][date_str] = float(row[7])
+                perf_data[operator_id][FIELD_PERF_DATA_24H][date_str] = float(row[7])
+            if row[8] is not None:
+                perf_data[operator_id][FIELD_PERF_DATA_30D][date_str] = float(row[8])
 
         return perf_data
 
@@ -350,12 +446,10 @@ class ClickHouseStorage:
             SELECT max(metric_date) AS dt
             FROM performance
             WHERE network = %(network)s
-              AND updated_at >= %(updated_after)s
         """
 
         params = {
-            'network': network,
-            'updated_after': self._updated_after(max_age_days),
+            'network': network
         }
         try:
             result = self.client.query(query, parameters=params).result_rows
@@ -487,27 +581,36 @@ class ClickHouseStorage:
     def get_operators_with_validator_counts(self, network, max_age_days: int | None = None):
         query = """
             WITH
-            toDateTime(%(updated_after)s) AS updated_after
+                toDateTime(%(updated_after)s) AS updated_after,
+                %(network)s                   AS network_param,
+
+                lc AS (
+                    SELECT
+                        network,
+                        operator_id,
+                        argMax(validator_count, updated_at) AS validator_count,
+                        max(updated_at)                     AS counts_latest_at
+                    FROM validator_counts
+                    WHERE network = network_param
+                    GROUP BY network, operator_id
+                )
+
             SELECT
-            o.network        AS network,
-            o.operator_id    AS operator_id,
-            o.operator_name  AS operator_name,
-            o.is_vo          AS is_vo,
-            o.is_private     AS is_private,
-            /* display count only if its latest row is fresh */
-            IF(lc.counts_latest_at >= updated_after, lc.validator_count, NULL) AS validator_count
+                o.network       AS network,
+                o.operator_id   AS operator_id,
+                o.operator_name AS operator_name,
+                o.is_vo         AS is_vo,
+                o.is_private    AS is_private,
+                IF(lc.counts_latest_at >= updated_after /* AND lc.validator_count > 0 */, lc.validator_count, NULL) AS validator_count
             FROM operators AS o
-            LEFT JOIN (
-            SELECT network, operator_id, validator_count, counts_latest_at
-            FROM validator_counts_latest
-            WHERE network = %(network)s
-            ) AS lc
-            ON lc.network = o.network
+            LEFT JOIN lc
+                ON lc.network = o.network
             AND lc.operator_id = o.operator_id
-            WHERE o.network = %(network)s
-            AND (
+            WHERE
+                o.network = network_param
+                AND (
                     o.updated_at >= updated_after
-                OR coalesce(lc.counts_latest_at, toDateTime('1970-01-01')) >= updated_after
+                    OR coalesce(lc.counts_latest_at, toDateTime('1970-01-01')) >= updated_after
                 )
             ORDER BY o.operator_id
             SETTINGS join_use_nulls = 1

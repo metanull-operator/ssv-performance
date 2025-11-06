@@ -122,6 +122,11 @@ def get_operator_performance_data(network: str, days: int, metric_type: str,
     date_from_vc = (date.today() - timedelta(hours=36)).isoformat()
 
     sql = """
+        WITH
+            toDate(%(date_from)s)      AS date_from,
+            today()                    AS date_to,
+            toDate(%(date_from_vc)s)   AS counts_from
+
         SELECT
             o.operator_id   AS operator_id,
             o.operator_name AS operator_name,
@@ -134,36 +139,36 @@ def get_operator_performance_data(network: str, days: int, metric_type: str,
         FROM operators AS o
 
         LEFT JOIN (
-        SELECT
-            network,
-            operator_id,
-            metric_date,
-            argMax(metric_value, last_row_at) AS metric_value
-        FROM performance_daily
-        WHERE network = %(network)s
-            AND metric_type = %(metric_type)s
-            AND metric_date BETWEEN toDate(%(date_from)s) AND today()
-        GROUP BY network, operator_id, metric_date
+            SELECT
+                network,
+                operator_id,
+                metric_date,
+                metric_value
+            FROM performance_daily
+            WHERE network = %(network)s
+                AND metric_type = %(metric_type)s
+                AND metric_date BETWEEN date_from AND date_to
         ) AS p
         ON p.network = o.network
-        AND p.operator_id = o.operator_id
+            AND p.operator_id = o.operator_id
 
         LEFT JOIN (
-        SELECT
-            network,
-            operator_id,
-            argMax(validator_count, counts_latest_at) AS validator_count
-        FROM validator_counts_latest
-        WHERE network = %(network)s
-            AND counts_latest_at >= toDateTime(%(date_from_vc)s)
-        GROUP BY network, operator_id
+            SELECT
+                network,
+                operator_id,
+                argMax(validator_count, (metric_date, updated_at)) AS validator_count,
+                argMax(metric_date, (metric_date, updated_at))     AS latest_metric_date
+            FROM validator_counts
+            WHERE network = %(network)s
+            GROUP BY network, operator_id
+            HAVING latest_metric_date >= counts_from
         ) AS lc
         ON lc.network = o.network
-        AND lc.operator_id = o.operator_id
+            AND lc.operator_id = o.operator_id
 
         WHERE o.network = %(network)s
-        AND (
-                coalesce(p.metric_value, 0) > 0
+            AND (
+                    coalesce(p.metric_value, 0) > 0
                 OR coalesce(lc.validator_count, 0) > 0
             )
         ORDER BY o.operator_id, p.metric_date

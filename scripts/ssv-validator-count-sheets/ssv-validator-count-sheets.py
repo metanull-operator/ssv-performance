@@ -67,29 +67,34 @@ def get_operator_validator_count_data(network: str, days: int, clickhouse_passwo
     date_from_vc = (date.today() - timedelta(hours=36)).isoformat()
 
     query = """
+        WITH
+            toDate(%(date_from)s) AS date_from,
+            toDate(now('UTC'))    AS date_to
+
         SELECT
-            o.operator_id   AS operator_id,
-            o.operator_name AS operator_name,
-            o.is_vo         AS is_vo,
-            o.is_private    AS is_private,
-            o.address       AS address,
-            v.metric_date   AS metric_date,
+            o.operator_id     AS operator_id,
+            o.operator_name   AS operator_name,
+            o.is_vo           AS is_vo,
+            o.is_private      AS is_private,
+            o.address         AS address,
+            v.metric_date     AS metric_date,
             v.validator_count AS validator_count
         FROM operators AS o
 
         LEFT JOIN (
-        SELECT
-            network,
-            operator_id,
-            metric_date,
-            argMax(validator_count, last_row_at) AS validator_count
-        FROM validator_counts_daily
-        WHERE network = %(network)s
-            AND metric_date BETWEEN toDate(%(date_from)s) AND today()
-        GROUP BY network, operator_id, metric_date
+            SELECT
+                network,
+                operator_id,
+                metric_date,
+                argMax(validator_count, (metric_date, updated_at)) AS validator_count
+            FROM validator_counts
+            WHERE network = %(network)s
+                AND metric_date BETWEEN date_from AND date_to
+            GROUP BY
+                network, operator_id, metric_date
         ) AS v
         ON v.network = o.network
-        AND v.operator_id = o.operator_id
+            AND v.operator_id = o.operator_id
 
         WHERE o.network = %(network)s
             AND coalesce(v.validator_count, 0) > 0

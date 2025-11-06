@@ -7,7 +7,7 @@ from common.config import *
 ##
 def operator_threshold_alert_24h(operator, threshold):
 
-    logging.debug(f"Operator {operator[FIELD_OPERATOR_ID]}: Checking 24h data point against threshold {threshold}")
+#    logging.debug(f"Operator {operator[FIELD_OPERATOR_ID]}: Checking 24h data point against threshold {threshold}")
 
     try:
         # If we have no data points, then there are no alerts

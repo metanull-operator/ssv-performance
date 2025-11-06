@@ -17,9 +17,10 @@ def bundle_messages(messages, max_length=MAX_DISCORD_MESSAGE_LENGTH):
         if len(cur_bundle) + len(message) + 1 > max_length:  # +1 for the newline character
             bundles.append(cur_bundle)  # Over length, so save the current bundle and start a new one
             cur_bundle = message  # Current message becomes first in new bundle
+        elif not cur_bundle.strip():
+            cur_bundle = message
         else:
-            # Room for more message. Add it to the end of the current bundle
-            cur_bundle += "\n" + message if cur_bundle else message
+            cur_bundle += "\n" + message
 
     # Add the cur_bundle if there's anything there
     if cur_bundle:

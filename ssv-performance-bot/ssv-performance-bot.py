@@ -28,6 +28,8 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description="SSV Verified Operator Committee Discord bot")
     parser.add_argument('--mentions-30d', action='store_true',
                         help='Include 30-day performance mentions in daily messages')
+    parser.add_argument('--mentions-removed', action='store_true',
+                        help='Include mentions in daily messages for removed operators with active validators')
     parser.add_argument("--network",
                         default=os.environ.get("NETWORK", "mainnet"),
                         help="Network to query (default: mainnet)")
@@ -62,7 +64,7 @@ def parse_arguments():
     except ValueError:
         raise ValueError(f"Invalid ID(s) in --dm_recipients: {args.dm_recipients}")
 
-    return args.network, args.discord_token_file, args.channel_id, args.alert_time, args.extra_message, dm_recipients, args.log_level, args.mentions_30d, args.clickhouse_password_file, args.instant_alerts
+    return args.network, args.discord_token_file, args.channel_id, args.alert_time, args.extra_message, dm_recipients, args.log_level, args.mentions_30d, args.clickhouse_password_file, args.instant_alerts, args.mentions_removed
 
 
 ##
@@ -88,7 +90,7 @@ async def main():
 
     # Parse arguments and environment variables
     try:
-        network, discord_token_file, channel_id, alert_time, extra_message, dm_recipients, log_level, mentions_30d, clickhouse_password_file, instant_alerts = parse_arguments()
+        network, discord_token_file, channel_id, alert_time, extra_message, dm_recipients, log_level, mentions_30d, clickhouse_password_file, instant_alerts, mentions_removed = parse_arguments()
     except SystemExit as e:
         if e.code != 0:
             logging.error("Argument parsing failed", exc_info=True)
@@ -142,13 +144,14 @@ async def main():
                 sys.exit(1)
 
             if loop_tasks is None:
-                loop_tasks = LoopTasks(network, bot, channel, alert_time, extra_message, dm_recipients, mentions_30d)
+                loop_tasks = LoopTasks(network, bot, channel, alert_time, extra_message, dm_recipients, mentions_30d=mentions_30d, mentions_removed=mentions_removed)
                 bot.loop.create_task(loop_tasks.start_tasks())
                 logging.info("Loop tasks started successfully.")
 
                 if instant_alerts:
                     logging.info("Instant alerts enabled, sending initial alert message.")
-                    bot.loop.create_task(loop_tasks.performance_status_all_loop())              
+                    bot.loop.create_task(loop_tasks.performance_status_all_loop())
+                    bot.loop.create_task(loop_tasks.daily_notification_task())           
             else:
                 logging.info("Loop tasks already initialized, skipping restart.")
         except Exception as e:

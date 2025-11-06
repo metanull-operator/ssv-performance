@@ -21,7 +21,7 @@ def create_subscriber_mentions(guild, subscriptions, operator_ids, notification_
 
     user_ids = get_operator_subscriptions_by_type(subscriptions, operator_ids, notification_type)
 
-    mention_msg = "\n"
+    mention_msg = ""
     for user_id in user_ids:
 
         # If dm_recipients is provided, only include those users. For QA/testing,
@@ -37,11 +37,13 @@ def create_subscriber_mentions(guild, subscriptions, operator_ids, notification_
             if len(mention_msg) + len(mention) + 1 > MAX_DISCORD_MESSAGE_LENGTH:  # +1 for whitespace
                 messages.append(mention_msg)
                 mention_msg = "\n" + mention
+            elif not mention_msg.strip():
+                mention_msg += mention
             else:
                 mention_msg += ' ' + mention
 
     # Flush any remaining message text
     if mention_msg:
-        messages.append(mention_msg)
+        messages.append("\n" + mention_msg)
 
     return messages

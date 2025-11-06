@@ -10,7 +10,7 @@ from bot.bot_messages_alerts import send_vo_threshold_messages
 
 class LoopTasks:
 
-    def __init__(self, network, bot, channel, notification_time_str, extra_message, dm_recipients=[], mentions_30d=False):
+    def __init__(self, network, bot, channel, notification_time_str, extra_message, dm_recipients=[], mentions_30d=False, mentions_removed=False):
         self.network = network
         self.bot = bot
         self.extra_message = extra_message
@@ -19,6 +19,7 @@ class LoopTasks:
         self.notification_time = datetime.strptime(notification_time_str, "%H:%M").time()
         self.dm_recipients = dm_recipients
         self.mentions_30d = mentions_30d
+        self.mentions_removed = mentions_removed
 
 
     ##
@@ -112,7 +113,11 @@ class LoopTasks:
                 logging.warning("Subscription data unavailable.")
 
             # Set periods for which users will be mentioned based on configuration
-            mention_periods = ['24h', '30d'] if self.mentions_30d else ['24h']
+            mention_periods = ['24h']
+            if self.mentions_30d:
+                mention_periods.append('30d')
+            if self.mentions_removed:
+                mention_periods.append('removed')
 
             # Send alerts messages and mentions to the channel
             await send_vo_threshold_messages(self.channel, perf_data, extra_message=self.extra_message,
