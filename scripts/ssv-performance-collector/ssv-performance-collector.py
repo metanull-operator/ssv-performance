@@ -281,8 +281,11 @@ def _chunks(seq, size):
         
 
 def upsert_daily_partition(client, table: str, network: str, source: str, target_date):
+    # Inline SETTINGS so the mutation is synchronous; clickhouse_connect opens
+    # a fresh session per command, so a separate `SET mutations_sync = 2` is lost.
     client.command(
-        f"ALTER TABLE {table} DELETE WHERE network=%(net)s AND source=%(src)s AND metric_date=%(dt)s",
+        f"ALTER TABLE {table} DELETE WHERE network=%(net)s AND source=%(src)s AND metric_date=%(dt)s "
+        f"SETTINGS mutations_sync = 2",
         parameters={'net': network, 'src': source, 'dt': target_date}
     )
 
@@ -322,6 +325,7 @@ def insert_clickhouse_performance_data(client, network, operators, target_date, 
             validator_count,
             operator_fee,
             operator.get("owner_address", ""),
+            None,  # vo_demoted_at: cleared whenever the API is returning the operator
             now
         ))
 
@@ -335,18 +339,17 @@ def insert_clickhouse_performance_data(client, network, operators, target_date, 
                  len(operator_rows), len(performance_rows), len(operator_fees_rows))
 
     # 1) Operators: per-ID delete-then-insert (keeps older operators not seen today)
-    client.command("SET mutations_sync = 2")
-
     BATCH = 1000
     for ids_chunk in _chunks(operator_ids, BATCH):
         client.command(
-            "ALTER TABLE operators DELETE WHERE network=%(net)s AND operator_id IN %(ids)s",
+            "ALTER TABLE operators DELETE WHERE network=%(net)s AND operator_id IN %(ids)s "
+            "SETTINGS mutations_sync = 2",
             parameters={"net": network, "ids": ids_chunk}
         )
     if operator_rows:
         client.insert('operators', operator_rows, column_names=[
             'network','operator_id','operator_name','is_vo','is_private',
-            'validator_count','operator_fee','address','updated_at'
+            'validator_count','operator_fee','address','vo_demoted_at','updated_at'
         ])
 
     # 2) Performance (DAILY UPSERT): wipe this date, then insert today's rows
@@ -381,6 +384,89 @@ def insert_clickhouse_validator_count_data(client, network, validator_counts, ta
     ])
 
 
+def sweep_stale_verified_operators(client, network, todays_operator_ids, staleness_days,
+                                   min_coverage, min_operators):
+    """
+    Demote is_vo=1 operators whose DB record hasn't been refreshed from the API
+    within `staleness_days`. Skips the sweep if today's fetch doesn't look healthy,
+    so an API outage can't silently strip verified status from everyone.
+    """
+    today_count = len(todays_operator_ids)
+
+    if today_count < min_operators:
+        logging.warning(
+            "VO_SWEEP: skipping — today's fetch (%d ops) below absolute floor (%d).",
+            today_count, min_operators
+        )
+        return
+
+    res = client.query(
+        "SELECT uniqExact(operator_id) FROM operators "
+        "WHERE network = %(net)s AND updated_at >= now() - INTERVAL %(days)s DAY",
+        parameters={'net': network, 'days': staleness_days}
+    )
+    recent_count = res.result_rows[0][0] if res.result_rows else 0
+    if recent_count > 0 and today_count < min_coverage * recent_count:
+        logging.warning(
+            "VO_SWEEP: skipping — today's fetch (%d) is below %.0f%% of operators "
+            "seen in the last %d days (%d); possible API degradation.",
+            today_count, min_coverage * 100, staleness_days, recent_count
+        )
+        return
+
+    # Pick the latest row per operator so duplicate MergeTree rows don't
+    # cause a single operator to be demoted (or re-inserted) multiple times.
+    res = client.query(
+        "SELECT operator_id, operator_name, is_private, validator_count, operator_fee, address "
+        "FROM ("
+        "    SELECT "
+        "        operator_id, "
+        "        argMax(operator_name, updated_at)    AS operator_name, "
+        "        argMax(is_private, updated_at)       AS is_private, "
+        "        argMax(validator_count, updated_at)  AS validator_count, "
+        "        argMax(operator_fee, updated_at)     AS operator_fee, "
+        "        argMax(address, updated_at)          AS address, "
+        "        argMax(is_vo, updated_at)            AS latest_is_vo, "
+        "        max(updated_at)                      AS latest_at "
+        "    FROM operators "
+        "    WHERE network = %(net)s "
+        "    GROUP BY operator_id"
+        ") "
+        "WHERE latest_is_vo = 1 "
+        "AND latest_at < now() - INTERVAL %(days)s DAY",
+        parameters={'net': network, 'days': staleness_days}
+    )
+    stale = [row for row in res.result_rows if row[0] not in todays_operator_ids]
+
+    if not stale:
+        logging.info("VO_SWEEP: no stale verified operators found.")
+        return
+
+    stale_ids = [row[0] for row in stale]
+    logging.info(
+        "VO_SWEEP: demoting %d verified operators stale >= %d days (sample: %s).",
+        len(stale_ids), staleness_days, stale_ids[:20]
+    )
+
+    for ids_chunk in _chunks(stale_ids, 1000):
+        client.command(
+            "ALTER TABLE operators DELETE WHERE network=%(net)s AND operator_id IN %(ids)s "
+            "SETTINGS mutations_sync = 2",
+            parameters={"net": network, "ids": ids_chunk}
+        )
+
+    now = datetime.now(timezone.utc)
+    demoted_date = now.date()
+    rows = [
+        (network, op_id, name, 0, is_priv, vc, fee, addr, demoted_date, now)
+        for (op_id, name, is_priv, vc, fee, addr) in stale
+    ]
+    client.insert('operators', rows, column_names=[
+        'network', 'operator_id', 'operator_name', 'is_vo', 'is_private',
+        'validator_count', 'operator_fee', 'address', 'vo_demoted_at', 'updated_at'
+    ])
+
+
 def read_clickhouse_password_from_file(password_file_path):
     with open(password_file_path, 'r') as file:
         return file.read().strip()
@@ -406,7 +492,20 @@ def main():
                         default=os.environ.get("COLLECTOR_LOG_LEVEL", "INFO"),
                         help='Set the logging level')
     parser.add_argument('--beacon-api-url', type=str, default=os.environ.get("BEACON_API_URL"),
-                        help='Base URL for Beacon API')    
+                        help='Base URL for Beacon API')
+    parser.add_argument('--vo-staleness-days', type=int,
+                        default=int(os.environ.get('VO_STALENESS_DAYS', 14)),
+                        help='Demote is_vo=1 operators whose DB row has not been refreshed '
+                             'within this many days (default 14)')
+    parser.add_argument('--vo-sweep-min-operators', type=int,
+                        default=int(os.environ.get('VO_SWEEP_MIN_OPERATORS', 100)),
+                        help='Skip the VO sweep unless today\'s fetch returned at least this '
+                             'many operators (absolute sanity floor, default 100)')
+    parser.add_argument('--vo-sweep-min-coverage', type=float,
+                        default=float(os.environ.get('VO_SWEEP_MIN_COVERAGE', 0.9)),
+                        help='Skip the VO sweep unless today\'s fetch covers at least this '
+                             'fraction of operators seen in the last --vo-staleness-days days '
+                             '(default 0.9)')
     args = parser.parse_args()
 
     if args.beacon_api_url:
@@ -455,6 +554,15 @@ def main():
 
     insert_clickhouse_performance_data(client, args.network, operators, target_date, IMPORT_SOURCE)
     insert_clickhouse_validator_count_data(client, args.network, final_active_counts, target_date, IMPORT_SOURCE)
+
+    sweep_stale_verified_operators(
+        client,
+        args.network,
+        set(operators.keys()),
+        args.vo_staleness_days,
+        args.vo_sweep_min_coverage,
+        args.vo_sweep_min_operators,
+    )
 
 
 if __name__ == "__main__":

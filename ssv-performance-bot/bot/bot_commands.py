@@ -6,7 +6,7 @@ from discord.commands import Option
 from storage.storage_factory import StorageFactory
 from bot.bot_messages_subscriptions import create_subscriptions_message
 from bot.bot_messages_operator import send_operator_performance_messages
-from bot.bot_messages_alerts import respond_vo_threshold_messages
+from bot.bot_messages_alerts import respond_vo_threshold_messages, respond_removed_validators_messages
 from bot.bot_messages_fees import respond_fee_messages
 from bot.bot_messages_operators import respond_operator_messages
 from bot.bot_messages import send_direct_message_test
@@ -68,6 +68,7 @@ Thresholds displayed are subject to change.
 - /info: Display bot information
 - /operator [operator_ids...]: Show recent performance for specified operator IDs
 - /operators: Show information about all operators
+- /removed-operators: List removed operators that still have active validators
 - /subscribe daily|alerts [operator_ids...]: Subscribe to daily operator performance direct messages or threshold alert @mentions
 - /subscriptions: List all operator IDs to which you are subscribed for daily operator performance messages or threshold alert @mentions
 - /unsubscribe daily|alerts [operator_ids...]: Unsubscribe from daily operator performance direct messages or threshold alert @mentions
@@ -334,6 +335,35 @@ Thresholds displayed are subject to change.
         except Exception as e:
             logging.error(f"Error fetching alerts: {e}", exc_info=True)
             await ctx.followup.send("An error occurred while fetching alerts.", ephemeral=True)
+
+
+    ##
+    ## Discord /removed-operators command
+    ##
+    @bot.slash_command(name='removed-operators', description='List removed operators that still have active validators')
+    async def removed_operators(ctx):
+        logging.info("/removed-operators called")
+
+        if not allowed_channel(ctx):
+            await ctx.respond("VO Performance Bot commands are not allowed in this channel.", ephemeral=True)
+            return
+
+        await ctx.defer()
+
+        try:
+            storage = StorageFactory.get_storage('ssv_performance')
+            perf_data = storage.get_latest_performance_data(network)
+
+            if not perf_data:
+                logging.error(f"removed_operators() perf_data empty")
+                await ctx.followup.send("Performance data not available.", ephemeral=True)
+                return
+
+            await respond_removed_validators_messages(ctx, perf_data, extra_message=extra_message)
+
+        except Exception as e:
+            logging.error(f"Error fetching removed operators: {e}", exc_info=True)
+            await ctx.followup.send("An error occurred while fetching removed operator data.", ephemeral=True)
 
 
     ##

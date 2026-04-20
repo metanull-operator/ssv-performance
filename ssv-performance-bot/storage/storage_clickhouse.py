@@ -214,7 +214,8 @@ class ClickHouseStorage:
                 lc.counts_latest_at,
                 pm24.perf_24h,
                 pm30.perf_30d,
-                o.updated_at
+                o.updated_at,
+                o.vo_demoted_at
             FROM operators AS o
             LEFT JOIN latest_counts AS lc
                 ON lc.network = o.network
@@ -273,6 +274,7 @@ class ClickHouseStorage:
                     FIELD_PERFORMANCE: {'24h': row[7], '30d': row[8]},
                     FIELD_OPERATOR_UPDATED_AT: updated_at,
                     FIELD_OPERATOR_REMOVED: is_removed,
+                    FIELD_VO_DEMOTED_AT: row[10],
                 }
 
                 if (operator_id == 14):

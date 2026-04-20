@@ -18,6 +18,7 @@ services:
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-ssv_performance}  
       CLICKHOUSE_PASSWORD_FILE: /clickhouse-password.txt    
       BOT_EXTRA_MESSAGE: ${BOT_EXTRA_MESSAGE:-}
+      BOT_ALERT_RECENTLY_REMOVED_ROLE: ${BOT_ALERT_RECENTLY_REMOVED_ROLE:-}
     volumes:
       - ./certs:/certs:ro
       - ./credentials/discord-token.txt:/discord-token.txt:ro

@@ -116,12 +116,11 @@ class LoopTasks:
             mention_periods = ['24h']
             if self.mentions_30d:
                 mention_periods.append('30d')
-            if self.mentions_removed:
-                mention_periods.append('removed')
 
             # Send alerts messages and mentions to the channel
             await send_vo_threshold_messages(self.channel, perf_data, extra_message=self.extra_message,
-                                             subscriptions=subscriptions, mention_periods=mention_periods)
+                                             subscriptions=subscriptions, mention_periods=mention_periods,
+                                             include_removed=False)
         except Exception as e:
             logging.error(f"{type(e).__name__} exception in performance_status_all_loop(): {e}", exc_info=True)
 

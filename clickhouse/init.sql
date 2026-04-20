@@ -7,11 +7,17 @@ CREATE TABLE IF NOT EXISTS default.operators (
     validator_count Nullable(UInt32),
     operator_fee Nullable(Float64),
     address String,
+    vo_demoted_at Nullable(Date),
     updated_at DateTime DEFAULT now()
 )
 ENGINE = ReplacingMergeTree(updated_at)
 PARTITION BY network
 ORDER BY (network, operator_id);
+
+-- Idempotent upgrade for existing deployments: add vo_demoted_at column if missing.
+-- Safe to run on fresh installs (CREATE TABLE above already includes it).
+ALTER TABLE default.operators
+    ADD COLUMN IF NOT EXISTS vo_demoted_at Nullable(Date) AFTER address;
 
 CREATE TABLE IF NOT EXISTS default.performance (
     network String,

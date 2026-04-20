@@ -34,6 +34,7 @@ vi .env
 Set the following environment variables in `.env`:
 
 - BOT_DISCORD_CHANNEL_ID - A single Discord channel ID on which the bot will respond to commands and post daily messages. You can find the Discord channel ID by right-clicking on the channel name and selecting `Copy Channel ID`. [Turn on Discord Developer Mode](docs/discord-developer.md) if you do not see the `Copy Channel ID` option.
+- BOT_ALERT_RECENTLY_REMOVED_ROLE - A single Discord Role ID that the bot will @mention when operators are removed from SSV API responses.
 
 Other environment variables in `.env` may be modified as necessary to suit your implementation.
 
@@ -80,6 +81,15 @@ To stop the ssv-performance-bot and ClickHouse database:
 ```bash
 docker compose -p ssv-performance down
 ```
+
+## Daily Alert Sections
+
+The bot's daily alert post to Discord (also produced on demand by the `/alerts` command) contains several sections. Each one is rendered only when it has content:
+
+- **24h < *threshold*** - Operators whose 24h performance fell below one of the configured alert thresholds.
+- **30d < *threshold*** - Operators whose 30d performance fell below one of the configured alert thresholds.
+- **Removed Operators with Active Validators** - Operators whose record has not been updated by the collector within the last 36 hours but who still have active validators. This is a short-term "heads up" indicator recomputed on every query.
+- **Recently Removed Operator(s)** - Operators whose verified status was removed by the collector's staleness sweep within the last `VO_RECENTLY_REMOVED_DAYS` days (default 3). Each entry lists the date of demotion so a missed daily post does not cause the notification to be lost entirely. When this section fires, the bot also @-mentions the Discord role configured by `BOT_ALERT_RECENTLY_REMOVED_ROLE` (role ID preferred, role name accepted as a fallback; empty to disable).
 
 ## clickhouse-import.sh
 
