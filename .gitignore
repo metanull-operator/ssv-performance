@@ -179,3 +179,69 @@ cython_debug/
 # Visual Studio Code
 .vscode/
 *.code-workspace
+
+# ==============================================================================
+# AI ASSISTANTS & TERMINAL TOOLS
+# ==============================================================================
+# Claude Code / Anthropic config, rules, and cache (e.g. settings.local.json)
+.claude/
+.claudeignore
+CLAUDE.local.md
+
+# Cline & Roo Code agents
+.cline/
+.roocode/
+
+# ==============================================================================
+# AI IDEs & EXTENSIONS (CURSOR, WINDSURF, COPILOT)
+# ==============================================================================
+# Cursor editor configurations and indexes
+.cursor/
+.cursorrules
+.cursor_mcp.json
+
+# Windsurf / Codeium Cascade state
+.windsurf/
+
+# GitHub Copilot & JetBrains AI caches
+.copilot/
+.aiassistant/
+
+# ==============================================================================
+# MACHINE LEARNING MODELS & WEIGHTS
+# ==============================================================================
+# Large model binaries and checkpoints
+*.bin
+*.onnx
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.gguf
+*.pkl
+*.h5
+
+# Shared weight storage folders
+models/
+weights/
+checkpoints/
+
+# ==============================================================================
+# LOCAL VECTOR DATABASES & EMBEDDINGS
+# ==============================================================================
+# Local instances of semantic vector stores
+.chroma/
+.pinecone/
+faiss_index/
+qdrant_storage/
+
+# ==============================================================================
+# METRICS, EXPERIMENT TRACKING & LOGS
+# ==============================================================================
+# Training dashboards and telemetry
+wandb/
+tensorboard/
+runs/
+.aim/
+.memory/
+.tasks/
