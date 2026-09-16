@@ -121,9 +121,9 @@ async def main():
         sys.exit(1)
 
     # Set up Discord bot
+    # No privileged intents needed: slash commands carry their own args
+    # (no Message Content), and mentions are built from user IDs (no Server Members).
     intents = discord.Intents.default()
-    intents.members = True
-    intents.message_content = True
 
     bot = commands.Bot(command_prefix='!', intents=intents, help_command=None)
 

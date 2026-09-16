@@ -8,11 +8,14 @@ from bot.bot_subscriptions import get_operator_subscriptions_by_type
 ## Query for guild member by user_id and return mention text
 ##
 def mention_member(guild, user_id):
-    member = guild.get_member(int(user_id))
-    if member:
-        return f"{member.mention} "
-
-    return ''
+    # A Discord mention is just <@USER_ID> -- no Member object (and no Server
+    # Members intent) required. This no longer checks that the user is still in
+    # the guild; a mention of a non-member doesn't notify anyone and renders
+    # harmlessly, so there's no functional downside for alert pings.
+    try:
+        return f"<@{int(user_id)}> "
+    except (ValueError, TypeError):
+        return ''
 
 
 ##
