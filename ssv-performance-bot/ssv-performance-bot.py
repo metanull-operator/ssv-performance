@@ -18,6 +18,13 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 
 ##
+## Interpret an environment variable as a boolean flag
+##
+def _env_flag(name):
+    return os.environ.get(name, "").strip().lower() in ("1", "true", "yes", "on")
+
+
+##
 ## Parse command-line arguments and environment variables
 ##
 def parse_arguments():
@@ -52,7 +59,9 @@ def parse_arguments():
                         default=default_dm_list,
                         help="List of Discord user IDs to which direct messages may be sent")
     parser.add_argument("--instant-alerts", action='store_true',
-                        help="Send an initial performance alert message when the bot starts")
+                        default=_env_flag("BOT_INSTANT_ALERTS"),
+                        help="Send an initial performance alert message when the bot starts. "
+                             "Also enabled by BOT_INSTANT_ALERTS=1 (default off).")
     parser.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
                         default=os.environ.get("BOT_LOG_LEVEL", "INFO"),
                         help="Set the logging level")
