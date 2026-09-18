@@ -4,8 +4,8 @@ services:
     restart: unless-stopped    
     hostname: ssv-performance-bot
     build:
-      context: .
-      dockerfile: ssv-performance-bot/Dockerfile
+      context: ssv-performance-bot
+      dockerfile: Dockerfile
     environment:
       NETWORK: ${NETWORK:-mainnet}
       BOT_DISCORD_CHANNEL_ID: ${BOT_DISCORD_CHANNEL_ID}
